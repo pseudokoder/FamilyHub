@@ -17,6 +17,11 @@
 .settings/
 *.sublime-workspace
 
+# PyCharm
+.venv/
+__pychache__/
+*.pyc
+
 # IDE - VSCode
 .vscode/*
 !.vscode/settings.json
@@ -25,6 +30,8 @@
 !.vscode/extensions.json
 
 # misc
+.env
+instance/
 /.sass-cache
 /connect.lock
 /coverage
