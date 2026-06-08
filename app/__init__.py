@@ -1,15 +1,25 @@
-from flask_bootstrap import Bootstrap5
+import os
+
 from flask import Flask
+from flask_bootstrap import Bootstrap5
 
-def create_app():
-  app = Flask(__name__)
-  bootstrap = Bootstrap5(app)
+from app.config import Config
+from app.models import db
 
-  # Config
-  app.config["SECRET_KEY"] = 'dev-key-change-later'
 
-  # Register blueprints
-  from app.routes.main import main_bp
-  app.register_blueprint(main_bp)
+def create_app(config_class=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
 
-  return app
+    # Make sure the instance/ folder exists so SQLite can create its file there.
+    os.makedirs(app.instance_path, exist_ok=True)
+
+    # Initialize extensions against this app.
+    Bootstrap5(app)
+    db.init_app(app)
+
+    # Register blueprints
+    from app.routes.main import main_bp
+    app.register_blueprint(main_bp)
+
+    return app
