@@ -1,0 +1,118 @@
+/*
+ * FamilyHub — elderly-first stylesheet.
+ *
+ * TEACHING NOTE (D277 Front-End Web Development): Bootstrap gives us a solid
+ * baseline, but its defaults are tuned for general audiences. Our primary
+ * users are aging parents, so we override a few things globally:
+ *
+ *   1. Bigger base font  — WCAG accessibility guidance: never make users
+ *      squint. 18px base instead of Bootstrap's 16px.
+ *   2. Bigger tap targets — fingers get less precise with age; every button
+ *      gets generous padding so it's hard to miss.
+ *   3. High contrast     — dark text on light backgrounds, obvious focus
+ *      rings for keyboard users.
+ *
+ * Why a separate stylesheet instead of inline styles? Separation of concerns:
+ * templates describe STRUCTURE, CSS describes PRESENTATION. One change here
+ * restyles the whole site (you'll meet this principle again in D276 Web
+ * Development Foundations).
+ */
+
+/* 1. Bigger, more readable text everywhere */
+html {
+    font-size: 18px;
+}
+
+body {
+    /* System font stack: crisp on Windows, Mac, and the parents' iPads alike */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    color: #1a1a1a;             /* near-black on white = maximum contrast */
+    background-color: #fafafa;
+}
+
+/* 2. Big, obvious, hard-to-miss buttons */
+.btn {
+    padding: 0.65rem 1.4rem;
+    font-size: 1.1rem;
+    border-radius: 0.5rem;
+}
+
+.btn-lg {
+    padding: 0.9rem 2rem;
+    font-size: 1.3rem;
+}
+
+/* Giant "dashboard" buttons on the home page — the main navigation for
+   the least tech-savvy users. One big button per activity. */
+.btn-dashboard {
+    display: block;
+    width: 100%;
+    padding: 1.5rem;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* 3. Forms that are easy to see and easy to hit */
+.form-control, .form-select {
+    font-size: 1.15rem;
+    padding: 0.65rem 0.9rem;
+}
+
+.form-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Obvious focus ring — helps keyboard users and anyone who loses the cursor */
+.form-control:focus, .btn:focus, a:focus {
+    outline: 3px solid #2563eb;
+    outline-offset: 2px;
+}
+
+/* Bigger checkboxes ("remember me", admin flags) */
+.form-check-input {
+    width: 1.4em;
+    height: 1.4em;
+}
+.form-check-label {
+    padding-left: 0.4rem;
+    font-size: 1.1rem;
+}
+
+/* Navbar: larger brand and links than Bootstrap defaults */
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+.nav-link {
+    font-size: 1.15rem;
+}
+
+/* Photo gallery: card grid with comfortable spacing */
+.photo-card img {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;          /* crop to fill — keeps the grid tidy */
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.album-card {
+    transition: box-shadow 0.15s ease-in-out;
+}
+.album-card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25); /* obvious "clickable" cue */
+}
+
+/* The photo-detail page shows the full image, never wider than the screen */
+.photo-full {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+}
+
+/* Flash messages (success/error banners) need to be unmissable */
+.alert {
+    font-size: 1.15rem;
+    padding: 1rem 1.25rem;
+}
