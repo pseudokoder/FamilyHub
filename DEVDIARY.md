@@ -211,6 +211,28 @@ Spring Security method rule.
    the hand-written upload form (see why `enctype="multipart/form-data"`
    matters)
 
+### Addendum: iPhone HEIC support + the sideways-photo bug that never was
+
+Half the family shoots on iPhone, and iPhones save **HEIC** — a format
+browsers can't display. Two new things in `photo_service`:
+
+- **Convert at the door, not on every view.** `pillow-heif` teaches Pillow
+  to read HEIC; uploads ending in `.heic`/`.heif` are re-saved as JPEG
+  (quality 90 ≈ visually lossless) *once, at upload time*. Everything on
+  disk is therefore something an `<img>` tag can show, and the gallery
+  code never needs to know HEIC existed. Paying a cost once at write time
+  to keep every read simple is a classic engineering trade
+  (D284 Software Engineering). The DB keeps `IMG_4821.heic` as the
+  original filename — honest metadata for the v2 export.
+
+- **EXIF orientation gets baked in.** Phone cameras don't rotate pixels;
+  they store the pixels sideways plus a metadata tag saying "display me
+  rotated." Re-saving an image (conversion, thumbnails) *strips that tag*,
+  which is why naive photo sites are full of sideways grandmas.
+  `ImageOps.exif_transpose()` applies the rotation to the pixels before
+  every re-save. Verified in testing with a synthetic sideways JPEG: its
+  thumbnail came out portrait, as the photographer intended.
+
 ---
 
 ## Decisions Made Without Wes
@@ -235,11 +257,11 @@ Running log of judgment calls made mid-build, per the workflow rules
    library computer.
 5. **(Ch. 2)** Password rule is "8+ characters", nothing else. Invite-only
    site, modern NIST guidance, elderly-friendly.
-6. **(Ch. 3)** **HEIC (iPhone photos) is NOT accepted yet** — Pillow needs an
-   extra library (`pillow-heif`) for it. ⚠️ *The one open question for Wes:*
-   if the parents shoot on iPhones, their camera rolls are HEIC and the
-   upload form will (politely) reject them. Adding pillow-heif + convert-to-
-   JPEG-on-upload is a small follow-up — say the word.
+6. **(Ch. 3)** ~~HEIC (iPhone photos) not accepted yet~~ — **RESOLVED
+   June 11, 2026**: Wes confirmed half the family shoots on iPhone, so
+   `pillow-heif` was added and HEIC/HEIF uploads are now accepted and
+   **converted to JPEG once, at upload time** (see the Chapter 3 addendum
+   below for why convert-at-the-door beats convert-on-view).
 7. **(Ch. 3)** No `cover_photo_id` column — the album cover is simply its
    first photo (a computed property). Simplest schema that works; a real
    column can be added later by migration without data loss.

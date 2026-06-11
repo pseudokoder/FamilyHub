@@ -18,14 +18,24 @@ import os
 import uuid
 
 from flask import current_app
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 
 from app.extensions import db
 from app.models import Album, Photo, PhotoComment
 
-# Formats Pillow handles well and browsers display natively. HEIC (newer
-# iPhones) is deliberately NOT here yet — see "Decisions Made Without Wes".
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+# Teach Pillow to read HEIC/HEIF — the format iPhones shoot by default.
+# One call at import time and Image.open() handles them like any other image.
+register_heif_opener()
+
+# Formats we accept from the upload form.
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp", "heic", "heif"}
+
+# ...but browsers can't DISPLAY HEIC, so these get converted to JPEG once,
+# at upload time. Convert at the door, not on every page view: we pay the
+# cost once and the gallery stays simple — everything on disk is something
+# an <img> tag can show.
+CONVERT_TO_JPEG = {"heic", "heif"}
 
 # Gallery thumbnails: longest side capped at 400px. The gallery page then
 # loads ~50 KB per photo instead of ~8 MB — the difference between "instant"
@@ -108,9 +118,20 @@ def save_photos(album, files, user):
         file.stream.seek(0)
 
         # Random name on disk; the human name goes in the database.
-        stored_name = f"{uuid.uuid4().hex}.{ext}"
-        full_path = os.path.join(_album_dir(album.id), stored_name)
-        file.save(full_path)
+        if ext in CONVERT_TO_JPEG:
+            # iPhone HEIC -> JPEG, once, right here. exif_transpose applies
+            # the photo's rotation metadata BEFORE we re-save, so portrait
+            # shots don't arrive sideways. quality=90 is visually lossless
+            # for family photos at a fraction of the size.
+            stored_name = f"{uuid.uuid4().hex}.jpg"
+            full_path = os.path.join(_album_dir(album.id), stored_name)
+            img = ImageOps.exif_transpose(Image.open(file.stream))
+            img.convert("RGB").save(full_path, "JPEG", quality=90)
+            ext = "jpg"
+        else:
+            stored_name = f"{uuid.uuid4().hex}.{ext}"
+            full_path = os.path.join(_album_dir(album.id), stored_name)
+            file.save(full_path)
         _make_thumbnail(full_path, ext)
 
         photo = Photo(
@@ -135,7 +156,10 @@ def _make_thumbnail(full_path, ext):
     directory, name = os.path.split(full_path)
     thumb_path = os.path.join(directory, f"thumb_{name}")
     try:
-        img = Image.open(full_path)
+        # exif_transpose first: re-saving strips the EXIF rotation tag that
+        # phone cameras rely on, so we bake the rotation into the pixels —
+        # otherwise every portrait-mode thumbnail would lie on its side.
+        img = ImageOps.exif_transpose(Image.open(full_path))
         # thumbnail() keeps the aspect ratio — no squashed grandchildren.
         img.thumbnail(THUMBNAIL_MAX)
         if ext in ("jpg", "jpeg") and img.mode != "RGB":
