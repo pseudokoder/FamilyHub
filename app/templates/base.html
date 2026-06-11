@@ -59,9 +59,19 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('timeline.list_events') }}">Timeline</a>
                 </li>
-                {% if current_user.is_admin %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('admin.list_users') }}">Manage Users</a>
+                    <a class="nav-link" href="{{ url_for('main.about') }}">About</a>
+                </li>
+                {% if current_user.is_admin %}
+                {# Admin tools live in one dropdown so the everyday menu
+                   stays short for everyone else. #}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{{ url_for('admin.list_users') }}">Manage Users</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.site_settings') }}">Site Settings</a></li>
+                    </ul>
                 </li>
                 {% endif %}
             </ul>

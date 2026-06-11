@@ -16,5 +16,6 @@ from app.extensions import db  # noqa: F401  (re-exported on purpose)
 from app.models.family_member import FamilyMember  # noqa: E402,F401
 from app.models.photo import Album, Photo, PhotoComment  # noqa: E402,F401
 from app.models.post import Post, PostComment  # noqa: E402,F401
+from app.models.site_setting import SiteSetting  # noqa: E402,F401
 from app.models.timeline import TimelineEvent  # noqa: E402,F401
 from app.models.user import User  # noqa: E402,F401

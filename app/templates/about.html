@@ -1,0 +1,29 @@
+{# The About page — admin-written text via Site Settings. #}
+{% extends "base.html" %}
+
+{% block title %}About{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1>About This Site</h1>
+        <div class="fs-5 lh-lg my-4">
+            {% if about_text %}
+                {{ about_text | family_text }}
+            {% else %}
+                <p class="text-muted">
+                    Nothing written here yet — an admin can fill this in
+                    under Admin → Site Settings.
+                </p>
+            {% endif %}
+        </div>
+
+        {% if contact_text %}
+        <h2 class="h4 mt-5">Questions? Stuck?</h2>
+        <div class="fs-5 lh-lg">
+            {{ contact_text | family_text }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

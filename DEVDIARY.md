@@ -323,6 +323,31 @@ admin deletes (like posts and photos).
 
 ---
 
+## Chapter 7 — Admin Site Settings
+
+**What was built:** the "basic site text fields" panel from CLAUDE.md —
+tagline, About page text, contact info, and a dashboard banner photo —
+at Admin → Site Settings.
+
+**The new modeling idea: a key/value table**
+([site_setting.py](app/models/site_setting.py)). Settings come and go;
+adding a *column* per setting means a migration every time, adding a *row*
+is free. The trade-off (the DB can't type-check values) is fine for display
+strings and wrong for real entities — knowing which is which is the lesson.
+`settings_service.set_value` is an **upsert**: update the row if it exists,
+insert it if not.
+
+**The hero image** reuses every upload lesson from Chapter 3 (allow-list,
+Pillow verification, EXIF transpose, re-encode to JPEG) plus one new one:
+it's shrunk to ≤1600px because it loads on *every* dashboard visit. One
+fixed filename — a new upload replaces the old; it's a banner, not an
+archive. Served through the login wall like all family images.
+
+Note the navbar change: admin tools moved into one **Admin dropdown** so
+the everyday menu stays short for the parents.
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules
@@ -385,6 +410,13 @@ Running log of judgment calls made mid-build, per the workflow rules
     dates, and honest "unknown" beats invented precision.
 18. **(Ch. 6)** Timeline delete is creator-or-admin (like posts/photos),
     even though editing is open to all — consistent, learnable rules.
+19. **(Ch. 7)** The About page and hero image are **behind the login**, not
+    public — admin-written text and a family banner photo are family
+    content under the CLAUDE.md PII rule. The public home page stays
+    generic.
+20. **(Ch. 7)** Starter settings were seeded (tagline, about, contact
+    placeholder text) so the feature is visibly working on first login —
+    edit them at Admin → Site Settings.
 
 ---
 

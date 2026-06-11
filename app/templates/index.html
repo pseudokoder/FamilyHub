@@ -9,8 +9,17 @@
 {% block content %}
 {% if current_user.is_authenticated %}
 
-    <h1 class="display-5 mb-4">Welcome, {{ current_user.display_name }}!</h1>
+    {% if hero_exists is defined and hero_exists %}
+    <img src="{{ url_for('main.hero_image') }}" alt="Our family"
+         class="img-fluid rounded mb-4 w-100" style="max-height: 320px; object-fit: cover;">
+    {% endif %}
+
+    <h1 class="display-5 mb-2">Welcome, {{ current_user.display_name }}!</h1>
+    {% if tagline is defined and tagline %}
+    <p class="lead">{{ tagline }}</p>
+    {% else %}
     <p class="lead">What would you like to do today?</p>
+    {% endif %}
 
     <div class="row mt-4">
         <div class="col-md-8 col-lg-6">

@@ -14,9 +14,10 @@ from functools import wraps
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
+from app.forms.admin_forms import SiteSettingsForm
 from app.forms.auth_forms import CreateUserForm, ResetPasswordForm
 from app.models import User, db
-from app.services import user_service
+from app.services import settings_service, user_service
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -45,6 +46,28 @@ def admin_required(view):
 @admin_required
 def list_users():
     return render_template("admin/users.html", users=user_service.get_all_users())
+
+
+@admin_bp.route("/settings", methods=["GET", "POST"])
+@admin_required
+def site_settings():
+    """The 'basic site text fields' panel from CLAUDE.md: tagline, about,
+    contact, and the dashboard hero photo."""
+    form = SiteSettingsForm(data=settings_service.get_all())
+    if form.validate_on_submit():
+        settings_service.set_value("tagline", form.tagline.data)
+        settings_service.set_value("about_text", form.about_text.data)
+        settings_service.set_value("contact_text", form.contact_text.data)
+        if form.hero.data and form.hero.data.filename:
+            error = settings_service.save_hero_image(form.hero.data)
+            if error:
+                flash(error, "danger")
+                return render_template("admin/settings.html", form=form)
+        flash("Site settings saved.", "success")
+        return redirect(url_for("admin.site_settings"))
+    return render_template(
+        "admin/settings.html", form=form, hero_exists=settings_service.hero_exists()
+    )
 
 
 @admin_bp.route("/users/new", methods=["GET", "POST"])
