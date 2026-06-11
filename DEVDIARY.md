@@ -301,6 +301,28 @@ than the birth date with a friendly message.
 
 ---
 
+## Chapter 6 — Family Timeline
+
+**What was built:** the family's history as one chronological page, grouped
+by decade, editable by every member.
+
+**The interesting problem: partial dates.** Family history knows "June 12,
+1947" but also just "1890". A DATE column can't say "month unknown" — so
+[TimelineEvent](app/models/timeline.py) stores three integers: `year`
+(required), `month` and `day` (nullable). The page then shows exactly as
+much as we know — `1890`, `March 1962`, `June 12, 1947` — because **honest
+data beats fake precision** (storing 1890 as "Jan 1, 1890" would look exact
+and lie). Sorting uses portable `COALESCE(month, 0)` so year-only events
+lead their year, identically on SQLite and MySQL.
+
+Two small new tools in the templates/forms toolbox: Jinja's
+`loop.changed()` prints each decade header exactly once, and a second
+custom validator rejects a day given without a month. Permissions follow
+the established family rules: everyone edits (like the wiki), creator or
+admin deletes (like posts and photos).
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules
@@ -358,6 +380,11 @@ Running log of judgment calls made mid-build, per the workflow rules
     [[links]] connect entries to each other; connecting them to photo
     albums needs a tagging system (v2 candidate). Logged so it isn't
     forgotten.
+17. **(Ch. 6)** Timeline dates = three integer columns (year/month/day,
+    month+day nullable) instead of a DATE — family history has partial
+    dates, and honest "unknown" beats invented precision.
+18. **(Ch. 6)** Timeline delete is creator-or-admin (like posts/photos),
+    even though editing is open to all — consistent, learnable rules.
 
 ---
 

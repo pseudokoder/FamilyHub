@@ -1,0 +1,61 @@
+{# The family timeline — every event in order, grouped by decade. #}
+{% extends "base.html" %}
+
+{% block title %}Family Timeline{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1>🕰️ Family Timeline</h1>
+    <a href="{{ url_for('timeline.create_event') }}" class="btn btn-primary btn-lg">
+        ➕ Add an Event
+    </a>
+</div>
+
+{% if events %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        {% for event in events %}
+        {# loop.changed(): Jinja remembers the last value and is True when it
+           changes — a one-line way to print each decade header exactly once. #}
+        {% if loop.changed(event.decade) %}
+        <h2 class="display-6 border-bottom pb-1 mt-4">{{ event.decade }}s</h2>
+        {% endif %}
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div>
+                        <span class="badge text-bg-primary fs-6 mb-2">{{ event.display_date }}</span>
+                        <h3 class="h4 mb-1">{{ event.title }}</h3>
+                        {% if event.description %}
+                        <div>{{ event.description | family_text }}</div>
+                        {% endif %}
+                        <small class="text-muted">added by {{ event.creator.display_name }}</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-outline-secondary btn-sm"
+                           href="{{ url_for('timeline.edit_event', event_id=event.id) }}">✏️ Edit</a>
+                        {% if current_user.is_admin or event.created_by == current_user.id %}
+                        <form method="post"
+                              action="{{ url_for('timeline.delete_event', event_id=event.id) }}"
+                              onsubmit="return confirm('Remove this event from the family timeline? This cannot be undone.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">🗑</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <p class="lead">The timeline is empty — what's the earliest family story you know?</p>
+    <a href="{{ url_for('timeline.create_event') }}" class="btn btn-primary btn-lg px-5">
+        Add the First Event
+    </a>
+</div>
+{% endif %}
+{% endblock %}
