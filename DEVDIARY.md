@@ -90,7 +90,53 @@ on the internet with an unauthenticated setup endpoint.
 
 ## Chapter 2 — Authentication
 
-*(Being written — filled in when this step lands.)*
+**What was built:** the complete login system. Admin-created accounts only —
+there is **no public registration page anywhere**; the family is invite-only.
+
+### The pieces, in reading order
+
+1. [app/extensions.py](app/extensions.py) — every Flask extension is born
+   here, empty, and wired to the app in the factory (`init_app` pattern —
+   the file's docstring explains why this kills circular imports).
+2. [app/models/user.py](app/models/user.py) — the `User` model + the
+   `user_loader` that turns a session cookie back into a person.
+3. [app/services/user_service.py](app/services/user_service.py) — create
+   user, authenticate, reset password. **All** business logic; no HTTP.
+4. [app/forms/auth_forms.py](app/forms/auth_forms.py) — login/create/reset
+   forms with server-side validation rules.
+5. [app/routes/auth.py](app/routes/auth.py) — login/logout routes (thin!).
+6. [app/routes/admin.py](app/routes/admin.py) — `@admin_required` decorator
+   + the user-management pages at `/admin/users`.
+7. [app/templates/base.html](app/templates/base.html) — the master layout
+   (template inheritance), navbar, flash messages.
+
+### The security decisions and WHY
+
+| Decision | Why | WGU course |
+|----------|-----|------------|
+| **bcrypt** password hashing (Flask-Bcrypt) | One-way + salted: a stolen database still reveals zero passwords. Chosen over Werkzeug's default specifically because Spring Security's `BCryptPasswordEncoder` reads the *same hash format* — v1 password hashes migrate to v2 **unchanged**. | D315 Network & Security |
+| **CSRF tokens on every POST** (global `CSRFProtect`) | Another site can't trick a logged-in parent's browser into submitting our forms. Secure-by-default beats per-form opt-in. | D315 |
+| **Session cookies: HttpOnly + SameSite=Lax**, `Secure` flag env-driven | JS can't steal the cookie (XSS defense); browsers won't send it cross-site (CSRF defense #2); HTTPS-only in production. | D315 |
+| **Vague login errors** ("username and password don't match") | Saying *which* was wrong lets attackers harvest valid usernames. | D315 |
+| **`?next=` redirect validation** in auth.py | Prevents "open redirect" phishing — we only follow relative, on-site paths. | D315 |
+| **Logout is POST, not GET** | GET must never change state; a GET logout is triggerable by an `<img>` tag on any website. Also keeps routes REST-clean for v2's Angular API. | D284 / D288 |
+| **403 vs 401 vs 404** | `@admin_required` aborts with 403 ("I know you; no"). Unknown ids give 404. Precision in status codes = a clean REST API later. | D288 |
+| **First admin via `flask create-admin`** | No "setup page" ever sits unauthenticated on the internet; only someone with SSH/keyboard access can bootstrap. | D284 |
+
+Fun real-world bug from testing: the smoke test searched the page for
+`don't match` and failed — because Jinja **autoescapes** the apostrophe to
+`don&#39;t`. Autoescaping is itself a security feature (it's what blocks XSS
+from user input), and it's on by default in Flask templates.
+
+### Elderly-first touches
+
+- "Keep me logged in" pre-checked, 30-day cookie — no password gauntlet
+  every visit.
+- 8+ character passwords, no complexity theater (modern NIST guidance:
+  length beats symbols; symbols breed sticky notes).
+- Friendly, blame-free error messages; forms re-render with input intact.
+- Login page tells you exactly what to do if you forgot your password:
+  call Wes.
 
 ---
 
@@ -109,6 +155,19 @@ Running log of judgment calls made mid-build, per the workflow rules
    python-dotenv is installed; it holds only the non-secret `FLASK_APP=run.py`
    so `flask run`/`flask db` work without manual environment setup. Secrets
    still live only in `.env`.
+2. **(Ch. 1)** `create-admin` shipped with the auth commit, not the CLI
+   commit as planned — the command needs the `User` model to exist, and
+   commits should be self-contained.
+3. **(Ch. 2)** `User` is a separate table from `FamilyMember`. Login accounts
+   and family-tree people are different concepts: great-grandpa gets a wiki
+   page, never a password. They can be linked with a foreign key later
+   without a schema rewrite.
+4. **(Ch. 2)** "Keep me logged in" defaults to **checked** with a 30-day
+   cookie. ~8 trusted users on personal devices; convenience for elderly
+   users outweighs shared-computer risk. Flip the default if anyone uses a
+   library computer.
+5. **(Ch. 2)** Password rule is "8+ characters", nothing else. Invite-only
+   site, modern NIST guidance, elderly-friendly.
 
 ---
 

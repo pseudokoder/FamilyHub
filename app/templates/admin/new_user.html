@@ -1,0 +1,19 @@
+{# Admin: create an account for a family member. There is NO public signup —
+   this page (plus the create-admin CLI command) is the only door in. #}
+{% extends "base.html" %}
+{% from "bootstrap5/form.html" import render_form %}
+
+{% block title %}New Account{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1 class="mb-2">Create a Family Account</h1>
+        <p class="text-muted mb-4">
+            Pick a simple username and a temporary password, then share both
+            with the family member. You can reset the password any time.
+        </p>
+        {{ render_form(form, button_style="primary btn-lg") }}
+    </div>
+</div>
+{% endblock %}

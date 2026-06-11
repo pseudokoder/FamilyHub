@@ -1,0 +1,22 @@
+{# The login page. render_form is Bootstrap-Flask's macro: it renders every
+   field of our LoginForm class — labels, inputs, the hidden CSRF token, and
+   any validation error messages — as proper Bootstrap markup, from one line.
+   The form's FIELDS are defined in code (app/forms/auth_forms.py), so
+   validation rules live in exactly one place. #}
+{% extends "base.html" %}
+{% from "bootstrap5/form.html" import render_form %}
+
+{% block title %}Log In{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+        <h1 class="mb-4">Log In</h1>
+        {{ render_form(form, button_style="primary btn-lg w-100") }}
+        <p class="text-muted mt-4">
+            Forgot your password? Call or text Wes — he can set a new one
+            for you in about ten seconds.
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{# Admin: list of every account, with per-user actions. #}
+{% extends "base.html" %}
+
+{% block title %}Manage Users{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Family Accounts</h1>
+    <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
+        ➕ New Account
+    </a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Display name</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Member since</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.display_name }}</td>
+                <td><code>{{ user.username }}</code></td>
+                <td>
+                    {% if user.is_admin %}
+                        <span class="badge text-bg-primary">Admin</span>
+                    {% else %}
+                        <span class="badge text-bg-secondary">Member</span>
+                    {% endif %}
+                </td>
+                {# strftime formats the timestamp for humans —
+                   "June 11, 2026" beats an ISO timestamp on an admin page. #}
+                <td>{{ user.created_at.strftime("%B %d, %Y") }}</td>
+                <td class="text-end">
+                    <a class="btn btn-outline-secondary btn-sm"
+                       href="{{ url_for('admin.reset_password', user_id=user.id) }}">
+                        Reset password
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

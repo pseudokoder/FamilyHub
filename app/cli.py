@@ -46,3 +46,40 @@ def register_cli(app):
         """
         upgrade()
         click.echo("Database is up to date (all migrations applied).")
+
+    @app.cli.command("create-admin")
+    @click.argument("username")
+    @click.option(
+        "--display-name",
+        default=None,
+        help="Name shown to the family (defaults to the username).",
+    )
+    @click.option(
+        "--password",
+        prompt=True,              # ask interactively if not given as a flag...
+        hide_input=True,          # ...without echoing it to the screen,
+        confirmation_prompt=True, # ...and ask twice to catch typos.
+        help="Password for the new admin (omit to be prompted securely).",
+    )
+    def create_admin_command(username, display_name, password):
+        """Create an ADMIN account — the bootstrap step after init-db.
+
+        Every other account is created by an admin inside the app
+        (/admin/users). But the FIRST admin has to come from somewhere,
+        and a terminal command is the safe somewhere: only a person with
+        SSH access to the server (or sitting at this keyboard) can run it.
+        """
+        from app.services import user_service
+
+        try:
+            user = user_service.create_user(
+                username=username,
+                display_name=display_name or username,
+                password=password,
+                is_admin=True,
+            )
+        except ValueError as err:
+            # raise a ClickException so the command exits with status 1 —
+            # scripts and deploy pipelines can detect the failure.
+            raise click.ClickException(str(err))
+        click.echo(f"Admin account '{user.username}' created. You can log in now.")

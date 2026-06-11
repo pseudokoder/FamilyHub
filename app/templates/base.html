@@ -1,0 +1,99 @@
+{# ============================================================================
+   base.html — the master layout every page inherits from.
+
+   TEACHING NOTE (D276 Web Development Foundations): this is Jinja2
+   **template inheritance** — the DRY principle applied to HTML. The navbar,
+   stylesheet, and flash-message area are written ONCE here; every page
+   "extends" this file and only fills in the {% block %} holes. Change the
+   navbar here, every page updates.
+
+   v2 mapping: in Angular this becomes the root AppComponent with a
+   <router-outlet> where {% block content %} sits today.
+============================================================================ #}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    {# viewport tag = the page scales properly on phones and iPads —
+       half the family will use this from a recliner, not a desk. #}
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Home{% endblock %} — FamilyHub</title>
+
+    {# Bootstrap-Flask serves Bootstrap from the installed package — no CDN.
+       The site works even if a third-party CDN is down or blocked. #}
+    {{ bootstrap.load_css() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('main.home') }}">👪 FamilyHub</a>
+
+        {# The "hamburger" button — Bootstrap collapses the menu on small
+           screens so nav links stay big and tappable. #}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#mainNav" aria-controls="mainNav"
+                aria-expanded="false" aria-label="Show menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+            {# current_user comes from Flask-Login and is available in every
+               template automatically. Logged-out visitors see almost nothing —
+               all family content stays behind the login wall. #}
+            {% if current_user.is_authenticated %}
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.home') }}">Home</a>
+                </li>
+                {% block nav_links %}{% endblock %}
+                {% if current_user.is_admin %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('admin.list_users') }}">Manage Users</a>
+                </li>
+                {% endif %}
+            </ul>
+            <span class="navbar-text text-white me-3">
+                Hi, {{ current_user.display_name }}!
+            </span>
+            {# Logout is a POST form, not a link — state-changing actions are
+               never GET (see the teaching note on the logout route). The
+               hidden csrf_token proves the click came from OUR page. #}
+            <form method="post" action="{{ url_for('auth.logout') }}" class="d-flex">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-light">Log Out</button>
+            </form>
+            {% else %}
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="btn btn-light" href="{{ url_for('auth.login') }}">Log In</a>
+                </li>
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<main class="container pb-5">
+    {# Flash messages: one-time banners ("Welcome back!", "Photo uploaded!").
+       Flask stores them in the session; they show once, then vanish.
+       The category (success/danger/warning) picks the Bootstrap color. #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"
+                    aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+{# Bootstrap's JavaScript (menus, dismissible alerts) loads at the END of the
+   body so the visible page never waits on a script — pages feel faster. #}
+{{ bootstrap.load_js() }}
+</body>
+</html>
