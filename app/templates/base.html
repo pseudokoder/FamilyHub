@@ -47,7 +47,9 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('main.home') }}">Home</a>
                 </li>
-                {% block nav_links %}{% endblock %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('photos.list_albums') }}">Photo Albums</a>
+                </li>
                 {% if current_user.is_admin %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin.list_users') }}">Manage Users</a>

@@ -14,15 +14,9 @@
 
     <div class="row mt-4">
         <div class="col-md-8 col-lg-6">
-            {% if photos_ready is defined and photos_ready %}
             <a href="{{ url_for('photos.list_albums') }}" class="btn btn-primary btn-dashboard">
                 📷 Photo Albums
             </a>
-            {% else %}
-            <button class="btn btn-primary btn-dashboard" disabled>
-                📷 Photo Albums (coming this week!)
-            </button>
-            {% endif %}
             <button class="btn btn-secondary btn-dashboard" disabled>
                 📖 Family History Blog (coming soon)
             </button>

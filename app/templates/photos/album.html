@@ -1,0 +1,75 @@
+{# One album: the upload box up top (the #1 action!), then the photo grid. #}
+{% extends "base.html" %}
+
+{% block title %}{{ album.title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('photos.list_albums') }}">Photo Albums</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">{{ album.title }}</li>
+    </ol>
+</nav>
+
+<h1>{{ album.title }}</h1>
+{% if album.description %}
+<p class="lead">{{ album.description }}</p>
+{% endif %}
+
+{# ---- The upload box ----------------------------------------------------
+   Hand-written form (instead of render_form) because file uploads need two
+   things worth seeing in plain HTML at least once:
+     * enctype="multipart/form-data" — without it the browser sends only
+       the fileNAMES, not the files. The #1 upload gotcha.
+     * multiple on the input — select a whole batch at once.
+   The csrf_token line is what render_form was adding invisibly. #}
+<div class="card bg-light my-4">
+    <div class="card-body">
+        <h2 class="h4 mb-3">Add photos to this album</h2>
+        <form method="post" enctype="multipart/form-data"
+              action="{{ url_for('photos.upload_photos', album_id=album.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label for="photos" class="form-label">
+                    1. Choose one or more photos from your computer or phone
+                </label>
+                <input class="form-control form-control-lg" type="file"
+                       id="photos" name="photos" multiple
+                       accept=".jpg,.jpeg,.png,.gif,.webp">
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">
+                2. ⬆ Upload Photos
+            </button>
+        </form>
+    </div>
+</div>
+
+{# ---- The photo grid ---------------------------------------------------- #}
+{% if album.photos %}
+<div class="row g-4">
+    {% for photo in album.photos %}
+    <div class="col-6 col-md-4 col-lg-3">
+        <div class="card photo-card h-100 position-relative">
+            <img src="{{ url_for('photos.photo_thumb', photo_id=photo.id) }}"
+                 alt="{{ photo.caption or photo.original_filename }}">
+            <div class="card-body py-2">
+                <a href="{{ url_for('photos.view_photo', photo_id=photo.id) }}"
+                   class="stretched-link text-decoration-none">
+                    {{ photo.caption or "View & comment" }}
+                </a>
+                {% if photo.comments %}
+                <span class="badge text-bg-secondary">💬 {{ photo.comments | length }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="lead text-center text-muted py-4">
+    This album is empty so far — add the first photos with the box above!
+</p>
+{% endif %}
+{% endblock %}

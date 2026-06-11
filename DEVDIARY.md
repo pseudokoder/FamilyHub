@@ -140,9 +140,76 @@ from user input), and it's on by default in Flask templates.
 
 ---
 
-## Chapter 3 — Photo Albums
+## Chapter 3 — Photo Albums (the #1 feature)
 
-*(Being written — filled in when this step lands.)*
+**What was built:** albums, multi-photo upload with thumbnails, a gallery,
+per-photo comment threads, and safe deletion. The parents can now upload
+photos.
+
+### The data model
+
+```
+users 1──* albums 1──* photos 1──* photo_comments
+```
+
+Three classic one-to-many relationships
+([app/models/photo.py](app/models/photo.py)). The database stores *metadata*;
+the image bytes live on disk in `uploads/photos/<album_id>/` — **outside**
+`app/static`, outside git. The golden rule: the DB remembers files, it
+doesn't contain them.
+
+### How an upload actually works (read photo_service.save_photos)
+
+1. **Extension allow-list** — jpg/jpeg/png/gif/webp, judged by the *last*
+   extension so `trick.jpg.exe` is seen as `.exe` and rejected.
+2. **Content check** — Pillow must parse the bytes as a real image.
+   A virus renamed to `vacation.jpg` fails here. Names lie; bytes don't.
+3. **Random UUID filename** on disk — kills name collisions (`IMG_0001.jpg`
+   × 50) and path tricks (`..\..\evil`). The original name is kept in the DB
+   for humans.
+4. **Thumbnail** — Pillow shrinks a copy to ≤400px. The gallery loads ~50 KB
+   per photo instead of ~8 MB; on the parents' connection that's the
+   difference between "instant" and "broken".
+5. One **transaction commit** for the whole batch (D427).
+
+Forgiving by design: 9 good photos + 1 broken one = 9 saved, and a message
+naming exactly which one failed. Never all-or-nothing, never a bare "error".
+
+### Photos are served through the login wall
+
+`/photos/<id>/file` and `/photos/<id>/thumb` are normal Flask routes with
+`@login_required` — verified in testing: an anonymous request for the image
+bytes gets redirected to the login page. If photos lived in `app/static`,
+anyone holding a URL could fetch them forever. This is THE reason for the
+uploads-outside-web-root rule in CLAUDE.md.
+
+### Authorization vs authentication (worth memorizing)
+
+- *Authentication*: who are you? (`@login_required` — everyone sees photos)
+- *Authorization*: may YOU do this? (`photo_service.can_delete` — only the
+  uploader or an admin may delete a photo)
+
+The rule lives in ONE service function; routes ask it. In v2 this becomes a
+Spring Security method rule.
+
+### Elderly-first UX choices
+
+- Upload box at the TOP of the album page, steps numbered **1.** choose,
+  **2.** upload. Big file input, big button.
+- Whole album/photo cards are clickable (`stretched-link`), not tiny links.
+- Deleting asks "Delete this photo for everyone? This cannot be undone."
+  — destructive actions always confirm (CLAUDE.md rule).
+- Friendly empty states ("yours can be the very first!") instead of blank
+  pages.
+
+### Files to read, in order
+
+1. [app/models/photo.py](app/models/photo.py)
+2. [app/services/photo_service.py](app/services/photo_service.py)
+3. [app/routes/photos.py](app/routes/photos.py)
+4. [app/templates/photos/album.html](app/templates/photos/album.html) —
+   the hand-written upload form (see why `enctype="multipart/form-data"`
+   matters)
 
 ---
 
@@ -168,6 +235,23 @@ Running log of judgment calls made mid-build, per the workflow rules
    library computer.
 5. **(Ch. 2)** Password rule is "8+ characters", nothing else. Invite-only
    site, modern NIST guidance, elderly-friendly.
+6. **(Ch. 3)** **HEIC (iPhone photos) is NOT accepted yet** — Pillow needs an
+   extra library (`pillow-heif`) for it. ⚠️ *The one open question for Wes:*
+   if the parents shoot on iPhones, their camera rolls are HEIC and the
+   upload form will (politely) reject them. Adding pillow-heif + convert-to-
+   JPEG-on-upload is a small follow-up — say the word.
+7. **(Ch. 3)** No `cover_photo_id` column — the album cover is simply its
+   first photo (a computed property). Simplest schema that works; a real
+   column can be added later by migration without data loss.
+8. **(Ch. 3)** `Photo.position` column exists NOW, but drag-to-rearrange UI
+   is deferred. Adding the column later would mean migrating + backfilling
+   every album; adding the UI later costs nothing.
+9. **(Ch. 3)** Comments attach to *photos*, not albums — CLAUDE.md says
+   "comment on photos", and a photo-level thread is where "who is that in
+   the back row?" conversations actually happen.
+10. **(Ch. 3)** Album deletion has no UI yet — only photo deletion
+    (uploader or admin). Deleting a whole album is rare, high-stakes, and a
+    natural fit for the admin panel feature later.
 
 ---
 

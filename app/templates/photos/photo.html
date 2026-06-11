@@ -1,0 +1,77 @@
+{# One photo, full size, with its comment thread. #}
+{% extends "base.html" %}
+{% from "bootstrap5/form.html" import render_form %}
+
+{% block title %}Photo in {{ photo.album.title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('photos.list_albums') }}">Photo Albums</a>
+        </li>
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('photos.view_album', album_id=photo.album_id) }}">
+                {{ photo.album.title }}
+            </a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">Photo</li>
+    </ol>
+</nav>
+
+<div class="text-center mb-3">
+    <img class="photo-full"
+         src="{{ url_for('photos.photo_file', photo_id=photo.id) }}"
+         alt="{{ photo.caption or photo.original_filename }}">
+</div>
+
+{% if photo.caption %}
+<p class="lead text-center">{{ photo.caption }}</p>
+{% endif %}
+<p class="text-muted text-center">
+    Added by {{ photo.uploader.display_name }}
+    on {{ photo.uploaded_at.strftime("%B %d, %Y") }}
+</p>
+
+{% if can_delete %}
+<div class="text-center mb-4">
+    {# Destructive action -> POST form + a confirmation dialog. The browser
+       confirm() is simple but does the job CLAUDE.md asks for: nothing is
+       destroyed by one accidental tap. #}
+    <form method="post"
+          action="{{ url_for('photos.delete_photo', photo_id=photo.id) }}"
+          onsubmit="return confirm('Delete this photo for everyone? This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger">🗑 Delete this photo</button>
+    </form>
+</div>
+{% endif %}
+
+<hr>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h2 class="h4 mb-3">💬 Comments</h2>
+
+        {% for comment in photo.comments %}
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                <p class="mb-1">{{ comment.body }}</p>
+                <small class="text-muted">
+                    — {{ comment.author.display_name }},
+                    {{ comment.created_at.strftime("%B %d, %Y") }}
+                </small>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted">No comments yet — say something about this photo!</p>
+        {% endfor %}
+
+        <div class="mt-3">
+            {{ render_form(comment_form,
+                           action=url_for('photos.add_comment', photo_id=photo.id),
+                           button_style="primary btn-lg") }}
+        </div>
+    </div>
+</div>
+{% endblock %}
