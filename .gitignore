@@ -35,6 +35,9 @@ instance/
 # Uploaded family photos live outside the web root and outside git.
 # They are real family data — backups handle them, not version control.
 uploads/
+# Backup zips and data exports — generated artifacts, often large.
+backups/
+export/
 /.sass-cache
 /connect.lock
 /coverage

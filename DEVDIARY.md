@@ -348,6 +348,60 @@ the everyday menu stays short for the parents.
 
 ---
 
+## Chapter 8 — Backups (required feature, finally built)
+
+**What was built:** [backup_service.py](app/services/backup_service.py),
+the `flask backup` / `flask restore-backup` commands, and the Admin →
+Backups page ("trigger/verify backups" from CLAUDE.md) with download links.
+
+**One backup = one zip:** `familyhub.db` (a snapshot) + `uploads/…` (every
+photo) + `manifest.json` (what's inside, so the backup can prove its own
+completeness years later).
+
+The three lessons baked into the code:
+
+1. **You can't just copy a live SQLite file** — a write mid-copy corrupts
+   the copy. `sqlite3`'s `backup()` API takes a consistent snapshot even
+   while the app runs.
+2. **An unverified backup is a hope, not a backup.** `verify_backup()`
+   CRC-checks every zip member, cross-checks the manifest, and runs
+   SQLite's own `PRAGMA integrity_check` on the database *inside the zip*.
+   The CLI exits non-zero on failure so cron monitoring notices.
+3. **A backup on the same disk dies with the disk.** `upload_backup()`
+   ships the zip to the Lightsail bucket when `BACKUP_S3_BUCKET` is set
+   (boto3 reads AWS keys from `.env`). Unconfigured (like local dev), it
+   says so honestly instead of erroring. The Download button on the admin
+   page is the manual off-site option meanwhile.
+
+### The restore procedure (TESTED June 11, 2026)
+
+```bash
+# on the server: stop the app first
+sudo systemctl stop familyhub        # (or however gunicorn runs)
+flask restore-backup backups/familyhub-backup-YYYYMMDD-HHMMSS.zip
+sudo systemctl start familyhub
+```
+
+`restore-backup` refuses unverifiable zips, parks the current DB as
+`familyhub.db.pre-restore` (an undo button for the undo button), and is
+**CLI-only on purpose** — restoring is a deliberate two-hands operation,
+never a web button. The round-trip test: photo uploaded → backup → marker
+row added → restore → marker gone, photo intact. It works; it's been run.
+
+### Nightly automation (deployment step, documented now)
+
+On the Lightsail server, one crontab line (`crontab -e`):
+
+```cron
+15 3 * * * cd /home/ubuntu/FamilyHub && .venv/bin/flask backup >> backups/backup.log 2>&1
+```
+
+3:15 AM nightly: create, verify, upload off-site, log the result. Plus
+periodic Lightsail instance snapshots from the AWS console (a whole-machine
+backup that catches everything else).
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules

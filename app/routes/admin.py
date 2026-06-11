@@ -11,13 +11,16 @@ hand-rolled version of exactly that annotation.
 
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask import (
+    Blueprint, abort, current_app, flash, redirect, render_template,
+    send_from_directory, url_for,
+)
 from flask_login import current_user, login_required
 
 from app.forms.admin_forms import SiteSettingsForm
 from app.forms.auth_forms import CreateUserForm, ResetPasswordForm
 from app.models import User, db
-from app.services import settings_service, user_service
+from app.services import backup_service, settings_service, user_service
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -67,6 +70,50 @@ def site_settings():
         return redirect(url_for("admin.site_settings"))
     return render_template(
         "admin/settings.html", form=form, hero_exists=settings_service.hero_exists()
+    )
+
+
+@admin_bp.route("/backups")
+@admin_required
+def backups():
+    """The 'trigger/verify backups' panel from CLAUDE.md."""
+    return render_template("admin/backups.html", backups=backup_service.list_backups())
+
+
+@admin_bp.route("/backups/run", methods=["POST"])
+@admin_required
+def run_backup():
+    """Back Up Now: create, verify, and (if configured) upload — then tell
+    the admin exactly what happened, honestly."""
+    path = backup_service.create_backup()
+    report = backup_service.verify_backup(path)
+    if report["ok"]:
+        flash(
+            f"Backup created and verified — DB ({report['db_tables']} tables) "
+            f"plus {report['file_count']} uploaded file(s).",
+            "success",
+        )
+        uploaded, message = backup_service.upload_backup(path)
+        flash(message, "success" if uploaded else "warning")
+    else:
+        flash("Backup FAILED verification: " + "; ".join(report["problems"]), "danger")
+    return redirect(url_for("admin.backups"))
+
+
+@admin_bp.route("/backups/<filename>/download")
+@admin_required
+def download_backup(filename):
+    """Let the admin pull a backup zip to their own computer — a manual
+    off-site copy that works even before the bucket is set up.
+
+    SECURITY: the filename comes from the URL, so we only accept names that
+    appear in our own backup list — no path tricks can reach other files.
+    """
+    known = {b["filename"] for b in backup_service.list_backups()}
+    if filename not in known:
+        abort(404)
+    return send_from_directory(
+        current_app.config["BACKUP_FOLDER"], filename, as_attachment=True
     )
 
 

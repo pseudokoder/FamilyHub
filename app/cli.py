@@ -83,3 +83,57 @@ def register_cli(app):
             # scripts and deploy pipelines can detect the failure.
             raise click.ClickException(str(err))
         click.echo(f"Admin account '{user.username}' created. You can log in now.")
+
+    @app.cli.command("backup")
+    def backup_command():
+        """Create, verify, and (if configured) upload a full backup.
+
+        This is the command the nightly cron job runs on the Lightsail
+        server — see DEVDIARY Chapter 8 for the crontab line. A backup that
+        fails verification exits non-zero so cron's mail/monitoring notices.
+        """
+        from app.services import backup_service
+
+        path = backup_service.create_backup()
+        click.echo(f"Backup written: {path}")
+
+        report = backup_service.verify_backup(path)
+        if not report["ok"]:
+            raise click.ClickException(
+                "Backup FAILED verification: " + "; ".join(report["problems"])
+            )
+        click.echo(
+            f"Verified: zip is sound, DB has {report['db_tables']} tables, "
+            f"{report['file_count']} uploaded file(s) included."
+        )
+
+        uploaded, message = backup_service.upload_backup(path)
+        click.echo(message)
+
+    @app.cli.command("restore-backup")
+    @click.argument("zip_path")
+    @click.option("--yes", is_flag=True, help="Skip the confirmation prompt (for scripts).")
+    def restore_backup_command(zip_path, yes):
+        """DESTRUCTIVE: replace the database + uploads with a backup's contents.
+
+        Deliberately CLI-only — restoring is rare, drastic, and should be a
+        deliberate two-hands operation, never a web button. In production:
+        stop gunicorn first, restore, start it again.
+        """
+        from app.services import backup_service
+
+        if not yes:
+            click.confirm(
+                "This OVERWRITES the current database and uploaded files "
+                "with the backup's contents. Continue?",
+                abort=True,  # 'no' aborts the whole command safely
+            )
+        try:
+            report = backup_service.restore_backup(zip_path)
+        except (RuntimeError, OSError) as err:
+            raise click.ClickException(str(err))
+        click.echo(
+            f"Restored. DB has {report['db_tables']} tables, "
+            f"{report['file_count']} file(s) back in place. "
+            "(The old DB was parked next to it as *.pre-restore.)"
+        )

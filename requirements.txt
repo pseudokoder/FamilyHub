@@ -22,4 +22,5 @@ Bootstrap-Flask==2.5.0      # Bootstrap 5 helpers for Jinja templates
 python-dotenv==1.2.2        # Loads .env so secrets stay out of the code and out of git
 Pillow==12.2.0              # Image processing: validate uploads + generate thumbnails
 pillow-heif==1.4.0          # Teaches Pillow to read iPhone HEIC photos (converted to JPEG at upload)
+boto3==1.43.28              # AWS SDK — ships backup zips to the Lightsail bucket
 WTForms==3.2.2              # The form/validation engine Flask-WTF builds on

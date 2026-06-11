@@ -71,3 +71,11 @@ class Config:
     # phone photos (~3-10 MB); stops a 4 GB video upload from filling the disk
     # (video is explicitly a v2 feature).
     MAX_CONTENT_LENGTH = 25 * 1024 * 1024
+
+    # --- Backups ------------------------------------------------------------
+    # Where backup zips are written locally (git-ignored). The OFF-SITE copy
+    # goes to the Lightsail bucket named in BACKUP_S3_BUCKET — read straight
+    # from the environment by backup_service, alongside the AWS credentials.
+    BACKUP_FOLDER = os.environ.get(
+        "BACKUP_FOLDER", os.path.join(basedir, "backups")
+    )

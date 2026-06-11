@@ -1,0 +1,52 @@
+{# Admin: trigger a backup, see the ones that exist, download for off-site. #}
+{% extends "base.html" %}
+
+{% block title %}Backups{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1>💾 Backups</h1>
+    <form method="post" action="{{ url_for('admin.run_backup') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary btn-lg">▶ Back Up Now</button>
+    </form>
+</div>
+
+<p class="text-muted">
+    Each backup is one zip: the whole database plus every uploaded photo,
+    verified after creation. On the server a nightly job runs this
+    automatically; the button is for "right before I change something big".
+    Restoring is a deliberate terminal operation —
+    <code>flask restore-backup &lt;file&gt;</code> (see DEVDIARY Chapter 8).
+</p>
+
+{% if backups %}
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr><th>Backup</th><th>Created</th><th>Size</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for backup in backups %}
+            <tr>
+                <td><code>{{ backup.filename }}</code></td>
+                <td>{{ backup.created.strftime("%B %d, %Y at %I:%M %p") }}</td>
+                {# filesizeformat: Jinja built-in, bytes -> "12.3 MB" #}
+                <td>{{ backup.bytes | filesizeformat }}</td>
+                <td class="text-end">
+                    <a class="btn btn-outline-secondary btn-sm"
+                       href="{{ url_for('admin.download_backup', filename=backup.filename) }}">
+                        ⬇ Download
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="lead text-center text-muted py-4">
+    No backups yet — press “Back Up Now” to make the first one.
+</p>
+{% endif %}
+{% endblock %}
