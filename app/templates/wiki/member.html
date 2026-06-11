@@ -1,0 +1,81 @@
+{# One person's wiki page — Wikipedia-style: facts up top, story below. #}
+{% extends "base.html" %}
+
+{% block title %}{{ member.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('wiki.list_members') }}">Family Wiki</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">{{ member.name }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h1 class="mb-1">{{ member.name }}</h1>
+                <p class="text-muted fs-5">
+                    {% if member.lifespan %}{{ member.lifespan }}{% endif %}
+                    {% if member.lifespan and member.location %} · {% endif %}
+                    {{ member.location or "" }}
+                </p>
+            </div>
+            <a class="btn btn-outline-secondary"
+               href="{{ url_for('wiki.edit_member', member_id=member.id) }}">
+                ✏️ Edit This Page
+            </a>
+        </div>
+
+        {# The infobox — Wikipedia's little fact table, family edition. #}
+        {% if member.birth_date or member.death_date %}
+        <div class="card bg-light my-3" style="max-width: 26rem;">
+            <div class="card-body py-2">
+                {% if member.birth_date %}
+                <div><strong>Born:</strong> {{ member.birth_date.strftime("%B %d, %Y") }}</div>
+                {% endif %}
+                {% if member.death_date %}
+                <div><strong>Died:</strong> {{ member.death_date.strftime("%B %d, %Y") }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="fs-5 lh-lg my-4">
+            {% if member.bio %}
+                {{ member.bio | family_text }}
+            {% else %}
+                <p class="text-muted">
+                    Nobody has written {{ member.name }}'s story yet —
+                    press “Edit This Page” and start it!
+                </p>
+            {% endif %}
+        </div>
+
+        {% if member.last_editor %}
+        <p class="text-muted">
+            <small>Last edited by {{ member.last_editor.display_name }}{% if member.updated_at %}
+            on {{ member.updated_at.strftime("%B %d, %Y") }}{% endif %}</small>
+        </p>
+        {% endif %}
+
+        {% if current_user.is_admin %}
+        {# NOTE: the confirm() text is deliberately generic — interpolating a
+           user-entered name into JavaScript breaks on names like O'Brien
+           (the apostrophe ends the JS string early). User data and script
+           code don't mix; that rule has no exceptions. #}
+        <form method="post" class="mt-4"
+              action="{{ url_for('wiki.delete_member', member_id=member.id) }}"
+              onsubmit="return confirm('Delete this person\'s page for everyone? This cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+                🗑 Delete this page (admin)
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

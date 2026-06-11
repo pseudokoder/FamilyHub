@@ -264,6 +264,43 @@ second feature needed it — DRY in action, not in advance.
 
 ---
 
+## Chapter 5 — Family Member Wiki
+
+**What was built:** a Wikipedia-style page per family member — name,
+lifespan, location, a long-form story — editable by **every** authenticated
+member (collaborative by design; only deletion is admin-only).
+
+**Schema evolution, live:** the Day-3 `FamilyMember` stub (name, location)
+grew six columns: `bio`, `birth_date`, `death_date`, `created_by`,
+`updated_by`, `updated_at`. Read the migration in `migrations/versions/` —
+that's a real table gaining columns without losing rows. Note
+`server_default=""` on `bio`: a NOT NULL column can only be added to a
+table with existing rows if the database knows what to put in them.
+
+**The [[wikilink]] feature** (extended
+[text_service.py](app/services/text_service.py)): typing `[[Jo O'Brien]]`
+in any memory or bio becomes a link to Jo's wiki page. Unknown names render
+as plain text — never a broken link. This delivers CLAUDE.md's "posts
+linkable to wiki entries" without teaching anyone HTML. Verified both ways:
+bios link to bios, blog posts link to bios.
+
+**A real bug worth remembering:** the first wiki migration **crashed** with
+`ValueError: Constraint must have a name`. Why: SQLite can't `ALTER TABLE`
+in place, so Alembic rebuilds the table ("batch mode") — and it refuses to
+copy constraints it can't name, and SQLAlchemy doesn't name them by default.
+The fix is a **naming convention** declared once on the metadata
+([app/extensions.py](app/extensions.py)): now every constraint gets a
+predictable name like `fk_photos_album_id_albums`, on SQLite today and
+MySQL in v2. The Alembic docs call this setup step "strongly recommended";
+now you know why firsthand.
+
+**Also new:** a custom WTForms validator
+([wiki_forms.py](app/forms/wiki_forms.py)) — any method named
+`validate_<field>` runs automatically; ours rejects a death date earlier
+than the birth date with a friendly message.
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules
@@ -312,6 +349,15 @@ Running log of judgment calls made mid-build, per the workflow rules
 13. **(Ch. 4)** No pagination on lists (posts, albums) — at family scale
     (tens of posts, not thousands) it's complexity with no payoff. Easy to
     add later if the archive grows huge.
+14. **(Ch. 5)** The wiki page IS the `FamilyMember` row (extended), not a
+    separate `WikiEntry` table — one real-world concept, one table.
+15. **(Ch. 5)** No edit/revision history on wiki pages (real Wikipedia has
+    one; ours has "last edited by"). A full history table is a natural v2
+    feature; v1 trusts ~8 family members.
+16. **(Ch. 5)** Photo embedding inside wiki pages/posts is deferred —
+    [[links]] connect entries to each other; connecting them to photo
+    albums needs a tagging system (v2 candidate). Logged so it isn't
+    forgotten.
 
 ---
 

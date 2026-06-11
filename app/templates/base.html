@@ -53,6 +53,9 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('posts.list_posts') }}">Memories</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('wiki.list_members') }}">Family Wiki</a>
+                </li>
                 {% if current_user.is_admin %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('admin.list_users') }}">Manage Users</a>

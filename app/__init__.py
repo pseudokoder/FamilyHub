@@ -50,12 +50,14 @@ def create_app(config_class=Config):
     from app.routes.main import main_bp
     from app.routes.photos import photos_bp
     from app.routes.posts import posts_bp
+    from app.routes.wiki import wiki_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(photos_bp)
     app.register_blueprint(posts_bp)
+    app.register_blueprint(wiki_bp)
 
     # Custom Jinja filters — tiny functions templates can pipe text through:
     # {{ post.body | family_text }} renders typed text as safe HTML.
