@@ -46,7 +46,45 @@ and this file.
 
 ## Chapter 1 — Database Migrations & CLI Commands
 
-*(Being written — filled in when this step lands.)*
+**What was built:** Flask-Migrate wired into the app factory, a `migrations/`
+folder (committed to git), the first migration script, and a custom
+`flask init-db` command ([app/cli.py](app/cli.py)).
+
+### Why migrations instead of `db.create_all()`?
+
+`db.create_all()` reads your models and creates whatever tables don't exist.
+Sounds fine — until you *change* a model. It won't alter existing tables, it
+keeps no history, and your laptop's database silently drifts away from the
+server's. **Migrations are version control for your database schema**: every
+change is a dated script in `migrations/versions/` that can be applied
+(`upgrade`) or rolled back (`downgrade`) on any machine, in order.
+
+The daily workflow from now on:
+
+1. Edit/add a model class in `app/models/`
+2. `flask db migrate -m "describe the change"` — Alembic *compares your
+   models to the live database* and autogenerates the script
+3. **Read the generated script** (autogenerate is good, not perfect)
+4. `flask init-db` (or `flask db upgrade`) — apply it
+
+WGU connection: D426 Data Management – Foundations (schema design) +
+D197 Version Control (why history matters). v2 equivalent: **Flyway** — same
+concept, SQL scripts instead of Python.
+
+### Why a custom `init-db` command?
+
+`flask init-db` is the one blessed way to set up or upgrade a database — on
+your desktop, the ThinkPad, or the Lightsail server over SSH. It's a thin
+wrapper around `flask db upgrade` today and will grow setup chores (like
+ensuring the uploads folder exists) without anyone having to relearn anything.
+Doing this in the terminal instead of a "setup page" means the app is never
+on the internet with an unauthenticated setup endpoint.
+
+### Files to read, in order
+
+1. [app/__init__.py](app/__init__.py) — `migrate.init_app(app, db)` + `register_cli(app)`
+2. [app/cli.py](app/cli.py) — the `init-db` command
+3. [migrations/versions/](migrations/versions/) — the first migration: `create family_member table`
 
 ---
 
