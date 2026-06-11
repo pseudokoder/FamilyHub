@@ -33,12 +33,5 @@ class UploadPhotosForm(FlaskForm):
     submit = SubmitField("⬆ Upload Photos")
 
 
-class CommentForm(FlaskForm):
-    body = TextAreaField(
-        "Write a comment",
-        validators=[
-            DataRequired(message="Type your comment first, then press the button."),
-            Length(max=2000),
-        ],
-    )
-    submit = SubmitField("Add Comment")
+# CommentForm used to live here — it moved to comment_forms.py the day the
+# blog needed the identical form. See the teaching note there (DRY).

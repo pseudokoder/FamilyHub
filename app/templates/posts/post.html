@@ -1,0 +1,71 @@
+{# One memory, full length, with its comment thread. #}
+{% extends "base.html" %}
+{% from "bootstrap5/form.html" import render_form %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('posts.list_posts') }}">Family Memories</a>
+        </li>
+        <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <h1>{{ post.title }}</h1>
+        <p class="text-muted">
+            by {{ post.author.display_name }}
+            on {{ post.created_at.strftime("%B %d, %Y") }}
+            {% if post.was_edited %}
+            <em>(edited {{ post.updated_at.strftime("%B %d, %Y") }})</em>
+            {% endif %}
+        </p>
+
+        {# family_text: the post body, safely escaped, with paragraphs.
+           See app/services/text_service.py for the XSS lesson. #}
+        <div class="fs-5 lh-lg my-4">
+            {{ post.body | family_text }}
+        </div>
+
+        {% if can_modify %}
+        <div class="d-flex gap-2 mb-4">
+            <a class="btn btn-outline-secondary"
+               href="{{ url_for('posts.edit_post', post_id=post.id) }}">✏️ Edit</a>
+            <form method="post"
+                  action="{{ url_for('posts.delete_post', post_id=post.id) }}"
+                  onsubmit="return confirm('Delete this memory for everyone? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-danger">🗑 Delete</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <hr>
+
+        <h2 class="h4 mb-3">💬 Comments</h2>
+        {% for comment in post.comments %}
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                <p class="mb-1">{{ comment.body }}</p>
+                <small class="text-muted">
+                    — {{ comment.author.display_name }},
+                    {{ comment.created_at.strftime("%B %d, %Y") }}
+                </small>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted">No comments yet — were you there? Tell your side!</p>
+        {% endfor %}
+
+        <div class="mt-3">
+            {{ render_form(comment_form,
+                           action=url_for('posts.add_comment', post_id=post.id),
+                           button_style="primary btn-lg") }}
+        </div>
+    </div>
+</div>
+{% endblock %}

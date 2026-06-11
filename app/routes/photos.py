@@ -26,7 +26,8 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.forms.photo_forms import AlbumForm, CommentForm, UploadPhotosForm
+from app.forms.comment_forms import CommentForm
+from app.forms.photo_forms import AlbumForm, UploadPhotosForm
 from app.models import Album, Photo
 from app.services import photo_service
 

@@ -49,11 +49,18 @@ def create_app(config_class=Config):
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.photos import photos_bp
+    from app.routes.posts import posts_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(photos_bp)
+    app.register_blueprint(posts_bp)
+
+    # Custom Jinja filters — tiny functions templates can pipe text through:
+    # {{ post.body | family_text }} renders typed text as safe HTML.
+    from app.services.text_service import family_text
+    app.jinja_env.filters["family_text"] = family_text
 
     # Custom terminal commands (flask init-db, flask create-admin)
     from app.cli import register_cli

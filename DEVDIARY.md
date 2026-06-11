@@ -235,6 +235,35 @@ browsers can't display. Two new things in `photo_service`:
 
 ---
 
+## Chapter 4 — Family History Blog
+
+**What was built:** memory posts with edit/delete and comment threads —
+the parents' main writing activity.
+
+The structure deliberately **rhymes with Chapter 3**: `Post`/`PostComment`
+mirror `Photo`/`PhotoComment`; `post_service.can_modify` mirrors
+`photo_service.can_delete` (author-or-admin); routes are the same RESTful
+shapes. Recognizing repeated shapes is how you read big codebases fast.
+
+**The new concept: rendering user text safely**
+([app/services/text_service.py](app/services/text_service.py)). We can't
+drop typed text into HTML raw — `<script>` in a comment would run in every
+family member's browser (**XSS**, the #1 web vulnerability, D315). The
+`family_text` Jinja filter escapes *everything* the user typed, then adds
+only tags *we* wrote: blank line → paragraph, single newline → `<br>`.
+Verified in testing: a post containing `<script>alert(1)</script>` rendered
+as harmless visible text.
+
+**Why no Markdown / rich-text editor?** Elderly-first. The parents type
+into a big plain box like an email and it comes out right — no toolbar to
+learn, nothing to get "wrong". (Decision logged below.)
+
+**Also note:** `CommentForm` moved to
+[app/forms/comment_forms.py](app/forms/comment_forms.py) the moment a
+second feature needed it — DRY in action, not in advance.
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules
@@ -274,6 +303,15 @@ Running log of judgment calls made mid-build, per the workflow rules
 10. **(Ch. 3)** Album deletion has no UI yet — only photo deletion
     (uploader or admin). Deleting a whole album is rare, high-stakes, and a
     natural fit for the admin panel feature later.
+11. **(Ch. 4)** Blog posts get **comments** even though CLAUDE.md only
+    listed comments for photos — responding to memories ("I was there!")
+    is the engagement loop that keeps parents writing, and it reuses the
+    photo-comment pattern nearly verbatim.
+12. **(Ch. 4)** Plain text with paragraphs, **no Markdown or rich-text
+    editor** — elderly-first: type like an email, it comes out right.
+13. **(Ch. 4)** No pagination on lists (posts, albums) — at family scale
+    (tens of posts, not thousands) it's complexity with no payoff. Easy to
+    add later if the archive grows huge.
 
 ---
 
