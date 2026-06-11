@@ -137,3 +137,20 @@ def register_cli(app):
             f"{report['file_count']} file(s) back in place. "
             "(The old DB was parked next to it as *.pre-restore.)"
         )
+
+    @app.cli.command("export-data")
+    def export_data_command():
+        """Dump ALL data to a portable JSON export (the v2 migration format).
+
+        This is CLAUDE.md's zero-data-loss guarantee: everything in the
+        database plus a checksummed manifest of every uploaded file, in a
+        format a future Java importer (or plain curiosity) can read.
+        """
+        from app.services import export_service
+
+        out_dir, counts, file_count = export_service.export_all()
+        click.echo(f"Export written to: {out_dir}")
+        for name, count in counts.items():
+            click.echo(f"  {name}: {count} row(s)")
+        click.echo(f"  uploaded files in manifest: {file_count}")
+        click.echo("Treat the export folder as sensitive — it's the whole archive.")

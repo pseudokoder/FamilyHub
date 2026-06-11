@@ -31,6 +31,17 @@ flask run
 
 Then open http://127.0.0.1:5000 and log in.
 
+## Management commands
+
+```powershell
+flask init-db                  # create/upgrade the database (runs migrations)
+flask create-admin <username>  # bootstrap the first admin account
+flask backup                   # full backup zip: DB + photos, verified,
+                               # uploaded off-site if BACKUP_S3_BUCKET is set
+flask restore-backup <zip>     # DESTRUCTIVE: restore DB + photos from a backup
+flask export-data              # portable JSON export of everything (v2 migration)
+```
+
 ## Stack
 
 Python 3 · Flask · SQLAlchemy · Flask-Migrate · SQLite (dev) · Bootstrap 5

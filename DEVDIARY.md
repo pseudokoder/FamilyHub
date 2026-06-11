@@ -402,6 +402,30 @@ backup that catches everything else).
 
 ---
 
+## Chapter 9 — Data Export (the v2 guarantee, in code)
+
+**What was built:** `flask export-data` →
+[export_service.py](app/services/export_service.py). One command dumps the
+entire archive to `export/familyhub-export-<timestamp>/`:
+
+- **data.json** — every table, every row. ISO-8601 dates, integer ids,
+  foreign keys by name. JSON, not a SQL dump, because JSON has no dialect:
+  a future Java importer, a Python script, or a human in 2040 can read it.
+- **files_manifest.json** — every uploaded file with size and **sha256**.
+  Checksums are how the v2 importer will *prove* every photo arrived
+  unchanged — that's what "zero data loss" means, verifiably.
+- **README.txt** — the format documents itself, inside the export.
+
+Two details worth studying: `_dump_table()` uses **table introspection**
+(`model.__table__.columns`) so one generic function exports every model —
+a table added next month exports automatically. And the export records its
+**alembic schema version**, so an importer can refuse data shapes it
+doesn't understand. The export includes bcrypt `password_hash` values on
+purpose: Spring Security reads bcrypt natively, so the family's logins
+survive the rewrite — treat exports as sensitive.
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules
@@ -489,11 +513,28 @@ so the rewrite is a translation, not a redesign.
 | `migrations/` (Alembic) | Flyway migration scripts |
 | SQLite (`instance/familyhub.db`) | MySQL (schema is portable SQL — no SQLite-only features used) |
 | `.env` + `app/config.py` | `application.properties` / Spring profiles |
+| `flask export-data` (JSON + sha256 manifest) | the v2 import tool's input format |
+| bcrypt password hashes | read natively by Spring Security — logins carry over |
+
+**The final v1 schema** (9 tables, all created by migrations, all portable):
+
+| Table | What it holds | Belongs to feature |
+|-------|---------------|--------------------|
+| `users` | login accounts (bcrypt hashes, admin flag) | Auth (Ch. 2) |
+| `family_member` | wiki pages: bio, birth/death dates, edit tracking | Wiki (Ch. 5) |
+| `albums` → `photos` → `photo_comments` | albums, photo metadata (files on disk), comment threads | Photos (Ch. 3) |
+| `posts` → `post_comments` | written memories + comment threads | Blog (Ch. 4) |
+| `timeline_events` | year/month/day partial-date events | Timeline (Ch. 6) |
+| `site_settings` | key/value admin text (tagline, about, contact) | Admin (Ch. 7) |
 
 ---
 
-## Backups (upcoming required feature)
+## What's NOT in v1 (on purpose)
 
-Placeholder: nightly SQLite + uploads backup to a Lightsail bucket, with a
-documented, tested restore procedure. Not built yet; tracked so it isn't
-forgotten.
+Deferred per CLAUDE.md, logged so nothing is forgotten: video uploads,
+permission tiers beyond admin/member, wiki revision history, photo tagging
+into wiki pages, drag-to-rearrange photos (the `position` column is
+waiting), album deletion UI, pagination. The remaining **deployment** work
+(not features): Lightsail instance, gunicorn + nginx, Let's Encrypt, the
+nightly backup crontab line from Chapter 8, and `BACKUP_S3_BUCKET` in the
+server's `.env`.
