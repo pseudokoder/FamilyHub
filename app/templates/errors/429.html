@@ -1,0 +1,23 @@
+{# The "slow down" page. Shown when one IP address hammers the login form
+   more than 10 times in a minute (see routes/auth.py). A robot doesn't
+   care what this page says — but a family member who got their caps-lock
+   stuck deserves a calm explanation, not an error dump. #}
+{% extends "base.html" %}
+
+{% block title %}Please wait a moment{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+  <h1 class="display-6">Let's take a quick breather</h1>
+  <p class="fs-4 mt-3">
+    There have been a lot of login tries in a row.<br>
+    Please wait <strong>one minute</strong>, then try again.
+  </p>
+  <p class="fs-5 text-muted">
+    Forgotten your password? Ask Wes — he can reset it for you.
+  </p>
+  <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('main.home') }}">
+    Back to the home page
+  </a>
+</div>
+{% endblock %}

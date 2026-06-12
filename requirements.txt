@@ -24,3 +24,4 @@ Pillow==12.2.0              # Image processing: validate uploads + generate thum
 pillow-heif==1.4.0          # Teaches Pillow to read iPhone HEIC photos (converted to JPEG at upload)
 boto3==1.43.28              # AWS SDK — ships backup zips to the Lightsail bucket
 WTForms==3.2.2              # The form/validation engine Flask-WTF builds on
+Flask-Limiter==4.1.1        # Rate limiting — brakes on the login form (D315)

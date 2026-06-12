@@ -600,6 +600,40 @@ the secret at all if you don't need it.
 
 ---
 
+## Chapter 12 — Login Rate Limiting (brakes for password robots)
+
+**What was built (June 12, 2026):** the login form now allows **10 attempts
+per minute per IP address**; attempt 11 gets a polite "please wait one
+minute" page (HTTP 429) instead of another chance at the password.
+
+### Why bcrypt alone wasn't enough
+
+bcrypt makes each password guess *slow* (~0.1s of deliberate math). But an
+attacker with a botnet doesn't mind slow — they mind **blocked**. Rate
+limiting is the second layer (defense in depth, D315): bcrypt taxes every
+guess, the limiter caps the number of guesses. A fumbling family member
+never notices (humans manage 3–4 tries a minute); a robot hits a wall.
+
+### The pieces
+
+- **Flask-Limiter** in extensions.py — created with no default limits, so
+  only routes that opt in are limited. One decorator on the login route:
+  `@limiter.limit("10 per minute")`.
+- **Counts live in process memory** (`memory://`) — right-sized for one
+  gunicorn worker at family scale. The v2/scale-up note: swap in Redis as
+  the storage and the route decorator doesn't change.
+- **ProxyFix, off by default** — behind nginx every request "comes from"
+  127.0.0.1, so the limiter would lump the whole family together. With
+  `TRUST_PROXY=True` (production only!) Flask reads the real visitor IP
+  from `X-Forwarded-For`. Trusting that header *without* a proxy in front
+  would let attackers spoof their IP — hence the env switch.
+- **A friendly 429 page** (templates/errors/429.html) — even the brakes
+  are elderly-first.
+- **Tested like CSRF**: off in TestConfig, one dedicated test turns it on
+  and proves try #11 from the same IP gets 429.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -749,6 +783,10 @@ Running log of judgment calls made mid-build, per the workflow rules
     Zero new dependencies, strips ALL metadata not just GPS, and matches
     what the HEIC path already did. Animated GIFs pass through untouched —
     no EXIF block in that format to worry about.
+25. **(Ch. 12)** Rate limit is 10/minute on login only — no site-wide
+    default limits. Family members click fast when browsing albums;
+    limiting reads would punish the people the site is for. Login is the
+    one route where volume = attack.
 
 ---
 

@@ -50,6 +50,10 @@ def app(tmp_path):
         # password-guessing) and a tax in tests. 4 rounds = fast tests,
         # same code paths.
         BCRYPT_LOG_ROUNDS = 4
+        # Rate limiting off in tests (it would trip on rapid-fire requests);
+        # test_auth.py re-enables it in one dedicated test, same pattern
+        # as CSRF above.
+        RATELIMIT_ENABLED = False
 
     app = create_app(TestConfig)
     with app.app_context():

@@ -58,6 +58,15 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
+    # --- Rate limiting (D315) ----------------------------------------------
+    # Master switch Flask-Limiter reads. Tests turn it off (like CSRF) and
+    # one dedicated test turns it back on to prove the brake works.
+    RATELIMIT_ENABLED = os.environ.get("RATELIMIT_ENABLED", "True") == "True"
+
+    # True only in production behind nginx — see the ProxyFix note in the
+    # application factory. Trusting proxy headers without a proxy = spoofable.
+    TRUST_PROXY = os.environ.get("TRUST_PROXY", "False") == "True"
+
     # --- Photo uploads ------------------------------------------------------
     # Uploads live OUTSIDE app/static on purpose: nothing in this folder is
     # ever served directly by the web server. Every photo goes through an

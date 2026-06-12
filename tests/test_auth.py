@@ -122,3 +122,39 @@ def test_csrf_actually_fires(tmp_path, admin):
         "/auth/login", data={"username": "admin", "password": ADMIN_PASSWORD}
     )
     assert response.status_code == 400  # rejected: no CSRF token
+
+
+def test_login_rate_limit_fires(tmp_path):
+    """The one test that turns rate limiting back ON (same pattern as the
+    CSRF test above): 10 rapid login attempts pass, the 11th gets a polite
+    429 'please wait' page instead of another crack at the password."""
+    from app import create_app
+    from app.config import Config
+    from app.extensions import db
+
+    class RateLimitConfig(Config):
+        TESTING = True
+        SECRET_KEY = "test-secret-key"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///" + (tmp_path / "rl.db").as_posix()
+        UPLOAD_FOLDER = str(tmp_path / "uploads_rl")
+        BACKUP_FOLDER = str(tmp_path / "backups_rl")
+        EXPORT_FOLDER = str(tmp_path / "export_rl")
+        WTF_CSRF_ENABLED = False
+        RATELIMIT_ENABLED = True
+
+    rl_app = create_app(RateLimitConfig)
+    with rl_app.app_context():
+        db.create_all()
+
+    client = rl_app.test_client()
+    bad_guess = {"username": "robot", "password": "guess-attempt"}
+    statuses = [
+        client.post("/auth/login", data=bad_guess).status_code
+        for _ in range(11)
+    ]
+    assert statuses[:10] == [200] * 10, "a fumbling human is never blocked"
+    assert statuses[10] == 429, "the robot's 11th try hits the brake"
+
+    # And the brake page is friendly, not a bare error dump.
+    response = client.post("/auth/login", data=bad_guess)
+    assert b"wait" in response.data.lower()

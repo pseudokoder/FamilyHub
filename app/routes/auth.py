@@ -7,6 +7,7 @@ v2 mapping: AuthController.java (@Controller) calling AuthService.
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
+from app.extensions import limiter
 from app.forms.auth_forms import LoginForm
 from app.services import user_service
 
@@ -29,7 +30,14 @@ def _safe_next(target):
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def login():
+    # SECURITY NOTE (D315): the @limiter.limit decorator above is the
+    # anti-brute-force brake. A human mistyping a password hits maybe 3-4
+    # tries a minute; a password-guessing robot hits hundreds. After 10
+    # requests in a minute from one IP, the route answers "429 Too Many
+    # Requests" (a friendly page) instead of running the check at all.
+    # bcrypt already makes each guess SLOW — this makes volume IMPOSSIBLE.
     # Already logged in? There's nothing to do here — go home.
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))

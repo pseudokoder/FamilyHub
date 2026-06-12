@@ -20,7 +20,9 @@ import os
 from flask import Flask
 
 from app.config import Config
-from app.extensions import bcrypt, bootstrap, csrf, db, login_manager, migrate
+from app.extensions import (
+    bcrypt, bootstrap, csrf, db, limiter, login_manager, migrate,
+)
 
 
 def create_app(config_class=Config):
@@ -42,6 +44,27 @@ def create_app(config_class=Config):
     # CSRFProtect makes EVERY POST in the app require a valid token — secure
     # by default, instead of remembering to protect each form individually.
     csrf.init_app(app)
+    # Rate limiting (only the login route opts in — see routes/auth.py).
+    limiter.init_app(app)
+
+    # Behind nginx, every request "comes from" 127.0.0.1 — the real visitor
+    # IP travels in the X-Forwarded-For header. ProxyFix teaches Flask to
+    # trust that header (and X-Forwarded-Proto for https detection), which
+    # the rate limiter needs to count per-visitor instead of lumping the
+    # whole world together. Off by default: trusting these headers when
+    # there ISN'T a proxy in front lets anyone spoof their IP.
+    if app.config["TRUST_PROXY"]:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    # A friendly page for "slow down" instead of a bare error dump. The
+    # rate limiter raises 429 Too Many Requests; elderly-first means even
+    # the brakes are polite.
+    from flask import render_template
+
+    @app.errorhandler(429)
+    def too_many_requests(error):
+        return render_template("errors/429.html"), 429
 
     # Register blueprints — each one is a self-contained feature area.
     # v2 mapping: one Blueprint ≈ one Spring Boot @Controller class.

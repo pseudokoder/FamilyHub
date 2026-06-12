@@ -25,6 +25,8 @@ Who's who (and their Spring Boot v2 equivalents):
 
 from flask_bcrypt import Bcrypt
 from flask_bootstrap import Bootstrap5
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -54,6 +56,14 @@ bcrypt = Bcrypt()
 login_manager = LoginManager()
 csrf = CSRFProtect()
 bootstrap = Bootstrap5()
+
+# Rate limiter (D315): slows down password-guessing robots. No default
+# limits — only the routes that opt in (the login form) are limited, keyed
+# by visitor IP address. storage_uri="memory://" keeps counts in process
+# memory: perfect for one gunicorn worker at family scale, and the v2 note
+# is that a multi-server deployment would swap in Redis here — the
+# decorator on the route wouldn't change at all.
+limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
 
 # When an anonymous visitor hits a @login_required page, send them to the
 # login form (the "auth" blueprint's "login" view) with a friendly message —
