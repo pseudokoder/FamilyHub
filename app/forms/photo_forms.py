@@ -20,6 +20,16 @@ class AlbumForm(FlaskForm):
     submit = SubmitField("Create Album")
 
 
+class PhotoCaptionForm(FlaskForm):
+    """Fix or add a caption after upload — typos shouldn't be forever."""
+
+    caption = TextAreaField(
+        "Caption (who/what/where — it's also what search finds)",
+        validators=[Optional(), Length(max=500)],
+    )
+    submit = SubmitField("Save Caption")
+
+
 class UploadPhotosForm(FlaskForm):
     """The upload form is deliberately tiny: choose files, press the button.
 

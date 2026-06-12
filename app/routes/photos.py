@@ -20,14 +20,14 @@ Every route is @login_required — family photos are PII (CLAUDE.md rule).
 import os
 
 from flask import (
-    Blueprint, abort, flash, redirect, render_template, send_from_directory,
-    url_for,
+    Blueprint, abort, flash, jsonify, redirect, render_template, request,
+    send_from_directory, url_for,
 )
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.forms.comment_forms import CommentForm
-from app.forms.photo_forms import AlbumForm, UploadPhotosForm
+from app.forms.photo_forms import AlbumForm, PhotoCaptionForm, UploadPhotosForm
 from app.models import Album, Photo, PhotoComment
 from app.services import photo_service
 
@@ -137,6 +137,45 @@ def delete_photo(photo_id):
     photo_service.delete_photo(photo)
     flash("Photo deleted.", "success")
     return redirect(url_for("photos.view_album", album_id=album_id))
+
+
+@photos_bp.route("/photos/<int:photo_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_photo(photo_id):
+    """Fix a caption after the fact. Same privilege as deleting the photo
+    (uploader or admin) — your photo, your words under it."""
+    photo = db.get_or_404(Photo, photo_id)
+    if not photo_service.can_delete(photo, current_user):
+        abort(403)
+    form = PhotoCaptionForm(obj=photo)
+    if form.validate_on_submit():
+        photo_service.update_caption(photo, form.caption.data)
+        flash("Caption saved.", "success")
+        return redirect(url_for("photos.view_photo", photo_id=photo.id))
+    return render_template("photos/edit_photo.html", form=form, photo=photo)
+
+
+@photos_bp.route("/albums/<int:album_id>/reorder", methods=["POST"])
+@login_required
+def reorder_photos(album_id):
+    """The drag-and-drop endpoint — the one JSON API in v1.
+
+    TEACHING NOTE: this is a little preview of v2, where EVERY route
+    answers JSON. The page's JavaScript (static/js/album-reorder.js)
+    POSTs {"order": [photo ids]} with the CSRF token in an X-CSRFToken
+    header — Flask-WTF accepts the header form for exactly this case,
+    where there's no HTML <form> to carry the hidden field.
+    """
+    album = db.get_or_404(Album, album_id)
+    payload = request.get_json(silent=True) or {}
+    order = payload.get("order")
+    if not isinstance(order, list) or not all(isinstance(i, int) for i in order):
+        return jsonify(error='Expected {"order": [photo ids]}.'), 400
+    try:
+        photo_service.reorder_photos(album, order)
+    except ValueError as message:
+        return jsonify(error=str(message)), 400
+    return jsonify(ok=True)
 
 
 @photos_bp.route("/photos/comments/<int:comment_id>/delete", methods=["POST"])

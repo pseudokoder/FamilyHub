@@ -116,3 +116,12 @@ body {
     font-size: 1.15rem;
     padding: 1rem 1.25rem;
 }
+
+/* Drag-to-rearrange: the "ghost" is the placeholder SortableJS shows in
+   the spot where the dragged photo will land — faded + outlined so the
+   eye can see the future position while the hand is mid-drag. */
+.drag-ghost {
+    opacity: 0.4;
+    outline: 3px dashed #2563eb;
+    outline-offset: -3px;
+}

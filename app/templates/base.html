@@ -19,6 +19,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Home{% endblock %} — FamilyHub</title>
 
+    {# CSRF token for JavaScript: page scripts (like drag-to-rearrange)
+       send this in an X-CSRFToken header, since they have no <form> to
+       carry the usual hidden field. Same token, different envelope. #}
+    {% if current_user.is_authenticated %}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% endif %}
+
     {# Bootstrap-Flask serves Bootstrap from the installed package — no CDN.
        The site works even if a third-party CDN is down or blocked. #}
     {{ bootstrap.load_css() }}
@@ -143,5 +150,8 @@
 {# Bootstrap's JavaScript (menus, dismissible alerts) loads at the END of the
    body so the visible page never waits on a script — pages feel faster. #}
 {{ bootstrap.load_js() }}
+{# Pages that need their own JavaScript add it here (e.g. the album page's
+   drag-to-rearrange). Empty for most pages. #}
+{% block scripts %}{% endblock %}
 </body>
 </html>

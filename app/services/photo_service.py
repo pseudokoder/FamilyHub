@@ -268,3 +268,29 @@ def can_delete_comment(comment, user):
 def delete_comment(comment):
     db.session.delete(comment)
     db.session.commit()
+
+
+def update_caption(photo, caption):
+    photo.caption = (caption or "").strip()
+    db.session.commit()
+    return photo
+
+
+def reorder_photos(album, ordered_ids):
+    """Apply a new sort order to an album (the drag-and-drop endpoint).
+
+    The list must contain EXACTLY this album's photo ids — no more, no
+    less, nothing from another album. A stale browser tab (someone else
+    uploaded while you were dragging) gets a clear error instead of a
+    half-scrambled album. Validate first, then write (D315 thinking
+    applied to data integrity, not just security).
+    """
+    expected_ids = {photo.id for photo in album.photos}
+    if set(ordered_ids) != expected_ids or len(ordered_ids) != len(expected_ids):
+        raise ValueError(
+            "That photo list is out of date — refresh the page and try again."
+        )
+    position_of = {photo_id: index for index, photo_id in enumerate(ordered_ids)}
+    for photo in album.photos:
+        photo.position = position_of[photo.id]
+    db.session.commit()

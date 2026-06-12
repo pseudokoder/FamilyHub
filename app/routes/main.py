@@ -9,9 +9,11 @@ text count as family content, so they're login-walled too.
 
 import os
 
-from flask import Blueprint, render_template, send_from_directory
+from flask import Blueprint, Response, jsonify, render_template, send_from_directory
 from flask_login import current_user, login_required
+from sqlalchemy import text
 
+from app.extensions import db
 from app.services import settings_service
 
 main_bp = Blueprint("main", __name__)
@@ -49,3 +51,44 @@ def hero_image():
         os.path.dirname(settings_service.hero_path()),
         settings_service.HERO_FILENAME,
     )
+
+
+# --- Plumbing routes (no family content, deliberately public) -----------------
+
+@main_bp.route("/health")
+def health():
+    """The standard liveness check every deployed app should have.
+
+    nginx, Lightsail health checks, and uptime monitors all hit a URL like
+    this to ask "are you alive?". It's public on purpose: it reveals
+    nothing but "app up, database reachable" — and monitoring robots don't
+    have logins. 200 = healthy; 503 = the load balancer should worry.
+    (Ops habits like this are the deployment half of D480.)
+    """
+    try:
+        db.session.execute(text("SELECT 1"))
+        return jsonify(status="ok", database="ok")
+    except Exception:
+        return jsonify(status="degraded", database="error"), 503
+
+
+@main_bp.route("/robots.txt")
+def robots_txt():
+    """Tell crawlers to index NOTHING. Everything real is login-walled
+    anyway — this is defense in depth for privacy: even the login page
+    and home page stay out of Google. A family archive has no SEO goals."""
+    return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
+
+
+@main_bp.route("/.well-known/security.txt")
+def security_txt():
+    """RFC 9116: a machine-readable 'how to report a security problem'
+    note at a standard path. Professional sites have one; it costs six
+    lines. The Expires field is REQUIRED by the RFC (stale contact info
+    is worse than none)."""
+    body = (
+        "Contact: mailto:wesley.leiter@gmail.com\n"
+        "Expires: 2027-06-12T00:00:00.000Z\n"
+        "Preferred-Languages: en\n"
+    )
+    return Response(body, mimetype="text/plain")

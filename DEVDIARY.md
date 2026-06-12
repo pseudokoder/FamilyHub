@@ -750,6 +750,34 @@ real annoyance, plus one discovery.
 
 ---
 
+## Chapter 17 — Quality-of-Life Round 2 (plumbing + polish)
+
+**What was built (June 12, 2026):** five small features.
+
+1. **`GET /health`** — the standard liveness URL: `{"status":"ok",
+   "database":"ok"}`, 503 if the DB can't answer `SELECT 1`. nginx and
+   uptime monitors hang their health checks on this. Public on purpose
+   (monitors don't have logins; it leaks nothing).
+2. **`robots.txt`** (`Disallow: /` — a family archive has no SEO goals)
+   and **`/.well-known/security.txt`** (RFC 9116: how to report a security
+   problem, with the RFC-required Expires field).
+3. **Photo caption editing** — `photos/<id>/edit`, uploader-or-admin, the
+   photo shown above the box. Typos aren't forever anymore (and captions
+   feed search).
+4. **Drag-to-rearrange photos** — the `Photo.position` column finally gets
+   its UI (decision #8 said "the column exists NOW, the UI costs nothing
+   later" — today is later). SortableJS is **vendored locally** (same
+   no-CDN rule as Bootstrap), the page works fine without JavaScript
+   (progressive enhancement), a tap still opens the photo on touch
+   (drag needs a 150 ms hold), and the new order saves itself via the
+   app's first JSON endpoint — a deliberate preview of every v2 route.
+   The CSRF token travels in an `X-CSRFToken` header since fetch() has no
+   form to carry the hidden field.
+5. **Lazy-loading thumbnails** — `loading="lazy"` on gallery images: the
+   browser only downloads thumbnails as they scroll into view.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -782,6 +810,11 @@ about how it *looks and feels*.
 - [ ] Upload 5+ photos at once — progress is tolerable, success message
       counts correctly
 - [ ] Album gallery thumbnails load fast and look uniform
+- [ ] Upload a real phone photo, download it back from the site, and check
+      its properties — no GPS/location metadata survives (Ch. 11)
+- [ ] Drag a photo to a new spot on desktop AND with a finger on a phone —
+      "✓ New order saved" appears, the order survives a refresh, and a
+      simple TAP still opens the photo (Ch. 17)
 
 ### Content rendering
 - [ ] Write a blog post with several paragraphs (typed like an email) —

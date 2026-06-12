@@ -20,7 +20,7 @@
         <div class="card album-card photo-card h-100 position-relative">
             {% if album.cover_photo %}
             <img src="{{ url_for('photos.photo_thumb', photo_id=album.cover_photo.id) }}"
-                 alt="Cover photo of the album {{ album.title }}">
+                 alt="Cover photo of the album {{ album.title }}" loading="lazy">
             {% else %}
             <div class="d-flex align-items-center justify-content-center bg-light"
                  style="height: 240px; font-size: 4rem;">📷</div>

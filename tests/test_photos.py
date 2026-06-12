@@ -244,6 +244,57 @@ def test_comment_delete_rules(admin_client, member_client):
     assert PhotoComment.query.count() == 0
 
 
+def test_caption_edit(admin_client, member_client):
+    """Captions are editable after upload — by the uploader or an admin."""
+    album_url = _create_album(admin_client)
+    admin_client.post(
+        album_url + "/photos",
+        data={"photos": [(make_image(), "p.jpg")]},
+        content_type="multipart/form-data",
+    )
+    photo_id = Photo.query.one().id
+
+    # Not your photo -> not your caption.
+    assert member_client.post(
+        f"/photos/{photo_id}/edit", data={"caption": "nope"}).status_code == 403
+
+    response = admin_client.post(
+        f"/photos/{photo_id}/edit",
+        data={"caption": "Aunt Ruth, front row, 1987"},
+        follow_redirects=True,
+    )
+    assert b"Caption saved" in response.data
+    assert b"Aunt Ruth, front row, 1987" in response.data
+
+
+def test_drag_reorder_endpoint(admin_client):
+    """POST /albums/<id>/reorder with the new id order rewrites positions;
+    a stale or foreign id list is refused whole (never half-applied)."""
+    album_url = _create_album(admin_client)
+    admin_client.post(
+        album_url + "/photos",
+        data={"photos": [(make_image(), "first.jpg"),
+                         (make_image(), "second.jpg"),
+                         (make_image(), "third.jpg")]},
+        content_type="multipart/form-data",
+    )
+    ids = [p.id for p in Photo.query.order_by(Photo.position).all()]
+
+    response = admin_client.post(album_url + "/reorder",
+                                 json={"order": ids[::-1]})
+    assert response.status_code == 200 and response.get_json()["ok"]
+
+    new_order = [p.id for p in Photo.query.order_by(Photo.position).all()]
+    assert new_order == ids[::-1], "positions follow the dragged order"
+
+    # Wrong/missing ids -> 400 and NOTHING changes.
+    assert admin_client.post(album_url + "/reorder",
+                             json={"order": ids[:2]}).status_code == 400
+    assert admin_client.post(album_url + "/reorder",
+                             json={"order": "junk"}).status_code == 400
+    assert [p.id for p in Photo.query.order_by(Photo.position).all()] == new_order
+
+
 def test_album_cover_is_first_photo(admin_client):
     album_url = _create_album(admin_client)
     admin_client.post(

@@ -34,7 +34,11 @@
 </p>
 
 {% if can_delete %}
-<div class="text-center mb-4">
+<div class="d-flex justify-content-center gap-2 mb-4">
+    <a class="btn btn-outline-secondary"
+       href="{{ url_for('photos.edit_photo', photo_id=photo.id) }}">
+        ✏️ Edit caption
+    </a>
     {# Destructive action -> POST form + a confirmation dialog. The browser
        confirm() is simple but does the job CLAUDE.md asks for: nothing is
        destroyed by one accidental tap. #}

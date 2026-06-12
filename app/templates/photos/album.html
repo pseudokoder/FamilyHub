@@ -46,14 +46,27 @@
     </div>
 </div>
 
-{# ---- The photo grid ---------------------------------------------------- #}
+{# ---- The photo grid ----------------------------------------------------
+   data-photo-id on each cell + the grid's reorder URL power the
+   drag-to-rearrange script (static/js/album-reorder.js). The page works
+   identically with JavaScript off — drag is an enhancement, not a need.
+   loading="lazy": the browser fetches thumbnails only as they scroll
+   into view, so a 100-photo album doesn't download 100 images up front. #}
 {% if album.photos %}
-<div class="row g-4">
+{% if album.photos | length > 1 %}
+<p class="text-muted">
+    Tip: press and hold a photo, then drag it to a new spot — the order
+    saves itself. <span id="reorderStatus" role="status"></span>
+</p>
+{% endif %}
+<div class="row g-4" id="photoGrid"
+     data-reorder-url="{{ url_for('photos.reorder_photos', album_id=album.id) }}">
     {% for photo in album.photos %}
-    <div class="col-6 col-md-4 col-lg-3">
+    <div class="col-6 col-md-4 col-lg-3" data-photo-id="{{ photo.id }}">
         <div class="card photo-card h-100 position-relative">
             <img src="{{ url_for('photos.photo_thumb', photo_id=photo.id) }}"
-                 alt="{{ photo.caption or photo.original_filename }}">
+                 alt="{{ photo.caption or photo.original_filename }}"
+                 loading="lazy">
             <div class="card-body py-2">
                 <a href="{{ url_for('photos.view_photo', photo_id=photo.id) }}"
                    class="stretched-link text-decoration-none">
@@ -86,5 +99,12 @@
         🗑 Delete this entire album ({{ album.photos | length }} photo{{ 's' if album.photos | length != 1 }})
     </button>
 </form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if album.photos | length > 1 %}
+<script src="{{ url_for('static', filename='js/vendor/Sortable.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/album-reorder.js') }}"></script>
 {% endif %}
 {% endblock %}
