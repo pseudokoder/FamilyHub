@@ -426,6 +426,210 @@ survive the rewrite — treat exports as sensitive.
 
 ---
 
+## Chapter 10 — The Test Suite (73 tests, all passing)
+
+**What was built:** a complete pytest suite — [tests/](tests/), 73 tests
+covering every feature chapter — plus [pytest.ini](pytest.ini) and
+[requirements-dev.txt](requirements-dev.txt). Run it from the project root:
+
+```bash
+pip install -r requirements-dev.txt   # once
+pytest                                 # ~6 seconds, 73 green dots
+```
+
+This delivers the CLAUDE.md workflow rule directly: **never pause the build
+to ask Wes to manually test** — the suite is how the code proves itself.
+WGU connection: D480 Software Design and Quality Assurance is the testing
+course; nearly every concept below appears in it.
+
+### How the suite is organized
+
+One test file per feature chapter — the suite's table of contents mirrors
+this diary's:
+
+| Test file | Covers | Diary chapter |
+|-----------|--------|---------------|
+| `test_auth.py` (22 tests) | login/logout, sessions, CSRF, password rules, admin gate | Ch. 2 |
+| `test_photos.py` | upload security, HEIC, EXIF, login-walled serving, delete rules | Ch. 3 |
+| `test_posts.py` | writing, XSS escaping, permissions, comments, forgiving forms | Ch. 4 |
+| `test_wiki.py` | collaborative editing, [[wikilinks]], date validation | Ch. 5 |
+| `test_timeline.py` | partial dates, decade page, edit/delete rules | Ch. 6 |
+| `test_admin.py` | user creation, password reset, site settings, hero image | Ch. 2/7 |
+| `test_backup_export.py` | backup/verify/restore round-trip, export format | Ch. 8/9 |
+| `test_text_service.py` | the `family_text` filter, called directly | Ch. 4/5 |
+
+### The two kinds of tests in here (the test pyramid)
+
+Most files are **integration tests**: they push a fake HTTP request through
+the *whole* stack — route → form → service → model → template — using
+Flask's built-in **test client**, then assert on the resulting HTML and
+database rows. One file, `test_text_service.py`, is **unit tests**: it
+calls one pure function directly and enumerates its edge cases. Pure-logic
+modules earn the cheap, fast treatment; anything involving routes and
+permissions earns the full-stack treatment, because that's where the
+security rules actually live.
+
+### conftest.py — the foundation everything stands on
+
+[tests/conftest.py](tests/conftest.py) defines the shared **fixtures**
+(reusable setup that pytest injects by argument name):
+
+- **`app`** — a fresh Flask app *per test*, built by `create_app(TestConfig)`
+  with a throwaway SQLite DB, uploads folder, and backup folder inside
+  pytest's `tmp_path` temp directory. Tests can't touch the real database
+  or real photos, and can't pollute each other. **Isolation is what makes
+  a test trustworthy** — and this is the application-factory pattern's
+  payoff (Chapter 2 promised "testability"; here's the receipt).
+- **`admin_client` / `member_client`** — two test clients, already logged
+  in as an admin and a regular member. Having BOTH in one test is how every
+  permission rule gets proven from both sides ("member may not delete
+  admin's photo").
+- **`make_image()` / `make_fake_image()`** — uploads are simulated with
+  **generated** files (Pillow draws real JPEG/PNG/HEIC images in memory;
+  the fake is text bytes wearing a `.jpg` name). No binary files checked
+  into git, and the EXIF-orientation test can manufacture a "sideways
+  iPhone photo" on demand.
+
+Three deliberate TestConfig choices worth understanding:
+
+| Setting | Why |
+|---------|-----|
+| `WTF_CSRF_ENABLED = False` | Otherwise every POST needs token-scraping boilerplate. The protection itself isn't untested — `test_auth.py` switches it back ON in one dedicated test and proves a tokenless POST is rejected. Disable globally, verify explicitly. |
+| `BCRYPT_LOG_ROUNDS = 4` | bcrypt's slowness throttles password-guessing in production — and throttles the test suite. 4 rounds runs the same code path fast. |
+| `db.create_all()` instead of migrations | Tests exercise app behavior, not migration history. Migrations get their workout on the real dev/prod databases. |
+
+### The bug hunt: what the suite caught (14 failures → 0)
+
+Writing tests after the features is exactly how you find out which
+"obviously fine" code isn't. The suite's first full run failed 14 of 73 —
+here's what was actually wrong, most interesting first:
+
+**1. The Flask-Login `g`-caching leak (10 of the 14).** The symptom looked
+impossible: anonymous clients were getting member pages, members were
+passing admin checks. The cause is a genuinely subtle interaction:
+
+- Flask-Login avoids re-querying the user table on every `current_user`
+  access by caching the loaded user in `g._login_user`.
+- In Flask 3.x, **`g` is scoped to the application context, not the
+  request**. In production each request gets its own short-lived app
+  context, so the cache dies with the request — invisible, harmless.
+- But our `app` fixture holds ONE app context open across the whole test
+  (it has to — the test body queries the DB between requests). So the
+  admin logged in by request #1 was still sitting in `g._login_user` when
+  the anonymous client sent request #2, and Flask-Login never re-read the
+  session cookie.
+
+The fix ([conftest.py](tests/conftest.py)) is a test-only `before_request`
+hook that pops `g._login_user` before each request, forcing Flask-Login to
+reload the user from the session cookie like production would. Note what
+we did NOT do: change application code to accommodate the tests. The app
+was correct; the test *environment* differed from production in one
+documented way, and the fix patches exactly that difference, where the
+difference lives.
+
+The transferable lesson: **when a test fails, first ask whether the app is
+wrong or the test environment is wrong.** Both answers are valuable; they
+lead to fixes in different places.
+
+**2. Empty upload crashed (real app bug).** Submitting the upload form with
+no files chosen made `save_photos` iterate over `None` — a `TypeError`
+where Mom should get the friendly "No photos were chosen" nudge. A guard
+clause in [photo_service.py](app/services/photo_service.py) fixes it. This
+one would have bitten a real parent on day one; the test suite caught it
+first. That's the whole sales pitch for testing, in one bug.
+
+**3. Export assumed a migrated database (environment-dependent app bug).**
+`export_all` reads the `alembic_version` table to stamp the export with its
+schema version — but that table only exists on databases built by
+migrations, and test databases come from `db.create_all()`. Now wrapped in
+try/except with `schema_version: null` in the export
+([export_service.py](app/services/export_service.py)). A unit of code
+should degrade gracefully when an *optional* environmental fact is absent.
+
+**4–5. Two tests were wrong, not the app.** `test_text_service` called
+`family_text` outside a request context — but the wikilink path calls
+`url_for`, which needs one (in production it always has one: Jinja filters
+run during requests). And a wiki test asserted "no `/family/` href on the
+page" — forgetting the Edit button and breadcrumb *always* link there; the
+assertion now uses a regex matching only bare `/family/<id>` view links,
+which is what a rendered wikilink would produce. Tests are code too;
+they can have bugs, and a failing test is a claim to *investigate*, not
+automatically a defect in the app.
+
+### Files to read, in order
+
+1. [pytest.ini](pytest.ini) — three lines; why `pytest` just works
+2. [tests/conftest.py](tests/conftest.py) — fixtures + the `g` cache fix
+3. [tests/test_photos.py](tests/test_photos.py) — the richest file:
+   generated uploads, security checks, permission rules
+4. [tests/test_text_service.py](tests/test_text_service.py) — what unit
+   tests look like next to integration tests
+
+---
+
+## Manual Testing Checklist
+
+Everything below needs **human eyes in a real browser** — visual layout,
+real devices, real photos, things automated tests can't judge. Per the
+CLAUDE.md workflow, Wes runs this whole list **once, at the end of the
+build** (and again on the Lightsail server after deployment). Everything
+functional is already covered by the 73 automated tests; this list is
+about how it *looks and feels*.
+
+### Elderly-first look & feel (the point of the whole design)
+- [ ] On a desktop: fonts comfortably large, buttons obviously buttons,
+      contrast strong enough to read in daylight
+- [ ] On a phone AND a tablet: navbar collapses properly, tap targets big
+      enough for unsteady hands, nothing requires pinch-zoom
+- [ ] Flash messages (green success / red error banners) are noticeable
+      but not alarming, and readable at a glance
+
+### Auth & navigation
+- [ ] Log in, close the browser entirely, reopen — still logged in
+      ("Keep me logged in" 30-day cookie)
+- [ ] Logged OUT, visit `/` — generic welcome page, zero family content,
+      a single obvious Login button
+- [ ] Log in as a non-admin — no Admin dropdown anywhere in the navbar
+
+### Photos (test with REAL files, not generated ones)
+- [ ] Upload a real iPhone HEIC photo — displays correctly in gallery
+      and full view
+- [ ] Upload a real portrait-mode phone photo — appears upright, not
+      sideways, in both thumbnail and full size
+- [ ] Upload 5+ photos at once — progress is tolerable, success message
+      counts correctly
+- [ ] Album gallery thumbnails load fast and look uniform
+
+### Content rendering
+- [ ] Write a blog post with several paragraphs (typed like an email) —
+      paragraphs render with visible spacing
+- [ ] A `[[Name]]` wikilink in a post/bio is visibly a link, and clicking
+      it lands on the right wiki page
+- [ ] Timeline page: decade headers appear once per decade, partial dates
+      read naturally ("1890", "March 1962", "June 12, 1947")
+- [ ] Upload a hero banner at Admin → Site Settings — it appears on the
+      dashboard, reasonably cropped, on desktop and phone
+
+### Destructive-action confirmations (click Cancel each time!)
+- [ ] Delete photo, delete post, delete wiki page, delete timeline event —
+      each pops a browser confirm dialog BEFORE anything happens
+- [ ] Validation errors keep typed text: submit a post with no title —
+      the body text survives the error page
+
+### Admin & backups
+- [ ] Create a new user at Admin → Users, then log in as them in a
+      private/incognito window
+- [ ] Admin → Backups: trigger a backup, see it verified, download the
+      zip, open it locally — DB + photos + manifest are inside
+
+### After deployment (server-only, can't be tested locally)
+- [ ] HTTPS padlock shows on https://familyhub.pseudokoder.com
+- [ ] Nightly cron backup ran (check `backups/backup.log` next morning)
+      and the zip landed in the Lightsail bucket
+- [ ] Lightsail instance snapshot scheduled in the AWS console
+
+---
+
 ## Decisions Made Without Wes
 
 Running log of judgment calls made mid-build, per the workflow rules
@@ -495,6 +699,18 @@ Running log of judgment calls made mid-build, per the workflow rules
 20. **(Ch. 7)** Starter settings were seeded (tagline, about, contact
     placeholder text) so the feature is visibly working on first login —
     edit them at Admin → Site Settings.
+21. **(Ch. 10)** The Flask-Login `g`-cache leak was fixed **in the test
+    fixture, not the app** — a `before_request` hook in conftest.py clears
+    the cached user before each test request. The app behaves correctly in
+    production (where each request has its own app context); changing app
+    code to suit a test-only condition would have been backwards.
+22. **(Ch. 10)** `export_all` now treats a missing `alembic_version` table
+    as `schema_version: null` instead of crashing — the table is a fact
+    about *how the DB was built* (migrations vs `create_all`), not about
+    the data being exported.
+23. **(Ch. 10)** CSRF is disabled globally in TestConfig but re-enabled
+    and verified in one dedicated test — pragmatism for 73 tests,
+    explicit proof the protection fires.
 
 ---
 
