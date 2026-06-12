@@ -692,6 +692,39 @@ that works, with the growth path documented.
 
 ---
 
+## Chapter 15 — Wiki Page History (the undo button)
+
+**What was built (June 12, 2026):** every save of a wiki page now records
+a complete snapshot (`wiki_revisions` table). A **Page History** button
+lists every version; any version can be read and restored with one click.
+
+### Why this was the riskiest gap in v1
+
+The wiki is editable by *everyone* — that's the feature. But until now, one
+accidental paste-over + Save destroyed the only copy of a bio, forever.
+DEVDIARY decision #15 deferred history to v2; Wes promoted it after seeing
+it called "the one feature gap that could cause real data loss." He was
+right to.
+
+### Design decisions worth studying
+
+- **Snapshots, not diffs (D426).** Each revision stores the full editable
+  state. Diffs are smaller; snapshots make restore a simple copy. At
+  family scale, storage is free and simple wins.
+- **Restore never rewinds — it appends.** Bringing back version 2 creates
+  version 5 (identical to 2). History only grows, so even a mistaken
+  restore is restorable. No operation in the wiki can lose words anymore.
+- **The migration backfills version 1** for pages that existed before the
+  feature (hand-written `INSERT ... SELECT` in the migration — a *data*
+  migration riding along with the *schema* migration).
+- **Relationship check on lookup**: `/family/3/history/99` 404s unless
+  revision 99 actually belongs to page 3 — the classic "insecure direct
+  object reference" trap (D315), closed in the service.
+- New table is in `EXPORTED_MODELS`, so `flask export-data` carries page
+  history into v2 too.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

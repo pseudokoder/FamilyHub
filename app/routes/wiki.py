@@ -78,3 +78,50 @@ def delete_member(member_id):
     wiki_service.delete_member(member)
     flash(f"The page for {name} was deleted.", "success")
     return redirect(url_for("wiki.list_members"))
+
+
+# --- Page history (the wiki's undo button) -----------------------------------
+#
+# RESTful shape: revisions are a sub-resource of the page —
+#   GET  /family/<id>/history                 list every saved version
+#   GET  /family/<id>/history/<rev_id>        read one old version
+#   POST /family/<id>/history/<rev_id>/restore  copy it back onto the page
+#
+# Restore is open to every member, same as editing — a restore IS an edit
+# (and it records a new revision itself, so even a restore can be undone).
+
+@wiki_bp.route("/family/<int:member_id>/history")
+@login_required
+def member_history(member_id):
+    member = db.get_or_404(FamilyMember, member_id)
+    return render_template("wiki/history.html", member=member)
+
+
+@wiki_bp.route("/family/<int:member_id>/history/<int:revision_id>")
+@login_required
+def view_revision(member_id, revision_id):
+    member = db.get_or_404(FamilyMember, member_id)
+    revision = wiki_service.get_revision(member, revision_id)
+    if revision is None:
+        abort(404)
+    # Version numbers count up from 1 (oldest), like Wikipedia — stable
+    # even as new revisions are added on top.
+    older = [r for r in member.revisions if r.id < revision.id]
+    return render_template(
+        "wiki/revision.html",
+        member=member, revision=revision, version_number=len(older) + 1,
+        is_current=(revision.id == member.revisions[0].id),
+    )
+
+
+@wiki_bp.route("/family/<int:member_id>/history/<int:revision_id>/restore",
+               methods=["POST"])
+@login_required
+def restore_revision(member_id, revision_id):
+    member = db.get_or_404(FamilyMember, member_id)
+    revision = wiki_service.get_revision(member, revision_id)
+    if revision is None:
+        abort(404)
+    wiki_service.restore_revision(member, revision, current_user)
+    flash(f"{member.name}'s page was restored to the older version.", "success")
+    return redirect(url_for("wiki.view_member", member_id=member.id))

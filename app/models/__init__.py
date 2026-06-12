@@ -19,3 +19,4 @@ from app.models.post import Post, PostComment  # noqa: E402,F401
 from app.models.site_setting import SiteSetting  # noqa: E402,F401
 from app.models.timeline import TimelineEvent  # noqa: E402,F401
 from app.models.user import User  # noqa: E402,F401
+from app.models.wiki_revision import WikiRevision  # noqa: E402,F401

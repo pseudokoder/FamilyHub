@@ -24,10 +24,16 @@
                     {{ member.location or "" }}
                 </p>
             </div>
-            <a class="btn btn-outline-secondary"
-               href="{{ url_for('wiki.edit_member', member_id=member.id) }}">
-                ✏️ Edit This Page
-            </a>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary"
+                   href="{{ url_for('wiki.edit_member', member_id=member.id) }}">
+                    ✏️ Edit This Page
+                </a>
+                <a class="btn btn-outline-secondary"
+                   href="{{ url_for('wiki.member_history', member_id=member.id) }}">
+                    📜 Page History
+                </a>
+            </div>
         </div>
 
         {# The infobox — Wikipedia's little fact table, family edition. #}

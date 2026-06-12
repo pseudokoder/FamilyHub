@@ -55,6 +55,15 @@ class FamilyMember(db.Model):
     creator = db.relationship("User", foreign_keys=[created_by])
     last_editor = db.relationship("User", foreign_keys=[updated_by])
 
+    # Page history, newest first (see wiki_revision.py for the WHY).
+    # delete-orphan: removing a person removes their page history with them.
+    revisions = db.relationship(
+        "WikiRevision",
+        back_populates="member",
+        cascade="all, delete-orphan",
+        order_by="desc(WikiRevision.id)",
+    )
+
     @property
     def lifespan(self):
         """'1947 – 2020', '1947 – ', or '' — for the page header."""

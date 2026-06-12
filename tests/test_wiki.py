@@ -96,3 +96,58 @@ def test_last_editor_is_tracked(admin_client, member_client):
               "birth_date": "", "death_date": ""},
     )
     assert b"Last edited by Member" in admin_client.get(f"/family/{page_id}").data
+
+
+# --- Page history (the wiki's undo button) -----------------------------------
+
+def _edit_bio(client, page_id, bio):
+    return client.post(
+        f"/family/{page_id}/edit",
+        data={"name": "Jo Leiter", "location": "", "bio": bio,
+              "birth_date": "", "death_date": ""},
+        follow_redirects=True,
+    )
+
+
+def test_every_save_records_a_revision(admin_client, member_client):
+    _add_person(admin_client, "Jo Leiter", bio="First draft.")
+    page_id = FamilyMember.query.one().id
+    _edit_bio(member_client, page_id, "Second draft.")
+
+    history = admin_client.get(f"/family/{page_id}/history").data
+    assert b"Version 1" in history
+    assert b"Version 2" in history
+    assert b"saved by Member" in history  # each version knows its author
+
+
+def test_restore_brings_back_old_text_without_erasing_history(admin_client):
+    """The whole point of the feature: paste-over disasters are undoable —
+    and the restore itself becomes a new version (history only grows)."""
+    from app.models import WikiRevision
+
+    _add_person(admin_client, "Jo Leiter", bio="The original story.")
+    page_id = FamilyMember.query.one().id
+    _edit_bio(admin_client, page_id, "Oops, pasted over everything.")
+
+    version_one = WikiRevision.query.order_by(WikiRevision.id).first()
+    response = admin_client.post(
+        f"/family/{page_id}/history/{version_one.id}/restore",
+        follow_redirects=True,
+    )
+    assert b"restored" in response.data
+    assert b"The original story." in response.data
+    assert WikiRevision.query.count() == 3, "restore ADDED a version"
+
+
+def test_revision_must_belong_to_its_page(admin_client):
+    """/family/<jo>/history/<franks-revision> is a 404, not a leak."""
+    from app.models import WikiRevision
+
+    _add_person(admin_client, "Jo Leiter")
+    _add_person(admin_client, "Frank Leiter")
+    jo = FamilyMember.query.filter_by(name="Jo Leiter").one()
+    frank = FamilyMember.query.filter_by(name="Frank Leiter").one()
+    franks_revision = WikiRevision.query.filter_by(member_id=frank.id).one()
+
+    response = admin_client.get(f"/family/{jo.id}/history/{franks_revision.id}")
+    assert response.status_code == 404
