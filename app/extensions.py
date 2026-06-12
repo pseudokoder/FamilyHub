@@ -28,6 +28,7 @@ from flask_bootstrap import Bootstrap5
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
+from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
@@ -64,6 +65,11 @@ bootstrap = Bootstrap5()
 # is that a multi-server deployment would swap in Redis here — the
 # decorator on the route wouldn't change at all.
 limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
+
+# Outbound email — used for exactly one thing: password-reset links.
+# Unconfigured (no MAIL_SERVER in .env) the feature politely hides itself
+# and the login page points people at Wes instead.
+mail = Mail()
 
 # When an anonymous visitor hits a @login_required page, send them to the
 # login form (the "auth" blueprint's "login" view) with a friendly message —

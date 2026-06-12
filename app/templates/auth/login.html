@@ -13,10 +13,20 @@
     <div class="col-md-7 col-lg-5">
         <h1 class="mb-4">Log In</h1>
         {{ render_form(form, button_style="primary btn-lg w-100") }}
+        {# config is Flask's app config, available in every template. When
+           MAIL_SERVER isn't set, self-service reset doesn't exist — so we
+           offer Wes instead of a dead link. #}
+        {% if config.MAIL_SERVER %}
+        <p class="fs-5 mt-4">
+            <a href="{{ url_for('auth.forgot_password') }}">Forgot your password?</a>
+            We can email you a reset link.
+        </p>
+        {% else %}
         <p class="text-muted mt-4">
             Forgot your password? Call or text Wes — he can set a new one
             for you in about ten seconds.
         </p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -40,6 +40,13 @@ class User(UserMixin, db.Model):
     # What the family actually sees: "Grandma Jo", not "jleiter1947".
     display_name = db.Column(db.String(120), nullable=False)
 
+    # Where password-reset links go. NULLABLE on purpose: an account
+    # without an email simply has no self-service reset — Wes resets it
+    # from the admin panel instead. unique=True still allows many NULLs
+    # (SQL treats NULLs as distinct), it only stops two accounts from
+    # sharing one inbox.
+    email = db.Column(db.String(255), unique=True, nullable=True)
+
     # We store a bcrypt HASH, never the password itself. bcrypt output is
     # 60 characters; 128 leaves headroom if the algorithm's format grows.
     # Even a full database leak doesn't reveal anyone's actual password —

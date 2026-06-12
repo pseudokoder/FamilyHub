@@ -21,7 +21,7 @@ from flask import Flask
 
 from app.config import Config
 from app.extensions import (
-    bcrypt, bootstrap, csrf, db, limiter, login_manager, migrate,
+    bcrypt, bootstrap, csrf, db, limiter, login_manager, mail, migrate,
 )
 
 
@@ -46,6 +46,8 @@ def create_app(config_class=Config):
     csrf.init_app(app)
     # Rate limiting (only the login route opts in — see routes/auth.py).
     limiter.init_app(app)
+    # Email (password-reset links only; hides itself when unconfigured).
+    mail.init_app(app)
 
     # Behind nginx, every request "comes from" 127.0.0.1 — the real visitor
     # IP travels in the X-Forwarded-For header. ProxyFix teaches Flask to

@@ -8,8 +8,10 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import limiter
-from app.forms.auth_forms import ChangePasswordForm, LoginForm
-from app.services import user_service
+from app.forms.auth_forms import (
+    ChangePasswordForm, ForgotPasswordForm, LoginForm, ResetPasswordForm,
+)
+from app.services import mail_service, user_service
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -59,6 +61,55 @@ def login():
             return redirect(_safe_next(request.args.get("next")) or url_for("main.home"))
 
     return render_template("auth/login.html", form=form)
+
+
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
+def forgot_password():
+    """Step 1: type your username, get an emailed link. Rate-limited even
+    tighter than login — each POST can trigger an outbound email."""
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    if not mail_service.is_configured():
+        flash("Email isn't set up on this server yet — ask Wes and he'll reset it for you.", "warning")
+        return redirect(url_for("auth.login"))
+
+    form = ForgotPasswordForm()
+    if form.validate_on_submit():
+        user = user_service.find_by_username(form.username.data)
+        if user is not None and user.email:
+            token = user_service.generate_reset_token(user)
+            reset_url = url_for("auth.reset_password", token=token, _external=True)
+            mail_service.send_password_reset(user, reset_url)
+        # The SAME message whether the username exists, has an email, or
+        # neither — an attacker learns nothing by guessing names here.
+        flash(
+            "If that account has an email on file, a reset link is on its "
+            "way. The link works for one hour — check spam if it's shy.",
+            "success",
+        )
+        return redirect(url_for("auth.login"))
+    return render_template("auth/forgot_password.html", form=form)
+
+
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    """Step 2: arrive from the emailed link, choose a new password.
+    user_service.verify_reset_token does all the deciding — expired,
+    forged, and already-used tokens all come back None."""
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    user = user_service.verify_reset_token(token)
+    if user is None:
+        flash("That reset link is invalid or has expired — request a fresh one.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user_service.set_password(user, form.password.data, actor=user)
+        flash("Your password is reset — log in with the new one!", "success")
+        return redirect(url_for("auth.login"))
+    return render_template("auth/reset_password.html", form=form, user=user)
 
 
 @auth_bp.route("/change-password", methods=["GET", "POST"])

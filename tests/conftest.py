@@ -54,6 +54,12 @@ def app(tmp_path):
         # test_auth.py re-enables it in one dedicated test, same pattern
         # as CSRF above.
         RATELIMIT_ENABLED = False
+        # Mail "configured" so the forgot-password feature is ON in tests —
+        # but MAIL_SUPPRESS_SEND means Flask-Mail never opens a real SMTP
+        # connection; mail.record_messages() captures the would-be sends.
+        MAIL_SERVER = "smtp.test.invalid"
+        MAIL_SUPPRESS_SEND = True
+        MAIL_DEFAULT_SENDER = "familyhub@test.invalid"
 
     app = create_app(TestConfig)
     with app.app_context():

@@ -67,6 +67,19 @@ class Config:
     # application factory. Trusting proxy headers without a proxy = spoofable.
     TRUST_PROXY = os.environ.get("TRUST_PROXY", "False") == "True"
 
+    # --- Email (password-reset links) ---------------------------------------
+    # MAIL_SERVER unset = the whole forgot-password feature hides itself
+    # and the login page says "ask Wes" instead. Set all five in .env to
+    # turn it on (e.g. Gmail SMTP with an app password).
+    MAIL_SERVER = os.environ.get("MAIL_SERVER")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", "587"))
+    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "True") == "True"
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.environ.get(
+        "MAIL_DEFAULT_SENDER", "familyhub@localhost"
+    )
+
     # --- Photo uploads ------------------------------------------------------
     # Uploads live OUTSIDE app/static on purpose: nothing in this folder is
     # ever served directly by the web server. Every photo goes through an

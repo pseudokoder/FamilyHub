@@ -17,6 +17,7 @@
             <tr>
                 <th>Display name</th>
                 <th>Username</th>
+                <th>Email (for resets)</th>
                 <th>Role</th>
                 <th>Member since</th>
                 <th></th>
@@ -27,6 +28,7 @@
             <tr>
                 <td>{{ user.display_name }}</td>
                 <td><code>{{ user.username }}</code></td>
+                <td>{{ user.email or "—" }}</td>
                 <td>
                     {% if user.is_admin %}
                         <span class="badge text-bg-primary">Admin</span>
@@ -38,6 +40,10 @@
                    "June 11, 2026" beats an ISO timestamp on an admin page. #}
                 <td>{{ user.created_at.strftime("%B %d, %Y") }}</td>
                 <td class="text-end">
+                    <a class="btn btn-outline-secondary btn-sm"
+                       href="{{ url_for('admin.edit_user', user_id=user.id) }}">
+                        Edit
+                    </a>
                     <a class="btn btn-outline-secondary btn-sm"
                        href="{{ url_for('admin.reset_password', user_id=user.id) }}">
                         Reset password

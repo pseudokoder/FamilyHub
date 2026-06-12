@@ -865,6 +865,40 @@ returns; another asserts the CSP itself never grows an 'unsafe-inline'.
 
 ---
 
+## Chapter 20 — Forgot-Password Email Flow (Wes stops being the helpdesk)
+
+**What was built (June 12, 2026):** "Forgot your password?" on the login
+page → type your username → an emailed link → choose a new password. The
+most common support call an elderly-user site gets, now self-service.
+
+### The clever part: stateless single-use tokens (no token table)
+
+The emailed link carries a token signed by **itsdangerous** (the same
+library that signs Flask's session cookies). Inside: the user's id and
+the **last 12 characters of their current password hash**. That fragment
+is the trick — using the link changes the password, which changes the
+hash, which invalidates the token. Single-use semantics, zero database
+state. Expired (1 hour), forged, and reused tokens all die in one
+`verify_reset_token()` function, each path tested.
+
+### Privacy + safety details worth reading
+
+- The response to "email me a link" is **identical** whether the username
+  exists, has no email, or doesn't exist — no username harvesting (same
+  principle as the vague login error, Ch. 2).
+- The route is rate-limited at **5/minute** (tighter than login) because
+  each POST can trigger an outbound email.
+- **Graceful degradation:** no `MAIL_SERVER` in .env → the login page
+  shows "call Wes" instead of a dead link, and the route declines
+  politely. A feature that half-exists and crashes is worse than one
+  that's absent.
+- `users.email` is **nullable** — accounts without an email simply have
+  no self-service reset (admins set emails at Admin → Users → Edit).
+- Reset emails are plain text on purpose: spam filters trust it more and
+  every mail app renders it the same.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -931,6 +965,9 @@ about how it *looks and feels*.
       with the right names attached (Ch. 18)
 
 ### After deployment (server-only, can't be tested locally)
+- [ ] With real MAIL_* settings in the server's .env: request a reset
+      link, receive the real email, and complete the reset (Ch. 20 —
+      automated tests cover the logic, only real SMTP delivery needs eyes)
 - [ ] HTTPS padlock shows on https://familyhub.pseudokoder.com
 - [ ] Nightly cron backup ran (check `backups/backup.log` next morning)
       and the zip landed in the Lightsail bucket

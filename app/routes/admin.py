@@ -18,7 +18,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app.forms.admin_forms import SiteSettingsForm
-from app.forms.auth_forms import CreateUserForm, ResetPasswordForm
+from app.forms.auth_forms import CreateUserForm, EditUserForm, ResetPasswordForm
 from app.models import User, db
 from app.services import (
     audit_service, backup_service, settings_service, user_service,
@@ -161,6 +161,22 @@ def create_user():
             )
             return redirect(url_for("admin.list_users"))
     return render_template("admin/new_user.html", form=form)
+
+
+@admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_user(user_id):
+    """Fix a display name, or set the email that password-reset links go
+    to. (Accounts without an email simply have no self-service reset.)"""
+    user = db.get_or_404(User, user_id)
+    form = EditUserForm(obj=user)
+    if form.validate_on_submit():
+        user_service.set_display_name(user, form.display_name.data,
+                                      actor=current_user)
+        user_service.set_email(user, form.email.data, actor=current_user)
+        flash(f"{user.display_name}'s account is updated.", "success")
+        return redirect(url_for("admin.list_users"))
+    return render_template("admin/edit_user.html", form=form, user=user)
 
 
 @admin_bp.route("/users/<int:user_id>/reset-password", methods=["GET", "POST"])

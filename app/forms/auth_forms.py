@@ -2,7 +2,7 @@
 
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
-from wtforms.validators import DataRequired, EqualTo, Length
+from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 
 # One shared rule: 8+ characters. For a small invite-only family site this
 # beats "uppercase + symbol + blood sample" rules that just push elderly
@@ -62,6 +62,42 @@ class ResetPasswordForm(FlaskForm):
         validators=[EqualTo("password", message="Those two don't match — try again.")],
     )
     submit = SubmitField("Set New Password")
+
+
+class EditUserForm(FlaskForm):
+    """Admin-only: fix a display name or set the email reset links go to.
+
+    TEACHING NOTE on the email validation: it's just "contains an @".
+    WTForms' full Email() validator drags in an extra dependency to chase
+    RFC 5322 corner cases, and the REAL test of an address is whether the
+    reset mail arrives. Validate cheaply, verify by delivery."""
+
+    display_name = StringField(
+        "Display name",
+        validators=[DataRequired(message="Please enter a display name."),
+                    Length(max=120)],
+    )
+    email = StringField(
+        "Email (for password-reset links — leave blank for none)",
+        validators=[Length(max=255)],
+    )
+    submit = SubmitField("Save Changes")
+
+    def validate_email(self, field):
+        if field.data and "@" not in field.data:
+            raise ValidationError("That doesn't look like an email address.")
+
+
+class ForgotPasswordForm(FlaskForm):
+    """Step 1 of self-service reset: 'who are you?' The answer is always
+    the same friendly message whether the username exists or not — no
+    username harvesting (same principle as the vague login error)."""
+
+    username = StringField(
+        "Your username",
+        validators=[DataRequired(message="Please type your username.")],
+    )
+    submit = SubmitField("Email Me a Reset Link")
 
 
 class ChangePasswordForm(FlaskForm):

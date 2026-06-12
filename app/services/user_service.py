@@ -3,9 +3,17 @@
 v2 mapping: this file becomes `UserService.java` (@Service) almost verbatim.
 """
 
+from flask import current_app
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
 from app.extensions import bcrypt, db
 from app.models import User
 from app.services import audit_service
+
+# Reset links die after one hour — long enough to walk to the computer,
+# short enough that a link forwarded around or sitting in a hacked inbox
+# next month is worthless.
+RESET_TOKEN_MAX_AGE_SECONDS = 3600
 
 
 def create_user(username, display_name, password, is_admin=False, actor=None):
@@ -67,3 +75,67 @@ def set_password(user, new_password, actor=None):
 def get_all_users():
     """Every account, oldest first — for the admin user list."""
     return User.query.order_by(User.created_at).all()
+
+
+def find_by_username(username):
+    return User.query.filter_by(username=username.strip().lower()).first()
+
+
+def set_email(user, email, actor=None):
+    """Set (or clear) the address password-reset links go to."""
+    user.email = (email or "").strip().lower() or None
+    audit_service.log_event(actor, "edit", "user", user.id,
+                            f"email for {user.username}")
+    db.session.commit()
+    return user
+
+
+def set_display_name(user, display_name, actor=None):
+    user.display_name = display_name.strip()
+    audit_service.log_event(actor, "edit", "user", user.id,
+                            f"display name for {user.username}")
+    db.session.commit()
+    return user
+
+
+# --- Password-reset tokens (the forgot-password email flow) -------------------
+#
+# TEACHING NOTE: no token table! The token IS the proof, thanks to
+# itsdangerous (the same library Flask uses to sign session cookies):
+#
+#   token = sign({user id, last 12 chars of the CURRENT password hash})
+#
+# - Tamper with it           -> signature breaks            -> rejected.
+# - Older than an hour       -> timestamp check fails       -> rejected.
+# - Already used             -> the password CHANGED, so the hash fragment
+#   inside the token no longer matches                      -> rejected.
+#
+# That last trick gives single-use semantics with zero database state —
+# the kind of design worth remembering for v2 (Spring's equivalent would
+# be a signed JWT carrying the same fragment).
+
+def _reset_serializer():
+    return URLSafeTimedSerializer(
+        current_app.config["SECRET_KEY"], salt="password-reset"
+    )
+
+
+def generate_reset_token(user):
+    return _reset_serializer().dumps(
+        {"uid": user.id, "frag": user.password_hash[-12:]}
+    )
+
+
+def verify_reset_token(token):
+    """The User this token belongs to, or None if it's expired, forged,
+    already used, or otherwise not believable."""
+    try:
+        data = _reset_serializer().loads(
+            token, max_age=RESET_TOKEN_MAX_AGE_SECONDS
+        )
+    except (BadSignature, SignatureExpired):
+        return None
+    user = db.session.get(User, data.get("uid", -1))
+    if user is None or user.password_hash[-12:] != data.get("frag"):
+        return None
+    return user
