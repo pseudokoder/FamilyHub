@@ -13,6 +13,7 @@ SQLAlchemy's query API becomes a Spring Data Repository interface.
 from app.extensions import db  # noqa: F401  (re-exported on purpose)
 
 # Import models so SQLAlchemy "sees" them and migrations pick them up.
+from app.models.audit_log import AuditLog  # noqa: E402,F401
 from app.models.family_member import FamilyMember  # noqa: E402,F401
 from app.models.photo import Album, Photo, PhotoComment  # noqa: E402,F401
 from app.models.post import Post, PostComment  # noqa: E402,F401

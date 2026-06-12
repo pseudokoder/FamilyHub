@@ -26,6 +26,7 @@ from pillow_heif import register_heif_opener
 
 from app.extensions import db
 from app.models import Album, Photo, PhotoComment
+from app.services import audit_service
 
 # Teach Pillow to read HEIC/HEIF — the format iPhones shoot by default.
 # One call at import time and Image.open() handles them like any other image.
@@ -55,6 +56,8 @@ def create_album(title, description, user):
         created_by=user.id,
     )
     db.session.add(album)
+    db.session.flush()  # assigns album.id so the audit row can name it
+    audit_service.log_event(user, "create", "album", album.id, album.title)
     db.session.commit()
     return album
 
@@ -65,11 +68,19 @@ def get_all_albums():
 
 
 def can_delete_album(album, user):
-    """Same shape as the photo rule: its creator, or an admin."""
-    return user.is_admin or album.created_by == user.id
+    """THE TRIAL-PERIOD RULE (see models/mixins.py): an admin always may;
+    the creator may only while the album is unlocked — AND only if no
+    photo inside it has been individually locked, because deleting the
+    album would take the protected photo with it. The strictest lock in
+    the box wins."""
+    if user.is_admin:
+        return True
+    if album.created_by != user.id or album.is_locked:
+        return False
+    return all(not photo.is_locked for photo in album.photos)
 
 
-def delete_album(album):
+def delete_album(album, user):
     """Delete a whole album: every photo's files, then all the rows.
 
     Files first, same order as delete_photo — if a disk delete fails the
@@ -83,6 +94,10 @@ def delete_album(album):
             if os.path.exists(path):
                 os.remove(path)
     folder = _album_dir(album.id)
+    audit_service.log_event(
+        user, "delete", "album", album.id,
+        f'"{album.title}" ({len(album.photos)} photos)',
+    )
     db.session.delete(album)
     db.session.commit()
     # The album's upload folder is empty now; removing it keeps the
@@ -206,6 +221,11 @@ def save_photos(album, files, user):
 
     # One commit for the whole batch: either the bookkeeping for all saved
     # photos lands, or none of it does (transactions, D427).
+    if saved:
+        audit_service.log_event(
+            user, "upload", "album", album.id,
+            f'{saved} photo(s) into "{album.title}"',
+        )
     db.session.commit()
     return saved, errors
 
@@ -241,12 +261,15 @@ def add_comment(photo, user, body):
 
 
 def can_delete(photo, user):
-    """Rule in ONE place: you can delete a photo if you uploaded it, or
-    you're an admin. Routes ask this function — they don't re-invent it."""
-    return user.is_admin or photo.uploaded_by == user.id
+    """Rule in ONE place: an admin always may; the uploader may only while
+    the photo is unlocked (the Trial Period rule — once an admin locks a
+    photo into the archive, only an admin can remove it)."""
+    if user.is_admin:
+        return True
+    return photo.uploaded_by == user.id and not photo.is_locked
 
 
-def delete_photo(photo):
+def delete_photo(photo, user):
     """Remove the photo's files AND its database row.
 
     Files first: if the disk delete fails we haven't lost the bookkeeping,
@@ -256,6 +279,9 @@ def delete_photo(photo):
     for path in (full_path, thumb_path):
         if os.path.exists(path):
             os.remove(path)
+    audit_service.log_event(
+        user, "delete", "photo", photo.id, photo.original_filename
+    )
     db.session.delete(photo)  # cascade removes its comments too
     db.session.commit()
 
@@ -265,13 +291,15 @@ def can_delete_comment(comment, user):
     return user.is_admin or comment.author_id == user.id
 
 
-def delete_comment(comment):
+def delete_comment(comment, user):
+    audit_service.log_event(user, "delete", "photo comment", comment.id)
     db.session.delete(comment)
     db.session.commit()
 
 
-def update_caption(photo, caption):
+def update_caption(photo, caption, user):
     photo.caption = (caption or "").strip()
+    audit_service.log_event(user, "edit caption", "photo", photo.id)
     db.session.commit()
     return photo
 

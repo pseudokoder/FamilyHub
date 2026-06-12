@@ -1,0 +1,43 @@
+{# The audit trail — newest first. Append-only by design: the app writes
+   these rows and never edits them, so this page is the answer to "who
+   deleted that?" that nobody can argue with. #}
+{% extends "base.html" %}
+
+{% block title %}Activity Log{% endblock %}
+
+{% block content %}
+<h1 class="mb-1">📋 Activity Log</h1>
+<p class="fs-5 text-muted mb-4">
+    Every change anyone makes — newest first, last 100 shown.
+</p>
+
+{% if events %}
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>When</th>
+                <th>Who</th>
+                <th>Did what</th>
+                <th>To</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in events %}
+            <tr>
+                <td class="text-nowrap">{{ event.created_at.strftime("%b %d, %H:%M") }}</td>
+                <td>{{ event.user.display_name if event.user else "CLI / system" }}</td>
+                <td><span class="badge text-bg-secondary">{{ event.action }}</span></td>
+                <td>{{ event.target_type }}{% if event.target_id %} #{{ event.target_id }}{% endif %}</td>
+                <td class="text-muted">{{ event.detail }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted fs-5">Nothing logged yet — actions will appear here as
+the family uses the site.</p>
+{% endif %}
+{% endblock %}

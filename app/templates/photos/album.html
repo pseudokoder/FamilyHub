@@ -17,6 +17,10 @@
 {% if album.description %}
 <p class="lead">{{ album.description }}</p>
 {% endif %}
+{% if album.is_locked %}
+<p><span class="badge text-bg-success fs-6">🔒 In the family archive
+   — only an admin can delete this album</span></p>
+{% endif %}
 
 {# ---- The upload box ----------------------------------------------------
    Hand-written form (instead of render_form) because file uploads need two
@@ -86,19 +90,36 @@
 </p>
 {% endif %}
 
-{% if can_delete_album %}
-{# Tucked at the very bottom, away from the everyday buttons — deleting a
-   whole album is the biggest destructive action on the site, and the
-   confirm() spells out exactly how big. #}
+{% if can_delete_album or current_user.is_admin %}
 <hr class="mt-5">
-<form method="post"
-      action="{{ url_for('photos.delete_album', album_id=album.id) }}"
-      onsubmit="return confirm('Delete this WHOLE album and every photo in it, for everyone? This cannot be undone.');">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="btn btn-outline-danger">
-        🗑 Delete this entire album ({{ album.photos | length }} photo{{ 's' if album.photos | length != 1 }})
-    </button>
-</form>
+<div class="d-flex gap-2 flex-wrap">
+    {% if can_delete_album %}
+    {# Tucked at the very bottom, away from the everyday buttons — deleting a
+       whole album is the biggest destructive action on the site, and the
+       confirm() spells out exactly how big. #}
+    <form method="post"
+          action="{{ url_for('photos.delete_album', album_id=album.id) }}"
+          onsubmit="return confirm('Delete this WHOLE album and every photo in it, for everyone? This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger">
+            🗑 Delete this entire album ({{ album.photos | length }} photo{{ 's' if album.photos | length != 1 }})
+        </button>
+    </form>
+    {% endif %}
+    {% if current_user.is_admin %}
+    {% if album.is_locked %}
+    <form method="post" action="{{ url_for('photos.unlock_album', album_id=album.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-secondary">🔓 Unlock album (admin)</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('photos.lock_album', album_id=album.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-secondary">🔒 Lock album into archive (admin)</button>
+    </form>
+    {% endif %}
+    {% endif %}
+</div>
 {% endif %}
 {% endblock %}
 

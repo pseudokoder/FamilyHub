@@ -11,6 +11,7 @@ for why a collaborative wiki without history is a data-loss machine).
 
 from app.extensions import db
 from app.models import FamilyMember, WikiRevision
+from app.services import audit_service
 
 
 def get_all_members():
@@ -57,7 +58,9 @@ def create_member(form_data, user):
         updated_by=user.id,
     )
     db.session.add(member)
+    db.session.flush()  # assigns member.id so the audit row can name it
     _record_revision(member, user)  # version 1: the page as first written
+    audit_service.log_event(user, "create", "wiki page", member.id, member.name)
     db.session.commit()
     return member
 
@@ -70,8 +73,19 @@ def update_member(member, form_data, user):
     member.death_date = form_data["death_date"]
     member.updated_by = user.id
     _record_revision(member, user)
+    audit_service.log_event(user, "edit", "wiki page", member.id, member.name)
     db.session.commit()
     return member
+
+
+def can_delete(member, user):
+    """THE TRIAL-PERIOD RULE: an admin always may. The page's creator may
+    while it's unlocked — once an admin locks the page into the archive,
+    only an admin can remove it. (Pages from before creator-tracking have
+    created_by = None, so they're admin-only automatically.)"""
+    if user.is_admin:
+        return True
+    return member.created_by == user.id and not member.is_locked
 
 
 def get_revision(member, revision_id):
@@ -99,10 +113,12 @@ def restore_revision(member, revision, user):
     member.death_date = revision.death_date
     member.updated_by = user.id
     _record_revision(member, user)
+    audit_service.log_event(user, "restore", "wiki page", member.id, member.name)
     db.session.commit()
     return member
 
 
-def delete_member(member):
+def delete_member(member, user):
+    audit_service.log_event(user, "delete", "wiki page", member.id, member.name)
     db.session.delete(member)  # cascade removes the page's history too
     db.session.commit()

@@ -5,9 +5,10 @@ v2 mapping: this file becomes `UserService.java` (@Service) almost verbatim.
 
 from app.extensions import bcrypt, db
 from app.models import User
+from app.services import audit_service
 
 
-def create_user(username, display_name, password, is_admin=False):
+def create_user(username, display_name, password, is_admin=False, actor=None):
     """Create a new account with a securely hashed password.
 
     Raises ValueError if the username is taken — the route layer turns that
@@ -30,6 +31,9 @@ def create_user(username, display_name, password, is_admin=False):
         is_admin=is_admin,
     )
     db.session.add(user)
+    db.session.flush()  # assigns user.id so the audit row can name it
+    # actor=None happens from the command line (flask create-admin).
+    audit_service.log_event(actor, "create", "user", user.id, username)
     db.session.commit()
     return user
 
@@ -51,9 +55,12 @@ def authenticate(username, password):
     return user
 
 
-def set_password(user, new_password):
-    """Reset a user's password (admin 'they forgot it again' button)."""
+def set_password(user, new_password, actor=None):
+    """Set a new password — used by the admin reset button AND the
+    self-service change page. The audit row records who did it; the hash
+    itself, of course, never appears anywhere."""
     user.password_hash = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    audit_service.log_event(actor, "set password", "user", user.id, user.username)
     db.session.commit()
 
 

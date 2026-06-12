@@ -778,6 +778,57 @@ real annoyance, plus one discovery.
 
 ---
 
+## Chapter 18 — Content Locking & the Audit Trail (Wes's Trial Period rule)
+
+**What was built (June 12, 2026):** Wes's permission redesign, verbatim:
+
+> "Wiki entries, photo uploads, album creations, history timeline entries
+> can be deleted by normal users after upload, but admin needs to have the
+> control to lock all those after they've been reviewed and approved, and
+> after they've been locked, then no one but an admin can delete them.
+> The time between upload and admin approval could be thought of as a
+> **Trial Period**."
+
+### The policy, as a table
+
+| Content | During trial (unlocked) | After admin locks |
+|---|---|---|
+| Photos, albums, wiki pages, timeline events | creator may delete | **admin only** |
+| Posts & comments | author may always delete | *(never lockable — your words stay yours)* |
+
+One consequence worth noticing: **wiki deletion actually got looser** —
+it was admin-only before; now a page's creator can take back their own
+page while it's unlocked. And **the strictest lock wins**: an unlocked
+album containing one locked photo can't be deleted by its creator,
+because the album would take the protected photo with it.
+
+### How it's built (read in this order)
+
+1. **`app/models/mixins.py`** — `LockableMixin` adds `locked_at` +
+   `locked_by` to all four content types *once* (composition over
+   copy-paste; the JPA cousin is `@MappedSuperclass`). `is_locked` is just
+   "is there a timestamp?" — no boolean to drift out of sync.
+2. **The `can_delete` rules** in each service gained one line:
+   `... and not item.is_locked`. Rules stay in services; templates and
+   routes only ever *ask*.
+3. **`lock_service.py`** — one lock()/unlock() pair serves all four types
+   (the mixin gave them the same shape). Admin-only, enforced in routes.
+4. **Lock badges** show for *everyone* ("🔒 In the family archive") so a
+   member understands why their delete button disappeared. Elderly-first
+   means permissions explain themselves.
+5. **`audit_log` table + `audit_service.log_event()`** — every create,
+   edit, upload, delete, lock, unlock, password set, settings change, and
+   backup run writes one row *in the same transaction as the action*
+   (log_event adds but never commits — the calling service's commit
+   carries both, so the log can never disagree with the data).
+   Admin → Activity Log shows the latest 100.
+6. **A decision to flag for Wes:** locking blocks *deletion* only —
+   editing stays open (the wiki is still collaborative; a locked photo's
+   caption can still be fixed). If "locked" should also freeze edits,
+   that's a one-line change per `can_modify` rule — say the word.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -837,6 +888,11 @@ about how it *looks and feels*.
       private/incognito window
 - [ ] Admin → Backups: trigger a backup, see it verified, download the
       zip, open it locally — DB + photos + manifest are inside
+- [ ] As admin: lock a photo — the green "In the family archive" badge
+      appears; log in as a member who uploaded it and confirm their
+      delete button is gone (Ch. 18)
+- [ ] Admin → Activity Log: today's actions are listed, newest first,
+      with the right names attached (Ch. 18)
 
 ### After deployment (server-only, can't be tested locally)
 - [ ] HTTPS padlock shows on https://familyhub.pseudokoder.com
@@ -936,6 +992,16 @@ Running log of judgment calls made mid-build, per the workflow rules
     default limits. Family members click fast when browsing albums;
     limiting reads would punish the people the site is for. Login is the
     one route where volume = attack.
+26. **(Ch. 18)** Locking blocks DELETION only, not editing — Wes's spec
+    said "no one but an admin can delete them" and said nothing about
+    edits, so the collaborative wiki stays collaborative even when locked.
+    Flagged in Chapter 18 for Wes to confirm or tighten.
+27. **(Ch. 18)** The audit log's target_id is deliberately NOT a foreign
+    key: an audit row must outlive the row it describes (an enforced FK
+    would either block deletes or cascade the log away — both wrong).
+28. **(Ch. 18)** Lock/unlock are idempotent (locking twice = no-op, not
+    an error) — admins double-click, and idempotent endpoints are also
+    what v2's REST API will want anyway.
 
 ---
 

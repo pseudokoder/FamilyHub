@@ -68,20 +68,42 @@
         </p>
         {% endif %}
 
-        {% if current_user.is_admin %}
-        {# NOTE: the confirm() text is deliberately generic — interpolating a
-           user-entered name into JavaScript breaks on names like O'Brien
-           (the apostrophe ends the JS string early). User data and script
-           code don't mix; that rule has no exceptions. #}
-        <form method="post" class="mt-4"
-              action="{{ url_for('wiki.delete_member', member_id=member.id) }}"
-              onsubmit="return confirm('Delete this person\'s page for everyone? This cannot be undone.');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-outline-danger btn-sm">
-                🗑 Delete this page (admin)
-            </button>
-        </form>
+        {% if member.is_locked %}
+        {# The lock badge shows for EVERYONE — it explains why the delete
+           button disappeared for the page's creator. #}
+        <p><span class="badge text-bg-success fs-6">🔒 In the family archive
+           — only an admin can delete this page</span></p>
         {% endif %}
+
+        <div class="d-flex gap-2 mt-4 flex-wrap">
+            {% if can_delete %}
+            {# NOTE: the confirm() text is deliberately generic — interpolating a
+               user-entered name into JavaScript breaks on names like O'Brien
+               (the apostrophe ends the JS string early). User data and script
+               code don't mix; that rule has no exceptions. #}
+            <form method="post"
+                  action="{{ url_for('wiki.delete_member', member_id=member.id) }}"
+                  onsubmit="return confirm('Delete this person\'s page for everyone? This cannot be undone.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    🗑 Delete this page
+                </button>
+            </form>
+            {% endif %}
+            {% if current_user.is_admin %}
+            {% if member.is_locked %}
+            <form method="post" action="{{ url_for('wiki.unlock_member', member_id=member.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">🔓 Unlock (admin)</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('wiki.lock_member', member_id=member.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">🔒 Lock into archive (admin)</button>
+            </form>
+            {% endif %}
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}

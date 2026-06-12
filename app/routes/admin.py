@@ -20,7 +20,9 @@ from flask_login import current_user, login_required
 from app.forms.admin_forms import SiteSettingsForm
 from app.forms.auth_forms import CreateUserForm, ResetPasswordForm
 from app.models import User, db
-from app.services import backup_service, settings_service, user_service
+from app.services import (
+    audit_service, backup_service, settings_service, user_service,
+)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -51,6 +53,16 @@ def list_users():
     return render_template("admin/users.html", users=user_service.get_all_users())
 
 
+@admin_bp.route("/activity")
+@admin_required
+def activity():
+    """The audit trail: who did what, newest first. Append-only — this
+    page only reads. 'Who deleted the Thanksgiving album?' lives here."""
+    return render_template(
+        "admin/activity.html", events=audit_service.recent_events(limit=100)
+    )
+
+
 @admin_bp.route("/settings", methods=["GET", "POST"])
 @admin_required
 def site_settings():
@@ -66,6 +78,8 @@ def site_settings():
             if error:
                 flash(error, "danger")
                 return render_template("admin/settings.html", form=form)
+        audit_service.log_event(current_user, "edit", "site settings")
+        db.session.commit()
         flash("Site settings saved.", "success")
         return redirect(url_for("admin.site_settings"))
     return render_template(
@@ -87,6 +101,11 @@ def run_backup():
     the admin exactly what happened, honestly."""
     path = backup_service.create_backup()
     report = backup_service.verify_backup(path)
+    audit_service.log_event(
+        current_user, "run backup", "backup",
+        detail="verified" if report["ok"] else "FAILED verification",
+    )
+    db.session.commit()
     if report["ok"]:
         flash(
             f"Backup created and verified — DB ({report['db_tables']} tables) "
@@ -128,6 +147,7 @@ def create_user():
                 display_name=form.display_name.data,
                 password=form.password.data,
                 is_admin=form.is_admin.data,
+                actor=current_user,
             )
         except ValueError as err:
             # Duplicate username. Re-render the form with everything the
@@ -151,7 +171,7 @@ def reset_password(user_id):
     user = db.get_or_404(User, user_id)
     form = ResetPasswordForm()
     if form.validate_on_submit():
-        user_service.set_password(user, form.password.data)
+        user_service.set_password(user, form.password.data, actor=current_user)
         flash(f"New password set for {user.display_name}.", "success")
         return redirect(url_for("admin.list_users"))
     return render_template("admin/reset_password.html", form=form, user=user)

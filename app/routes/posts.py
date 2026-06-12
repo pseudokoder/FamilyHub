@@ -61,7 +61,7 @@ def edit_post(post_id):
     # same PostForm class handles both "new" and "edit". One form, two jobs.
     form = PostForm(obj=post)
     if form.validate_on_submit():
-        post_service.update_post(post, form.title.data, form.body.data)
+        post_service.update_post(post, form.title.data, form.body.data, current_user)
         flash("Your changes are saved.", "success")
         return redirect(url_for("posts.view_post", post_id=post.id))
     return render_template("posts/edit_post.html", form=form, post=post)
@@ -73,7 +73,7 @@ def delete_post(post_id):
     post = db.get_or_404(Post, post_id)
     if not post_service.can_modify(post, current_user):
         abort(403)
-    post_service.delete_post(post)
+    post_service.delete_post(post, current_user)
     flash("The memory was deleted.", "success")
     return redirect(url_for("posts.list_posts"))
 
@@ -99,6 +99,6 @@ def delete_comment(comment_id):
     if not post_service.can_delete_comment(comment, current_user):
         abort(403)
     post_id = comment.post_id
-    post_service.delete_comment(comment)
+    post_service.delete_comment(comment, current_user)
     flash("Comment deleted.", "success")
     return redirect(url_for("posts.view_post", post_id=post_id))

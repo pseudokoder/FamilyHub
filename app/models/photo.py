@@ -17,10 +17,14 @@ exact relationship homework from D287/D288.
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.mixins import LockableMixin
 
 
-class Album(db.Model):
-    """A photo album — 'Thanksgiving 1987', 'The Las Vegas Trip', ..."""
+class Album(LockableMixin, db.Model):
+    """A photo album — 'Thanksgiving 1987', 'The Las Vegas Trip', ...
+
+    LockableMixin: once an admin locks an album, only an admin can delete
+    it (see mixins.py for the whole Trial Period story)."""
 
     __tablename__ = "albums"
 
@@ -45,7 +49,9 @@ class Album(db.Model):
         cascade="all, delete-orphan",
         order_by="Photo.position, Photo.id",
     )
-    creator = db.relationship("User")
+    # foreign_keys= is REQUIRED now: created_by and locked_by both point at
+    # users, and SQLAlchemy won't guess which one "creator" means.
+    creator = db.relationship("User", foreign_keys=[created_by])
 
     @property
     def cover_photo(self):
@@ -58,7 +64,7 @@ class Album(db.Model):
         return f"<Album {self.title!r}>"
 
 
-class Photo(db.Model):
+class Photo(LockableMixin, db.Model):
     """One uploaded photo: where it lives on disk + everything about it."""
 
     __tablename__ = "photos"
@@ -90,7 +96,8 @@ class Photo(db.Model):
     )
 
     album = db.relationship("Album", back_populates="photos")
-    uploader = db.relationship("User")
+    # Two FKs to users (uploaded_by + the mixin's locked_by) -> be explicit.
+    uploader = db.relationship("User", foreign_keys=[uploaded_by])
     comments = db.relationship(
         "PhotoComment",
         back_populates="photo",

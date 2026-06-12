@@ -17,9 +17,10 @@ protects. Every route that shows this data is @login_required.
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.mixins import LockableMixin
 
 
-class FamilyMember(db.Model):
+class FamilyMember(LockableMixin, db.Model):
     __tablename__ = "family_member"
 
     id = db.Column(db.Integer, primary_key=True)

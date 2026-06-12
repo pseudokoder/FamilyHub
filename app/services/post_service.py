@@ -6,6 +6,7 @@ v2 mapping: PostService.java (@Service).
 
 from app.extensions import db
 from app.models import Post, PostComment
+from app.services import audit_service
 
 
 def get_all_posts():
@@ -16,25 +17,31 @@ def get_all_posts():
 def create_post(title, body, user):
     post = Post(title=title.strip(), body=body.strip(), author_id=user.id)
     db.session.add(post)
+    db.session.flush()  # assigns post.id so the audit row can name it
+    audit_service.log_event(user, "create", "post", post.id, post.title)
     db.session.commit()
     return post
 
 
-def update_post(post, title, body):
+def update_post(post, title, body, user):
     post.title = title.strip()
     post.body = body.strip()
+    audit_service.log_event(user, "edit", "post", post.id, post.title)
     db.session.commit()  # updated_at stamps itself (onupdate in the model)
     return post
 
 
 def can_modify(post, user):
     """One rule, one place: the author or an admin may edit/delete a post.
-    Identical policy to photos — consistent rules are learnable rules,
-    for the family AND for whoever maintains this code."""
+
+    Posts are deliberately NOT lockable (Wes's rule): they're personal
+    words, and their author may always take them back — unlike photos and
+    wiki pages, which become shared archive once an admin locks them."""
     return user.is_admin or post.author_id == user.id
 
 
-def delete_post(post):
+def delete_post(post, user):
+    audit_service.log_event(user, "delete", "post", post.id, post.title)
     db.session.delete(post)  # cascade removes its comments
     db.session.commit()
 
@@ -51,6 +58,7 @@ def can_delete_comment(comment, user):
     return user.is_admin or comment.author_id == user.id
 
 
-def delete_comment(comment):
+def delete_comment(comment, user):
+    audit_service.log_event(user, "delete", "post comment", comment.id)
     db.session.delete(comment)
     db.session.commit()

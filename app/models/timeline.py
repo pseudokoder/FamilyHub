@@ -13,9 +13,10 @@ import calendar
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.mixins import LockableMixin
 
 
-class TimelineEvent(db.Model):
+class TimelineEvent(LockableMixin, db.Model):
     __tablename__ = "timeline_events"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -31,7 +32,8 @@ class TimelineEvent(db.Model):
         db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
-    creator = db.relationship("User")
+    # Two FKs to users (created_by + the mixin's locked_by) -> be explicit.
+    creator = db.relationship("User", foreign_keys=[created_by])
 
     @property
     def display_date(self):

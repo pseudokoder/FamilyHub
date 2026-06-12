@@ -29,7 +29,7 @@ from app.extensions import db
 from app.forms.comment_forms import CommentForm
 from app.forms.photo_forms import AlbumForm, PhotoCaptionForm, UploadPhotosForm
 from app.models import Album, Photo, PhotoComment
-from app.services import photo_service
+from app.services import lock_service, photo_service
 
 photos_bp = Blueprint("photos", __name__)
 
@@ -74,9 +74,33 @@ def delete_album(album_id):
     if not photo_service.can_delete_album(album, current_user):
         abort(403)
     title = album.title
-    photo_service.delete_album(album)
+    photo_service.delete_album(album, current_user)
     flash(f'The album "{title}" and all its photos were deleted.', "success")
     return redirect(url_for("photos.list_albums"))
+
+
+# --- Locking (admin only — the Trial Period switch) ---------------------------
+
+@photos_bp.route("/albums/<int:album_id>/lock", methods=["POST"])
+@login_required
+def lock_album(album_id):
+    if not current_user.is_admin:
+        abort(403)
+    album = db.get_or_404(Album, album_id)
+    lock_service.lock(album, current_user)
+    flash("Album locked into the family archive — only an admin can delete it now.", "success")
+    return redirect(url_for("photos.view_album", album_id=album.id))
+
+
+@photos_bp.route("/albums/<int:album_id>/unlock", methods=["POST"])
+@login_required
+def unlock_album(album_id):
+    if not current_user.is_admin:
+        abort(403)
+    album = db.get_or_404(Album, album_id)
+    lock_service.unlock(album, current_user)
+    flash("Album unlocked — its creator can delete it again.", "success")
+    return redirect(url_for("photos.view_album", album_id=album.id))
 
 
 @photos_bp.route("/albums/<int:album_id>/photos", methods=["POST"])
@@ -134,9 +158,31 @@ def delete_photo(photo_id):
     if not photo_service.can_delete(photo, current_user):
         abort(403)
     album_id = photo.album_id
-    photo_service.delete_photo(photo)
+    photo_service.delete_photo(photo, current_user)
     flash("Photo deleted.", "success")
     return redirect(url_for("photos.view_album", album_id=album_id))
+
+
+@photos_bp.route("/photos/<int:photo_id>/lock", methods=["POST"])
+@login_required
+def lock_photo(photo_id):
+    if not current_user.is_admin:
+        abort(403)
+    photo = db.get_or_404(Photo, photo_id)
+    lock_service.lock(photo, current_user)
+    flash("Photo locked into the family archive — only an admin can delete it now.", "success")
+    return redirect(url_for("photos.view_photo", photo_id=photo.id))
+
+
+@photos_bp.route("/photos/<int:photo_id>/unlock", methods=["POST"])
+@login_required
+def unlock_photo(photo_id):
+    if not current_user.is_admin:
+        abort(403)
+    photo = db.get_or_404(Photo, photo_id)
+    lock_service.unlock(photo, current_user)
+    flash("Photo unlocked — its uploader can delete it again.", "success")
+    return redirect(url_for("photos.view_photo", photo_id=photo.id))
 
 
 @photos_bp.route("/photos/<int:photo_id>/edit", methods=["GET", "POST"])
@@ -149,7 +195,7 @@ def edit_photo(photo_id):
         abort(403)
     form = PhotoCaptionForm(obj=photo)
     if form.validate_on_submit():
-        photo_service.update_caption(photo, form.caption.data)
+        photo_service.update_caption(photo, form.caption.data, current_user)
         flash("Caption saved.", "success")
         return redirect(url_for("photos.view_photo", photo_id=photo.id))
     return render_template("photos/edit_photo.html", form=form, photo=photo)
@@ -185,7 +231,7 @@ def delete_comment(comment_id):
     if not photo_service.can_delete_comment(comment, current_user):
         abort(403)
     photo_id = comment.photo_id
-    photo_service.delete_comment(comment)
+    photo_service.delete_comment(comment, current_user)
     flash("Comment deleted.", "success")
     return redirect(url_for("photos.view_photo", photo_id=photo_id))
 

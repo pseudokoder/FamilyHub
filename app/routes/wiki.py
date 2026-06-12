@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.forms.wiki_forms import FamilyMemberForm
 from app.models import FamilyMember
-from app.services import wiki_service
+from app.services import lock_service, wiki_service
 
 wiki_bp = Blueprint("wiki", __name__)
 
@@ -53,7 +53,10 @@ def create_member():
 @login_required
 def view_member(member_id):
     member = db.get_or_404(FamilyMember, member_id)
-    return render_template("wiki/member.html", member=member)
+    return render_template(
+        "wiki/member.html", member=member,
+        can_delete=wiki_service.can_delete(member, current_user),
+    )
 
 
 @wiki_bp.route("/family/<int:member_id>/edit", methods=["GET", "POST"])
@@ -71,13 +74,38 @@ def edit_member(member_id):
 @wiki_bp.route("/family/<int:member_id>/delete", methods=["POST"])
 @login_required
 def delete_member(member_id):
+    # POLICY CHANGE (June 12, 2026 — Wes's Trial Period rule): no longer
+    # admin-only. The page's CREATOR may delete while it's unlocked; once
+    # an admin locks it, admin-only. The rule lives in the service.
+    member = db.get_or_404(FamilyMember, member_id)
+    if not wiki_service.can_delete(member, current_user):
+        abort(403)
+    name = member.name
+    wiki_service.delete_member(member, current_user)
+    flash(f"The page for {name} was deleted.", "success")
+    return redirect(url_for("wiki.list_members"))
+
+
+@wiki_bp.route("/family/<int:member_id>/lock", methods=["POST"])
+@login_required
+def lock_member(member_id):
     if not current_user.is_admin:
         abort(403)
     member = db.get_or_404(FamilyMember, member_id)
-    name = member.name
-    wiki_service.delete_member(member)
-    flash(f"The page for {name} was deleted.", "success")
-    return redirect(url_for("wiki.list_members"))
+    lock_service.lock(member, current_user)
+    flash(f"{member.name}'s page is locked into the family archive — only an admin can delete it now.", "success")
+    return redirect(url_for("wiki.view_member", member_id=member.id))
+
+
+@wiki_bp.route("/family/<int:member_id>/unlock", methods=["POST"])
+@login_required
+def unlock_member(member_id):
+    if not current_user.is_admin:
+        abort(403)
+    member = db.get_or_404(FamilyMember, member_id)
+    lock_service.unlock(member, current_user)
+    flash(f"{member.name}'s page is unlocked — its creator can delete it again.", "success")
+    return redirect(url_for("wiki.view_member", member_id=member.id))
 
 
 # --- Page history (the wiki's undo button) -----------------------------------

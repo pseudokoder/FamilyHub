@@ -76,7 +76,9 @@ def change_password():
         if verified is None:
             flash("That current password isn't right — nothing was changed.", "danger")
         else:
-            user_service.set_password(current_user, form.password.data)
+            user_service.set_password(
+                current_user, form.password.data, actor=current_user
+            )
             flash("Your password is changed! Use the new one from now on.", "success")
             return redirect(url_for("main.home"))
     return render_template("auth/change_password.html", form=form)

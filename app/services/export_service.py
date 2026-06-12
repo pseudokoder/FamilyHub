@@ -31,7 +31,7 @@ from sqlalchemy import text
 
 from app.extensions import db
 from app.models import (
-    Album, FamilyMember, Photo, PhotoComment, Post, PostComment,
+    Album, AuditLog, FamilyMember, Photo, PhotoComment, Post, PostComment,
     SiteSetting, TimelineEvent, User, WikiRevision,
 )
 
@@ -39,7 +39,7 @@ from app.models import (
 # tripping over foreign keys (users first — everything points at them).
 EXPORTED_MODELS = [
     User, FamilyMember, Album, Photo, PhotoComment,
-    Post, PostComment, TimelineEvent, SiteSetting, WikiRevision,
+    Post, PostComment, TimelineEvent, SiteSetting, WikiRevision, AuditLog,
 ]
 
 

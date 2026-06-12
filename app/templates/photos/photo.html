@@ -33,12 +33,34 @@
     on {{ photo.uploaded_at.strftime("%B %d, %Y") }}
 </p>
 
-{% if can_delete %}
-<div class="d-flex justify-content-center gap-2 mb-4">
+{% if photo.is_locked %}
+<p class="text-center">
+    <span class="badge text-bg-success fs-6">🔒 In the family archive
+    — only an admin can delete this photo</span>
+</p>
+{% endif %}
+
+<div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
+    {% if current_user.is_admin or photo.uploaded_by == current_user.id %}
     <a class="btn btn-outline-secondary"
        href="{{ url_for('photos.edit_photo', photo_id=photo.id) }}">
         ✏️ Edit caption
     </a>
+    {% endif %}
+    {% if current_user.is_admin %}
+    {% if photo.is_locked %}
+    <form method="post" action="{{ url_for('photos.unlock_photo', photo_id=photo.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-secondary">🔓 Unlock (admin)</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('photos.lock_photo', photo_id=photo.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-secondary">🔒 Lock into archive (admin)</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    {% if can_delete %}
     {# Destructive action -> POST form + a confirmation dialog. The browser
        confirm() is simple but does the job CLAUDE.md asks for: nothing is
        destroyed by one accidental tap. #}
@@ -48,8 +70,8 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-outline-danger">🗑 Delete this photo</button>
     </form>
+    {% endif %}
 </div>
-{% endif %}
 
 <hr>
 

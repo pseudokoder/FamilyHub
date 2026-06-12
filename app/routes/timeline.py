@@ -13,7 +13,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.forms.timeline_forms import TimelineEventForm
 from app.models import TimelineEvent
-from app.services import timeline_service
+from app.services import lock_service, timeline_service
 
 timeline_bp = Blueprint("timeline", __name__)
 
@@ -21,8 +21,15 @@ timeline_bp = Blueprint("timeline", __name__)
 @timeline_bp.route("/timeline")
 @login_required
 def list_events():
+    events = timeline_service.get_all_events()
+    # The template shows a delete button only where the SERVICE rule says
+    # yes — never re-derive a permission in a template (one rule, one place).
+    deletable_ids = {
+        event.id for event in events
+        if timeline_service.can_delete(event, current_user)
+    }
     return render_template(
-        "timeline/timeline.html", events=timeline_service.get_all_events()
+        "timeline/timeline.html", events=events, deletable_ids=deletable_ids
     )
 
 
@@ -43,7 +50,7 @@ def edit_event(event_id):
     event = db.get_or_404(TimelineEvent, event_id)
     form = TimelineEventForm(obj=event)
     if form.validate_on_submit():
-        timeline_service.update_event(event, form.data)
+        timeline_service.update_event(event, form.data, current_user)
         flash("The event is updated.", "success")
         return redirect(url_for("timeline.list_events"))
     return render_template("timeline/edit_event.html", form=form, event=event)
@@ -55,6 +62,28 @@ def delete_event(event_id):
     event = db.get_or_404(TimelineEvent, event_id)
     if not timeline_service.can_delete(event, current_user):
         abort(403)
-    timeline_service.delete_event(event)
+    timeline_service.delete_event(event, current_user)
     flash("The event was removed from the timeline.", "success")
+    return redirect(url_for("timeline.list_events"))
+
+
+@timeline_bp.route("/timeline/<int:event_id>/lock", methods=["POST"])
+@login_required
+def lock_event(event_id):
+    if not current_user.is_admin:
+        abort(403)
+    event = db.get_or_404(TimelineEvent, event_id)
+    lock_service.lock(event, current_user)
+    flash(f'"{event.title}" is locked into the family archive.', "success")
+    return redirect(url_for("timeline.list_events"))
+
+
+@timeline_bp.route("/timeline/<int:event_id>/unlock", methods=["POST"])
+@login_required
+def unlock_event(event_id):
+    if not current_user.is_admin:
+        abort(403)
+    event = db.get_or_404(TimelineEvent, event_id)
+    lock_service.unlock(event, current_user)
+    flash(f'"{event.title}" is unlocked — its creator can delete it again.', "success")
     return redirect(url_for("timeline.list_events"))
