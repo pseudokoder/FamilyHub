@@ -23,7 +23,7 @@
 <div class="row justify-content-center">
     <div class="col-lg-7">
         <div class="text-center mb-3">
-            <img class="img-fluid rounded" style="max-height: 320px;"
+            <img class="img-fluid rounded photo-preview"
                  src="{{ url_for('photos.photo_thumb', photo_id=photo.id) }}"
                  alt="{{ photo.caption or photo.original_filename }}">
         </div>

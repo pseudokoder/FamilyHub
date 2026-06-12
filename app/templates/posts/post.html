@@ -37,7 +37,7 @@
                href="{{ url_for('posts.edit_post', post_id=post.id) }}">✏️ Edit</a>
             <form method="post"
                   action="{{ url_for('posts.delete_post', post_id=post.id) }}"
-                  onsubmit="return confirm('Delete this memory for everyone? This cannot be undone.');">
+                  data-confirm="Delete this memory for everyone? This cannot be undone.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-outline-danger">🗑 Delete</button>
             </form>
@@ -56,7 +56,7 @@
                     {% if current_user.is_admin or comment.author_id == current_user.id %}
                     <form method="post"
                           action="{{ url_for('posts.delete_comment', comment_id=comment.id) }}"
-                          onsubmit="return confirm('Delete this comment?');">
+                          data-confirm="Delete this comment?">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline-danger"
                                 aria-label="Delete this comment">🗑</button>

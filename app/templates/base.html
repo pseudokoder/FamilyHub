@@ -151,6 +151,8 @@
 {# Bootstrap's JavaScript (menus, dismissible alerts) loads at the END of the
    body so the visible page never waits on a script — pages feel faster. #}
 {{ bootstrap.load_js() }}
+{# Site-wide behaviors (the data-confirm dialogs) — see the file itself. #}
+<script src="{{ url_for('static', filename='js/familyhub.js') }}"></script>
 {# Pages that need their own JavaScript add it here (e.g. the album page's
    drag-to-rearrange). Empty for most pages. #}
 {% block scripts %}{% endblock %}

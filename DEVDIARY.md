@@ -829,6 +829,42 @@ because the album would take the protected photo with it.
 
 ---
 
+## Chapter 19 — HTTP Security Headers & the Strict CSP
+
+**What was built (June 12, 2026):** every response now carries a full set
+of security headers, hand-rolled in ~30 lines of `after_request` (no
+extension needed — and writing them by hand means knowing what each does).
+
+### The headers and the attack each one stops
+
+| Header | Stops |
+|---|---|
+| `Content-Security-Policy: script-src 'self' ...` | XSS payloads from *running*, even if one sneaks past escaping |
+| `frame-ancestors 'none'` + `X-Frame-Options: DENY` | clickjacking (our pages inside an attacker's iframe) |
+| `X-Content-Type-Options: nosniff` | "photo" uploads being re-interpreted as HTML+script |
+| `Referrer-Policy: strict-origin-when-cross-origin` | leaking `/family/<id>` URLs to other sites via the Referer header |
+| `form-action 'self'` | forms being re-targeted to submit credentials elsewhere |
+| `Strict-Transport-Security` (production only) | HTTPS-stripping; not sent in dev where it would lock out http://127.0.0.1 |
+
+### The real work: earning a CSP with NO 'unsafe-inline'
+
+A CSP is only as strong as its weakest `unsafe-*` escape hatch. Ours has
+none — which required evicting every scrap of inline code from templates:
+
+- Seven `onsubmit="return confirm(...)"` handlers became plain
+  `data-confirm="message"` **attributes** (data, not code), with ONE
+  delegated listener in `static/js/familyhub.js` doing the asking. Bonus:
+  future forms get confirm dialogs by adding an attribute, zero new JS.
+- Six `style="..."` attributes moved into named classes in style.css.
+- This is why SortableJS was vendored locally rather than CDN-loaded —
+  `script-src 'self'` means OUR origin only, and the whole site already
+  worked CDN-free (Bootstrap ships from the installed package).
+
+A test walks the formerly-inline pages and fails if `onsubmit=` ever
+returns; another asserts the CSP itself never grows an 'unsafe-inline'.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

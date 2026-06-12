@@ -99,7 +99,7 @@
        confirm() spells out exactly how big. #}
     <form method="post"
           action="{{ url_for('photos.delete_album', album_id=album.id) }}"
-          onsubmit="return confirm('Delete this WHOLE album and every photo in it, for everyone? This cannot be undone.');">
+          data-confirm="Delete this WHOLE album and every photo in it, for everyone? This cannot be undone.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-outline-danger">
             🗑 Delete this entire album ({{ album.photos | length }} photo{{ 's' if album.photos | length != 1 }})

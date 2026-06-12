@@ -11,7 +11,7 @@
 
     {% if hero_exists is defined and hero_exists %}
     <img src="{{ url_for('main.hero_image') }}" alt="Our family"
-         class="img-fluid rounded mb-4 w-100" style="max-height: 320px; object-fit: cover;">
+         class="img-fluid rounded mb-4 w-100 hero-banner">
     {% endif %}
 
     <h1 class="display-5 mb-2">Welcome, {{ current_user.display_name }}!</h1>

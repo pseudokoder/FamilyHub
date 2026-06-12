@@ -29,7 +29,7 @@
 <p class="text-muted fs-5">{{ revision.location or "" }}</p>
 
 {% if revision.birth_date or revision.death_date %}
-<div class="card bg-light my-3" style="max-width: 26rem;">
+<div class="card bg-light my-3 infobox-card">
     <div class="card-body py-2">
         {% if revision.birth_date %}
         <div><strong>Born:</strong> {{ revision.birth_date.strftime("%B %d, %Y") }}</div>

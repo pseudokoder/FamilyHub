@@ -38,7 +38,7 @@
 
         {# The infobox — Wikipedia's little fact table, family edition. #}
         {% if member.birth_date or member.death_date %}
-        <div class="card bg-light my-3" style="max-width: 26rem;">
+        <div class="card bg-light my-3 infobox-card">
             <div class="card-body py-2">
                 {% if member.birth_date %}
                 <div><strong>Born:</strong> {{ member.birth_date.strftime("%B %d, %Y") }}</div>
@@ -77,13 +77,11 @@
 
         <div class="d-flex gap-2 mt-4 flex-wrap">
             {% if can_delete %}
-            {# NOTE: the confirm() text is deliberately generic — interpolating a
-               user-entered name into JavaScript breaks on names like O'Brien
-               (the apostrophe ends the JS string early). User data and script
-               code don't mix; that rule has no exceptions. #}
+            {# The confirm text lives in a data- attribute (data, not code) —
+               see static/js/familyhub.js for the CSP story. #}
             <form method="post"
                   action="{{ url_for('wiki.delete_member', member_id=member.id) }}"
-                  onsubmit="return confirm('Delete this person\'s page for everyone? This cannot be undone.');">
+                  data-confirm="Delete this person's page for everyone? This cannot be undone.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-outline-danger btn-sm">
                     🗑 Delete this page

@@ -66,6 +66,49 @@ def create_app(config_class=Config):
     def too_many_requests(error):
         return render_template("errors/429.html"), 429
 
+    # --- HTTP security headers (D315) — sent with EVERY response. -----------
+    # Each one closes a specific attack class. The star is the
+    # Content-Security-Policy: the browser refuses to run any script that
+    # isn't a file from OUR origin. Even if an XSS bug slipped past the
+    # template escaping, the injected <script> would not execute — that's
+    # defense in depth. Note there is NO 'unsafe-inline': every confirm
+    # dialog and style lives in static files (see static/js/familyhub.js
+    # for the refactor story).
+    @app.after_request
+    def set_security_headers(response):
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            "img-src 'self' data:; "       # data: = Bootstrap's tiny inline icons
+            "font-src 'self'; "
+            "object-src 'none'; "           # no Flash/plugins, ever
+            "base-uri 'self'; "             # <base> tag can't be hijacked
+            "frame-ancestors 'none'; "      # nobody may iframe us (clickjacking)
+            "form-action 'self'",           # forms can only submit to US
+        )
+        # Belt and suspenders for older browsers that predate frame-ancestors.
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        # Browsers must not "sniff" a response into a different content type
+        # (classic trick: upload a "photo" that sniffs as HTML+script).
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        # Outbound links learn our domain, never the full URL (which could
+        # leak /family/<id> style paths to other sites).
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # We use none of these device APIs; say so explicitly.
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        if app.config["SESSION_COOKIE_SECURE"]:
+            # HSTS: once a browser has seen us over HTTPS, it refuses plain
+            # http for six months. Only sent in production — pinning HTTPS
+            # on http://127.0.0.1 would lock you out of your own dev server.
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=15552000; includeSubDomains"
+            )
+        return response
+
     # Register blueprints — each one is a self-contained feature area.
     # v2 mapping: one Blueprint ≈ one Spring Boot @Controller class.
     from app.routes.admin import admin_bp

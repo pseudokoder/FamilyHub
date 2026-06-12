@@ -16,7 +16,7 @@
         {% if hero_exists is defined and hero_exists %}
         <p class="form-label">Current banner:</p>
         <img src="{{ url_for('main.hero_image') }}" alt="Current dashboard banner"
-             class="img-fluid rounded mb-4" style="max-height: 200px;">
+             class="img-fluid rounded mb-4 hero-preview">
         {% endif %}
 
         {{ render_form(form, button_style="primary btn-lg") }}

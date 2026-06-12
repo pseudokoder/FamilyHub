@@ -125,3 +125,25 @@ body {
     outline: 3px dashed #2563eb;
     outline-offset: -3px;
 }
+
+/* These classes replaced inline style="..." attributes when the strict
+   Content-Security-Policy landed (DEVDIARY Ch. 19): CSP forbids inline
+   styles unless you weaken it with 'unsafe-inline', and moving five
+   styles here was cheaper than weakening the policy for the whole site. */
+.hero-banner {
+    max-height: 320px;
+    object-fit: cover;          /* crop, don't squash, the family banner */
+}
+.infobox-card {
+    max-width: 26rem;           /* the wiki page's little fact box */
+}
+.album-cover-placeholder {      /* empty album: a big friendly camera */
+    height: 240px;
+    font-size: 4rem;
+}
+.photo-preview {
+    max-height: 320px;          /* caption-edit page: photo above the box */
+}
+.hero-preview {
+    max-height: 200px;          /* admin settings: current banner preview */
+}
