@@ -899,6 +899,33 @@ state. Expired (1 hour), forged, and reused tokens all die in one
 
 ---
 
+## Chapter 21 — The OpenAPI Spec (v2's contract, written down)
+
+**What was built (June 12, 2026):** `docs/openapi.yaml` — every route in
+the app described in the industry-standard OpenAPI 3.0 format — plus a
+browsable `/apidocs` page and the raw spec at `/openapi.yaml`.
+
+### Why this matters for v2 specifically
+
+v2's Angular frontend needs to know exactly what URLs exist, what they
+take, and what they return — that's this file. Code generators can build
+TypeScript clients and even Spring controller stubs straight from it
+(D288 calls the approach API-first design). v1 renders HTML at these
+routes; v2 serves JSON at the SAME routes; the contract is the part that
+survives.
+
+### Two design points
+
+- **The spec cannot drift.** `tests/test_openapi.py` walks Flask's live
+  route map and FAILS the build if any route is missing from the YAML.
+  Add a route, document it, or stay red — documentation by enforcement.
+- **No Swagger UI.** The stock viewer injects inline styles, which our
+  strict CSP (Ch. 19) blocks by design. Rather than weaken the CSP for
+  one developer page, /apidocs renders the spec server-side — it's a YAML
+  file and a for-loop. The raw spec still pastes into editor.swagger.io.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

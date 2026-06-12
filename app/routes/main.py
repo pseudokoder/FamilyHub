@@ -14,7 +14,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import text
 
 from app.extensions import db
-from app.services import settings_service
+from app.services import settings_service, spec_service
 
 main_bp = Blueprint("main", __name__)
 
@@ -51,6 +51,30 @@ def hero_image():
         os.path.dirname(settings_service.hero_path()),
         settings_service.HERO_FILENAME,
     )
+
+
+# --- API documentation (developer-facing, still login-walled) -----------------
+
+@main_bp.route("/apidocs")
+@login_required
+def apidocs():
+    """The OpenAPI spec rendered as a browsable page — see spec_service
+    for why this is server-side instead of Swagger UI."""
+    spec = spec_service.load_spec()
+    return render_template(
+        "apidocs.html",
+        info=spec["info"],
+        grouped=spec_service.operations_by_tag(spec),
+    )
+
+
+@main_bp.route("/openapi.yaml")
+@login_required
+def openapi_yaml():
+    """The raw spec — paste it into editor.swagger.io or feed it to v2's
+    code generators."""
+    with open(spec_service.spec_path(), encoding="utf-8") as handle:
+        return Response(handle.read(), mimetype="text/yaml")
 
 
 # --- Plumbing routes (no family content, deliberately public) -----------------

@@ -1,0 +1,269 @@
+# FamilyHub v1 — the API contract, in OpenAPI 3.0.
+#
+# WHY THIS FILE EXISTS (read this before the YAML):
+# v1 renders HTML, but every route was designed RESTfully so that v2 can
+# serve JSON from the same URLs to an Angular frontend. This file writes
+# that contract down in the industry-standard format (D288 calls this
+# API-first design). Two things keep it honest:
+#
+#   1. tests/test_openapi.py walks Flask's live route map and FAILS if any
+#      route is missing from this file — the spec cannot silently drift.
+#   2. /apidocs renders this file as a browsable page (server-side, so it
+#      satisfies the strict CSP — no Swagger UI inline-style exceptions).
+#
+# Conventions: HTML-form routes are marked as returning text/html today;
+# v2 swaps those responses to application/json without touching the paths.
+
+openapi: "3.0.3"
+info:
+  title: FamilyHub API
+  version: "1.0"
+  description: >
+    Private family portal: photo albums, memory blog, family wiki,
+    timeline. All family content requires a session cookie (login).
+    "Lockable" content follows the Trial Period rule: creator may delete
+    until an admin locks it; then admin-only.
+
+tags:
+  - name: Auth
+    description: Login, logout, password self-service
+  - name: Albums & Photos
+    description: The family photo collection (lockable)
+  - name: Memories
+    description: Blog posts and their comments (never lockable)
+  - name: Wiki
+    description: One page per family member, with revision history (lockable)
+  - name: Timeline
+    description: Partial-date family history events (lockable)
+  - name: Search
+  - name: Admin
+    description: Requires the admin flag
+  - name: Plumbing
+    description: Health, crawler policy, security contact
+
+paths:
+  # --- Plumbing ---------------------------------------------------------------
+  /:
+    get: {tags: [Plumbing], summary: Public welcome page (dashboard when logged in), responses: {"200": {description: HTML page}}}
+  /health:
+    get:
+      tags: [Plumbing]
+      summary: Liveness check for monitors
+      responses:
+        "200": {description: '{"status":"ok","database":"ok"}'}
+        "503": {description: Database unreachable}
+  /robots.txt:
+    get: {tags: [Plumbing], summary: "Crawler policy: index nothing", responses: {"200": {description: text/plain}}}
+  /.well-known/security.txt:
+    get: {tags: [Plumbing], summary: RFC 9116 security contact, responses: {"200": {description: text/plain}}}
+  /about:
+    get: {tags: [Plumbing], summary: Admin-written about/contact page, responses: {"200": {description: HTML page}}}
+  /site/hero:
+    get: {tags: [Plumbing], summary: Dashboard banner image (login-walled), responses: {"200": {description: image bytes}}}
+
+  # --- Auth --------------------------------------------------------------------
+  /auth/login:
+    get: {tags: [Auth], summary: Login form, responses: {"200": {description: HTML form}}}
+    post:
+      tags: [Auth]
+      summary: Authenticate (rate-limited 10/min/IP)
+      responses:
+        "302": {description: Redirect home with session cookie}
+        "200": {description: Form re-rendered with vague error}
+        "429": {description: Rate limit hit}
+  /auth/logout:
+    post: {tags: [Auth], summary: End the session (POST-only by design), responses: {"302": {description: Redirect home}}}
+  /auth/change-password:
+    get: {tags: [Auth], summary: Change-own-password form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Auth], summary: Change own password (current password required), responses: {"302": {description: Changed}}}
+  /auth/forgot-password:
+    get: {tags: [Auth], summary: Request-reset form (hidden if mail unconfigured), responses: {"200": {description: HTML form}}}
+    post:
+      tags: [Auth]
+      summary: Email a reset link (rate-limited 5/min; identical response for unknown usernames)
+      responses: {"302": {description: Same friendly message either way}}
+  /auth/reset-password/{token}:
+    parameters: [{name: token, in: path, required: true, schema: {type: string}, description: Signed single-use token (1h)}]
+    get: {tags: [Auth], summary: New-password form (token checked first), responses: {"200": {description: HTML form}, "302": {description: Invalid/expired token}}}
+    post: {tags: [Auth], summary: Set the new password, responses: {"302": {description: Reset complete}}}
+
+  # --- Albums & Photos -----------------------------------------------------------
+  /albums:
+    get: {tags: [Albums & Photos], summary: All albums, newest first, responses: {"200": {description: HTML page}}}
+  /albums/new:
+    get: {tags: [Albums & Photos], summary: New-album form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Albums & Photos], summary: Create an album, responses: {"302": {description: Redirect to the new album}}}
+  /albums/{album_id}:
+    parameters: [{name: album_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Albums & Photos], summary: One album's gallery + upload box, responses: {"200": {description: HTML page}, "404": {description: No such album}}}
+  /albums/{album_id}/photos:
+    parameters: [{name: album_id, in: path, required: true, schema: {type: integer}}]
+    post:
+      tags: [Albums & Photos]
+      summary: Upload photos (multipart; forgiving batch — good files save, bad files get named errors; EXIF/GPS stripped)
+      responses: {"302": {description: Back to the album with per-file feedback}}
+  /albums/{album_id}/reorder:
+    parameters: [{name: album_id, in: path, required: true, schema: {type: integer}}]
+    post:
+      tags: [Albums & Photos]
+      summary: 'Save drag-and-drop order (JSON: {"order": [photo ids]}; the one JSON endpoint in v1)'
+      responses:
+        "200": {description: '{"ok": true}'}
+        "400": {description: Stale or foreign id list — nothing changed}
+  /albums/{album_id}/delete:
+    parameters: [{name: album_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Delete album + photos (creator during trial, admin always; refused if any photo inside is locked), responses: {"302": {description: Deleted}, "403": {description: Not permitted}}}
+  /albums/{album_id}/lock:
+    parameters: [{name: album_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Lock album into the archive (admin), responses: {"302": {description: Locked}, "403": {description: Admins only}}}
+  /albums/{album_id}/unlock:
+    parameters: [{name: album_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Unlock album (admin), responses: {"302": {description: Unlocked}, "403": {description: Admins only}}}
+  /photos/{photo_id}:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Albums & Photos], summary: One photo + comment thread, responses: {"200": {description: HTML page}}}
+  /photos/{photo_id}/file:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Albums & Photos], summary: Full-size image bytes (login-walled), responses: {"200": {description: image}}}
+  /photos/{photo_id}/thumb:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Albums & Photos], summary: Thumbnail bytes (login-walled), responses: {"200": {description: image}}}
+  /photos/{photo_id}/edit:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Albums & Photos], summary: Caption-edit form (uploader/admin), responses: {"200": {description: HTML form}}}
+    post: {tags: [Albums & Photos], summary: Save caption, responses: {"302": {description: Saved}}}
+  /photos/{photo_id}/comments:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Comment on a photo, responses: {"302": {description: Added}}}
+  /photos/{photo_id}/delete:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Delete photo (uploader during trial, admin always), responses: {"302": {description: Deleted}, "403": {description: Not permitted}}}
+  /photos/{photo_id}/lock:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Lock photo into the archive (admin), responses: {"302": {description: Locked}}}
+  /photos/{photo_id}/unlock:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Unlock photo (admin), responses: {"302": {description: Unlocked}}}
+  /photos/comments/{comment_id}/delete:
+    parameters: [{name: comment_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: Delete a photo comment (author/admin), responses: {"302": {description: Deleted}}}
+
+  # --- Memories (blog) -------------------------------------------------------------
+  /posts:
+    get: {tags: [Memories], summary: All memories, newest first, responses: {"200": {description: HTML page}}}
+  /posts/new:
+    get: {tags: [Memories], summary: New-memory form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Memories], summary: Write a memory, responses: {"302": {description: Redirect to the post}}}
+  /posts/{post_id}:
+    parameters: [{name: post_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Memories], summary: One memory + comments, responses: {"200": {description: HTML page}}}
+  /posts/{post_id}/edit:
+    parameters: [{name: post_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Memories], summary: Edit form (author/admin), responses: {"200": {description: HTML form}}}
+    post: {tags: [Memories], summary: Save changes, responses: {"302": {description: Saved}}}
+  /posts/{post_id}/delete:
+    parameters: [{name: post_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Memories], summary: Delete a memory (author/admin — posts are never locked), responses: {"302": {description: Deleted}}}
+  /posts/{post_id}/comments:
+    parameters: [{name: post_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Memories], summary: Comment on a memory, responses: {"302": {description: Added}}}
+  /posts/comments/{comment_id}/delete:
+    parameters: [{name: comment_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Memories], summary: Delete a post comment (author/admin), responses: {"302": {description: Deleted}}}
+
+  # --- Wiki ---------------------------------------------------------------------------
+  /family:
+    get: {tags: [Wiki], summary: Every family member, alphabetically, responses: {"200": {description: HTML page}}}
+  /family/new:
+    get: {tags: [Wiki], summary: New-person form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Wiki], summary: Create a page (duplicates redirect to the existing page), responses: {"302": {description: Redirect to the page}}}
+  /family/{member_id}:
+    parameters: [{name: member_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Wiki], summary: "One person's wiki page", responses: {"200": {description: HTML page}}}
+  /family/{member_id}/edit:
+    parameters: [{name: member_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Wiki], summary: Edit form (ANY member — collaborative), responses: {"200": {description: HTML form}}}
+    post: {tags: [Wiki], summary: Save (records a revision), responses: {"302": {description: Saved}}}
+  /family/{member_id}/delete:
+    parameters: [{name: member_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Wiki], summary: Delete a page (creator during trial, admin always), responses: {"302": {description: Deleted}, "403": {description: Not permitted}}}
+  /family/{member_id}/lock:
+    parameters: [{name: member_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Wiki], summary: Lock page into the archive (admin), responses: {"302": {description: Locked}}}
+  /family/{member_id}/unlock:
+    parameters: [{name: member_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Wiki], summary: Unlock page (admin), responses: {"302": {description: Unlocked}}}
+  /family/{member_id}/history:
+    parameters: [{name: member_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Wiki], summary: Every saved version of the page, responses: {"200": {description: HTML page}}}
+  /family/{member_id}/history/{revision_id}:
+    parameters:
+      - {name: member_id, in: path, required: true, schema: {type: integer}}
+      - {name: revision_id, in: path, required: true, schema: {type: integer}}
+    get: {tags: [Wiki], summary: Read one old version (404 unless it belongs to this page), responses: {"200": {description: HTML page}, "404": {description: Not this page's revision}}}
+  /family/{member_id}/history/{revision_id}/restore:
+    parameters:
+      - {name: member_id, in: path, required: true, schema: {type: integer}}
+      - {name: revision_id, in: path, required: true, schema: {type: integer}}
+    post: {tags: [Wiki], summary: Restore an old version (appends a new revision — history never rewinds), responses: {"302": {description: Restored}}}
+
+  # --- Timeline --------------------------------------------------------------------------
+  /timeline:
+    get: {tags: [Timeline], summary: All events, grouped by decade, responses: {"200": {description: HTML page}}}
+  /timeline/new:
+    get: {tags: [Timeline], summary: New-event form (partial dates allowed), responses: {"200": {description: HTML form}}}
+    post: {tags: [Timeline], summary: Add an event, responses: {"302": {description: Added}}}
+  /timeline/{event_id}/edit:
+    parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Timeline], summary: Edit form (any member), responses: {"200": {description: HTML form}}}
+    post: {tags: [Timeline], summary: Save changes, responses: {"302": {description: Saved}}}
+  /timeline/{event_id}/delete:
+    parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Timeline], summary: Delete an event (creator during trial, admin always), responses: {"302": {description: Deleted}}}
+  /timeline/{event_id}/lock:
+    parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Timeline], summary: Lock event into the archive (admin), responses: {"302": {description: Locked}}}
+  /timeline/{event_id}/unlock:
+    parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Timeline], summary: Unlock event (admin), responses: {"302": {description: Unlocked}}}
+
+  # --- Search ------------------------------------------------------------------------------
+  /search:
+    get:
+      tags: [Search]
+      summary: One box, everything — posts, wiki, albums, captions, timeline (LIKE wildcards escaped)
+      parameters: [{name: q, in: query, required: true, schema: {type: string, minLength: 2}}]
+      responses: {"200": {description: Grouped results page}, "302": {description: Query too short — friendly nudge}}
+
+  # --- Admin -------------------------------------------------------------------------------
+  /admin/users:
+    get: {tags: [Admin], summary: Every account, responses: {"200": {description: HTML page}, "403": {description: Admins only}}}
+  /admin/users/new:
+    get: {tags: [Admin], summary: New-account form (no self-registration exists), responses: {"200": {description: HTML form}}}
+    post: {tags: [Admin], summary: Create an account, responses: {"302": {description: Created}}}
+  /admin/users/{user_id}/edit:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Admin], summary: Edit display name / reset email, responses: {"200": {description: HTML form}}}
+    post: {tags: [Admin], summary: Save account changes, responses: {"302": {description: Saved}}}
+  /admin/users/{user_id}/reset-password:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Admin], summary: Reset-password form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Admin], summary: Set a new password for the user, responses: {"302": {description: Set}}}
+  /admin/settings:
+    get: {tags: [Admin], summary: Site text + hero image form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Admin], summary: Save settings / upload hero, responses: {"302": {description: Saved}}}
+  /admin/backups:
+    get: {tags: [Admin], summary: List local backups, responses: {"200": {description: HTML page}}}
+  /admin/backups/run:
+    post: {tags: [Admin], summary: Create, verify, and (if configured) upload a backup, responses: {"302": {description: Report via flash messages}}}
+  /admin/backups/{filename}/download:
+    parameters: [{name: filename, in: path, required: true, schema: {type: string}, description: Must match a known backup name — no path tricks}]
+    get: {tags: [Admin], summary: Download a backup zip, responses: {"200": {description: zip bytes}, "404": {description: Unknown filename}}}
+  /admin/activity:
+    get: {tags: [Admin], summary: The audit trail — who did what, newest first, responses: {"200": {description: HTML page}}}
+
+  # --- The docs themselves --------------------------------------------------------------------
+  /apidocs:
+    get: {tags: [Plumbing], summary: This spec, rendered as a browsable page, responses: {"200": {description: HTML page}}}
+  /openapi.yaml:
+    get: {tags: [Plumbing], summary: This spec, raw, responses: {"200": {description: text/yaml}}}

@@ -1,0 +1,39 @@
+{# The OpenAPI spec, rendered server-side (CSP-friendly — see
+   spec_service.py). Grouped by tag, one row per operation. #}
+{% extends "base.html" %}
+
+{% block title %}API Documentation{% endblock %}
+
+{% block content %}
+<h1 class="mb-1">{{ info.title }} <span class="text-muted fs-4">v{{ info.version }}</span></h1>
+<p class="fs-5 text-muted">{{ info.description }}</p>
+<p>
+    Raw spec: <a href="{{ url_for('main.openapi_yaml') }}"><code>openapi.yaml</code></a>
+    (works with editor.swagger.io and v2's code generators).
+</p>
+
+{% for tag, operations in grouped.items() %}
+{% if operations %}
+<h2 class="h4 mt-4 border-bottom pb-1">{{ tag }}</h2>
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <tbody>
+            {% for op in operations %}
+            <tr>
+                <td class="text-nowrap">
+                    {% if op.method == "GET" %}
+                    <span class="badge text-bg-primary">GET</span>
+                    {% else %}
+                    <span class="badge text-bg-warning text-dark">{{ op.method }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-nowrap"><code>{{ op.path }}</code></td>
+                <td class="text-muted">{{ op.summary }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}
