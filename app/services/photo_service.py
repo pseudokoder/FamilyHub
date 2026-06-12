@@ -89,6 +89,8 @@ def save_photos(album, files, user):
     selects 10 photos and one is broken, the other 9 still make it and the
     message explains exactly which one didn't — never all-or-nothing.
     """
+    if not files:
+        return 0, []
     saved, errors = 0, []
     # New photos go after existing ones (position column = album sort order).
     next_position = len(album.photos)

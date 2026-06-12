@@ -79,3 +79,9 @@ class Config:
     BACKUP_FOLDER = os.environ.get(
         "BACKUP_FOLDER", os.path.join(basedir, "backups")
     )
+
+    # Where `flask export-data` writes (git-ignored). In config rather than
+    # hardcoded in the service — hardcoded paths are untestable paths.
+    EXPORT_FOLDER = os.environ.get(
+        "EXPORT_FOLDER", os.path.join(basedir, "export")
+    )

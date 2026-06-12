@@ -77,14 +77,20 @@ def _sha256(path):
 def export_all():
     """Write a complete export; returns (out_dir, table_counts, file_count)."""
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    basedir = os.path.abspath(os.path.join(current_app.root_path, os.pardir))
-    out_dir = os.path.join(basedir, "export", f"familyhub-export-{stamp}")
+    out_dir = os.path.join(
+        current_app.config["EXPORT_FOLDER"], f"familyhub-export-{stamp}"
+    )
     os.makedirs(out_dir, exist_ok=True)
 
     # --- data.json: every table -------------------------------------------
-    schema_version = db.session.execute(
-        text("SELECT version_num FROM alembic_version")
-    ).scalar()
+    # alembic_version only exists on databases managed via migrations.
+    # Test databases are built with db.create_all(), so the table is absent.
+    try:
+        schema_version = db.session.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar()
+    except Exception:
+        schema_version = None
     tables = {model.__tablename__: _dump_table(model) for model in EXPORTED_MODELS}
     data = {
         "format": "familyhub-export",

@@ -32,6 +32,12 @@ this app to prepare for his WGU senior project — a full rewrite in Java/Spring
   it in DEVDIARY.md under "Decisions Made Without Wes," and keep going.
 - Every session ends with the app in a complete, running state. No broken builds.
 - Commit logically grouped changes to git with clear messages; push to GitHub.
+- **Never pause the build to ask Wes to manually test anything.** Verify your own
+  work with automated tests: pytest + Flask's test client covering routes, auth,
+  and file uploads (simulate uploads with generated sample files). Anything that
+  truly requires human eyes in a browser goes into the **"Manual Testing
+  Checklist"** section of DEVDIARY.md; Wes runs the entire checklist once at the
+  end of the build.
 
 ## About the Developer
 - Wes Leiter — WGU B.S. Software Engineering student (expected Fall 2027)
