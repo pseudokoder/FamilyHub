@@ -44,3 +44,13 @@ def add_comment(post, user, body):
     db.session.add(comment)
     db.session.commit()
     return comment
+
+
+def can_delete_comment(comment, user):
+    """Your words, your delete — or the admin's cleanup power."""
+    return user.is_admin or comment.author_id == user.id
+
+
+def delete_comment(comment):
+    db.session.delete(comment)
+    db.session.commit()

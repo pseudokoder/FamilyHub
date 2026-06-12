@@ -725,6 +725,31 @@ right to.
 
 ---
 
+## Chapter 16 — Quality-of-Life Round 1 (closing the little gaps)
+
+**What was built (June 12, 2026):** three small features that each close a
+real annoyance, plus one discovery.
+
+1. **Album deletion** (resolves decision #10's deferral): a "Delete this
+   entire album" button at the *bottom* of the album page — far from the
+   everyday buttons, with a confirm that spells out the blast radius.
+   The service deletes every photo's files first, then one row delete
+   cascades away the photo + comment rows. Creator-or-admin for now;
+   the locking feature (next chapters) will tighten this.
+2. **Self-service password change** — `auth/change-password`, linked from
+   a little account menu on the greeting in the navbar. Asks for the
+   *current* password first: the standard defense against someone sitting
+   down at an unlocked, logged-in laptop and locking the real owner out
+   (D315). Wes stops being the family's only password department.
+3. **Comment deletion** — your own comment gets a small 🗑 next to it
+   (admins see it on every comment). Same one-rule-one-place pattern:
+   `can_delete_comment` lives in the service.
+4. **Discovery:** "show who last edited a wiki page" was *already built*
+   (member.html shows it; test_wiki proves it) — the improvement list had
+   flagged it as missing. Lesson: always audit before you build.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

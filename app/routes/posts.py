@@ -16,7 +16,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.forms.comment_forms import CommentForm
 from app.forms.post_forms import PostForm
-from app.models import Post
+from app.models import Post, PostComment
 from app.services import post_service
 
 posts_bp = Blueprint("posts", __name__)
@@ -90,3 +90,15 @@ def add_comment(post_id):
         for message in form.body.errors:
             flash(message, "danger")
     return redirect(url_for("posts.view_post", post_id=post.id))
+
+
+@posts_bp.route("/posts/comments/<int:comment_id>/delete", methods=["POST"])
+@login_required
+def delete_comment(comment_id):
+    comment = db.get_or_404(PostComment, comment_id)
+    if not post_service.can_delete_comment(comment, current_user):
+        abort(403)
+    post_id = comment.post_id
+    post_service.delete_comment(comment)
+    flash("Comment deleted.", "success")
+    return redirect(url_for("posts.view_post", post_id=post_id))

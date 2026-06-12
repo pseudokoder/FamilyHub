@@ -1,12 +1,33 @@
 """Blog tests: writing, permissions, XSS safety, comments."""
 
-from app.models import Post
+from app.models import Post, PostComment
 
 
 def _write_post(client, title="The Buick Story", body="It caught fire.\n\nTwice."):
     return client.post(
         "/posts/new", data={"title": title, "body": body}, follow_redirects=True
     )
+
+
+def test_post_comment_delete_rules(admin_client, member_client):
+    """Your comment, your delete — someone else's, 403 (unless admin)."""
+    _write_post(admin_client)
+    post_id = Post.query.one().id
+    member_client.post(f"/posts/{post_id}/comments",
+                       data={"body": "I remember those tomatoes!"})
+    admin_client.post(f"/posts/{post_id}/comments", data={"body": "Admin note."})
+
+    members = PostComment.query.filter_by(body="I remember those tomatoes!").one()
+    admins = PostComment.query.filter_by(body="Admin note.").one()
+
+    # A member may not delete the admin's comment...
+    assert member_client.post(
+        f"/posts/comments/{admins.id}/delete").status_code == 403
+    # ...but their own deletes fine.
+    response = member_client.post(
+        f"/posts/comments/{members.id}/delete", follow_redirects=True)
+    assert b"Comment deleted" in response.data
+    assert PostComment.query.count() == 1  # only the admin's note remains
 
 
 def test_write_and_render_paragraphs(admin_client):

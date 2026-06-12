@@ -13,7 +13,7 @@ from tests.conftest import ADMIN_PASSWORD
 PROTECTED_ROUTES = [
     "/albums", "/albums/new", "/posts", "/posts/new",
     "/family", "/family/new", "/timeline", "/timeline/new",
-    "/about", "/site/hero", "/search",
+    "/about", "/site/hero", "/search", "/auth/change-password",
     "/admin/users", "/admin/settings", "/admin/backups",
 ]
 
@@ -122,6 +122,40 @@ def test_csrf_actually_fires(tmp_path, admin):
         "/auth/login", data={"username": "admin", "password": ADMIN_PASSWORD}
     )
     assert response.status_code == 400  # rejected: no CSRF token
+
+
+def test_change_own_password(client, admin):
+    """Self-service: wrong current password changes nothing; the right one
+    changes it for real (provable by logging in with the new password)."""
+    client.post("/auth/login",
+                data={"username": "admin", "password": ADMIN_PASSWORD})
+
+    # Wrong current password -> rejected, old password still works.
+    response = client.post(
+        "/auth/change-password",
+        data={"current_password": "not-my-password",
+              "password": "BrandNewPass1", "confirm": "BrandNewPass1"},
+        follow_redirects=True,
+    )
+    assert b"isn&#39;t right" in response.data
+
+    # Right current password -> changed.
+    response = client.post(
+        "/auth/change-password",
+        data={"current_password": ADMIN_PASSWORD,
+              "password": "BrandNewPass1", "confirm": "BrandNewPass1"},
+        follow_redirects=True,
+    )
+    assert b"password is changed" in response.data
+
+    # The proof: log out, log back in with the NEW password.
+    client.post("/auth/logout")
+    response = client.post(
+        "/auth/login",
+        data={"username": "admin", "password": "BrandNewPass1"},
+        follow_redirects=True,
+    )
+    assert b"Welcome back" in response.data
 
 
 def test_login_rate_limit_fires(tmp_path):

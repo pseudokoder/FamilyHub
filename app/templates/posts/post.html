@@ -50,7 +50,19 @@
         {% for comment in post.comments %}
         <div class="card mb-2">
             <div class="card-body py-2">
-                <p class="mb-1">{{ comment.body }}</p>
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <p class="mb-1">{{ comment.body }}</p>
+                    {# Your words, your delete (or the admin's broom). #}
+                    {% if current_user.is_admin or comment.author_id == current_user.id %}
+                    <form method="post"
+                          action="{{ url_for('posts.delete_comment', comment_id=comment.id) }}"
+                          onsubmit="return confirm('Delete this comment?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                aria-label="Delete this comment">🗑</button>
+                    </form>
+                    {% endif %}
+                </div>
                 <small class="text-muted">
                     — {{ comment.author.display_name }},
                     {{ comment.created_at.strftime("%B %d, %Y") }}

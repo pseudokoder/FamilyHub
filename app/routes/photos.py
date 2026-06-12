@@ -28,7 +28,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.forms.comment_forms import CommentForm
 from app.forms.photo_forms import AlbumForm, UploadPhotosForm
-from app.models import Album, Photo
+from app.models import Album, Photo, PhotoComment
 from app.services import photo_service
 
 photos_bp = Blueprint("photos", __name__)
@@ -62,8 +62,21 @@ def create_album():
 def view_album(album_id):
     album = db.get_or_404(Album, album_id)
     return render_template(
-        "photos/album.html", album=album, upload_form=UploadPhotosForm()
+        "photos/album.html", album=album, upload_form=UploadPhotosForm(),
+        can_delete_album=photo_service.can_delete_album(album, current_user),
     )
+
+
+@photos_bp.route("/albums/<int:album_id>/delete", methods=["POST"])
+@login_required
+def delete_album(album_id):
+    album = db.get_or_404(Album, album_id)
+    if not photo_service.can_delete_album(album, current_user):
+        abort(403)
+    title = album.title
+    photo_service.delete_album(album)
+    flash(f'The album "{title}" and all its photos were deleted.', "success")
+    return redirect(url_for("photos.list_albums"))
 
 
 @photos_bp.route("/albums/<int:album_id>/photos", methods=["POST"])
@@ -124,6 +137,18 @@ def delete_photo(photo_id):
     photo_service.delete_photo(photo)
     flash("Photo deleted.", "success")
     return redirect(url_for("photos.view_album", album_id=album_id))
+
+
+@photos_bp.route("/photos/comments/<int:comment_id>/delete", methods=["POST"])
+@login_required
+def delete_comment(comment_id):
+    comment = db.get_or_404(PhotoComment, comment_id)
+    if not photo_service.can_delete_comment(comment, current_user):
+        abort(403)
+    photo_id = comment.photo_id
+    photo_service.delete_comment(comment)
+    flash("Comment deleted.", "success")
+    return redirect(url_for("photos.view_photo", photo_id=photo_id))
 
 
 # --- Serving the image bytes -------------------------------------------------------

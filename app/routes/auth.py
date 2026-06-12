@@ -8,7 +8,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import limiter
-from app.forms.auth_forms import LoginForm
+from app.forms.auth_forms import ChangePasswordForm, LoginForm
 from app.services import user_service
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -59,6 +59,27 @@ def login():
             return redirect(_safe_next(request.args.get("next")) or url_for("main.home"))
 
     return render_template("auth/login.html", form=form)
+
+
+@auth_bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    """Self-service password change — Wes shouldn't be a human helpdesk
+    for every password the family wants to rotate."""
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        # Re-authenticate with the CURRENT password before changing
+        # anything — see the form's docstring for the threat this stops.
+        verified = user_service.authenticate(
+            current_user.username, form.current_password.data
+        )
+        if verified is None:
+            flash("That current password isn't right — nothing was changed.", "danger")
+        else:
+            user_service.set_password(current_user, form.password.data)
+            flash("Your password is changed! Use the new one from now on.", "success")
+            return redirect(url_for("main.home"))
+    return render_template("auth/change_password.html", form=form)
 
 
 @auth_bp.route("/logout", methods=["POST"])

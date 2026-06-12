@@ -62,3 +62,22 @@ class ResetPasswordForm(FlaskForm):
         validators=[EqualTo("password", message="Those two don't match — try again.")],
     )
     submit = SubmitField("Set New Password")
+
+
+class ChangePasswordForm(FlaskForm):
+    """Any member: change your OWN password.
+
+    Asking for the current password first is the standard defense against
+    the walk-away-from-the-laptop attack: a stranger at an unlocked,
+    logged-in screen still can't lock the real owner out (D315)."""
+
+    current_password = PasswordField(
+        "Your current password",
+        validators=[DataRequired(message="Please type your current password.")],
+    )
+    password = PasswordField("New password", validators=PASSWORD_RULES)
+    confirm = PasswordField(
+        "Type the new one again to be sure",
+        validators=[EqualTo("password", message="Those two don't match — try again.")],
+    )
+    submit = SubmitField("Change My Password")

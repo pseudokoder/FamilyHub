@@ -64,6 +64,35 @@ def get_all_albums():
     return Album.query.order_by(Album.created_at.desc()).all()
 
 
+def can_delete_album(album, user):
+    """Same shape as the photo rule: its creator, or an admin."""
+    return user.is_admin or album.created_by == user.id
+
+
+def delete_album(album):
+    """Delete a whole album: every photo's files, then all the rows.
+
+    Files first, same order as delete_photo — if a disk delete fails the
+    bookkeeping still exists and a re-run can finish. One db.session.delete
+    on the album removes the photo and comment ROWS via the FK cascade;
+    the database can't reach the disk, so the file loop above is on us.
+    """
+    for photo in album.photos:
+        full_path, thumb_path = photo_paths(photo)
+        for path in (full_path, thumb_path):
+            if os.path.exists(path):
+                os.remove(path)
+    folder = _album_dir(album.id)
+    db.session.delete(album)
+    db.session.commit()
+    # The album's upload folder is empty now; removing it keeps the
+    # uploads tree tidy. Failure is cosmetic, never fatal.
+    try:
+        os.rmdir(folder)
+    except OSError:
+        pass
+
+
 # --- Storage helpers ---------------------------------------------------------
 
 def _album_dir(album_id):
@@ -228,4 +257,14 @@ def delete_photo(photo):
         if os.path.exists(path):
             os.remove(path)
     db.session.delete(photo)  # cascade removes its comments too
+    db.session.commit()
+
+
+def can_delete_comment(comment, user):
+    """Your words, your delete — or the admin's cleanup power."""
+    return user.is_admin or comment.author_id == user.id
+
+
+def delete_comment(comment):
+    db.session.delete(comment)
     db.session.commit()

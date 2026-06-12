@@ -72,4 +72,19 @@
     This album is empty so far — add the first photos with the box above!
 </p>
 {% endif %}
+
+{% if can_delete_album %}
+{# Tucked at the very bottom, away from the everyday buttons — deleting a
+   whole album is the biggest destructive action on the site, and the
+   confirm() spells out exactly how big. #}
+<hr class="mt-5">
+<form method="post"
+      action="{{ url_for('photos.delete_album', album_id=album.id) }}"
+      onsubmit="return confirm('Delete this WHOLE album and every photo in it, for everyone? This cannot be undone.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-outline-danger">
+        🗑 Delete this entire album ({{ album.photos | length }} photo{{ 's' if album.photos | length != 1 }})
+    </button>
+</form>
+{% endif %}
 {% endblock %}

@@ -195,6 +195,55 @@ def test_delete_rules_and_disk_cleanup(admin_client, member_client, app):
     assert not os.path.exists(full_path) and not os.path.exists(thumb_path)
 
 
+def test_album_delete_rules_and_disk_cleanup(admin_client, member_client, app):
+    """Deleting an album removes its photos' files and rows; only the
+    album's creator or an admin may do it."""
+    album_url = _create_album(admin_client, "Old Album")
+    admin_client.post(
+        album_url + "/photos",
+        data={"photos": [(make_image(), "a.jpg"), (make_image(), "b.jpg")]},
+        content_type="multipart/form-data",
+    )
+    paths = [photo_service.photo_paths(p)[0] for p in Photo.query.all()]
+
+    assert member_client.post(album_url + "/delete").status_code == 403
+
+    response = admin_client.post(album_url + "/delete", follow_redirects=True)
+    assert b"were deleted" in response.data
+    assert Album.query.count() == 0
+    assert Photo.query.count() == 0, "FK cascade removed the photo rows"
+    for path in paths:
+        assert not os.path.exists(path), "files removed from disk too"
+
+
+def test_comment_delete_rules(admin_client, member_client):
+    """You may delete YOUR comment; an admin may delete anyone's."""
+    album_url = _create_album(admin_client)
+    admin_client.post(
+        album_url + "/photos",
+        data={"photos": [(make_image(), "p.jpg")]},
+        content_type="multipart/form-data",
+    )
+    photo_id = Photo.query.one().id
+    member_client.post(f"/photos/{photo_id}/comments",
+                       data={"body": "Members comment."})
+    admin_client.post(f"/photos/{photo_id}/comments",
+                      data={"body": "Admins comment."})
+
+    from app.models import PhotoComment
+    members_comment = PhotoComment.query.filter_by(body="Members comment.").one()
+    admins_comment = PhotoComment.query.filter_by(body="Admins comment.").one()
+
+    # A member can't delete someone ELSE's comment...
+    assert member_client.post(
+        f"/photos/comments/{admins_comment.id}/delete").status_code == 403
+    # ...but their own, yes.
+    member_client.post(f"/photos/comments/{members_comment.id}/delete")
+    # And the admin can clean up anything.
+    admin_client.post(f"/photos/comments/{admins_comment.id}/delete")
+    assert PhotoComment.query.count() == 0
+
+
 def test_album_cover_is_first_photo(admin_client):
     album_url = _create_album(admin_client)
     admin_client.post(
