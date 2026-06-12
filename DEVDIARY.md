@@ -656,6 +656,42 @@ it's only four steps: checkout → install Python → install pins → pytest.
 
 ---
 
+## Chapter 14 — Site-Wide Search (one box, the whole archive)
+
+**What was built (June 12, 2026):** a search box in the navbar that looks
+through **everything at once** — memories (title + body), wiki pages
+(name + location + bio), albums, photo captions/filenames, and timeline
+events — on one results page, grouped by type, empty sections hidden.
+
+### How it works (read in this order)
+
+1. `app/services/search_service.py` — five `ilike()` queries (one per
+   content type), each capped at 25 rows. `ilike` = case-insensitive LIKE,
+   portable to MySQL unchanged.
+2. `app/routes/search.py` — `GET /search?q=...`. **GET, not POST**: search
+   reads data, changes nothing, and a GET result page is bookmarkable and
+   shareable. (RESTful discipline → the v2 Angular app calls the same URL.)
+3. `templates/search/results.html` — grouped results; sections with no
+   matches don't render at all.
+
+### The teaching moment: escaping LIKE wildcards
+
+SQL LIKE treats `%` and `_` as wildcards. The ORM already prevents SQL
+*injection* (parameterized queries — the query TEXT can't be altered), but
+wildcards are a *semantic* leak: searching `%%` would match every row in
+the house. `_escape_like()` backslash-escapes user text so what you type
+is what gets matched, literally. Two different bugs, two different
+defenses — worth memorizing the distinction (D315 + D426).
+
+### Why LIKE and not a "real" search engine
+
+Family scale: hundreds of rows. A LIKE scan is instant, needs zero new
+infrastructure, and the upgrade path (MySQL FULLTEXT in v2) swaps in
+*inside the service* without touching route or template. Simplest thing
+that works, with the growth path documented.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

@@ -13,7 +13,7 @@ from tests.conftest import ADMIN_PASSWORD
 PROTECTED_ROUTES = [
     "/albums", "/albums/new", "/posts", "/posts/new",
     "/family", "/family/new", "/timeline", "/timeline/new",
-    "/about", "/site/hero",
+    "/about", "/site/hero", "/search",
     "/admin/users", "/admin/settings", "/admin/backups",
 ]
 

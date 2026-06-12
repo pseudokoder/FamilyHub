@@ -76,6 +76,17 @@
                 </li>
                 {% endif %}
             </ul>
+            {# One search box that looks through everything: posts, wiki,
+               albums, captions, timeline. GET (not POST) so a results page
+               can be bookmarked or shared — and no CSRF token is needed,
+               because reading is not a state change. #}
+            <form method="get" action="{{ url_for('search.search') }}"
+                  class="d-flex me-3 my-2 my-md-0" role="search">
+                <input class="form-control" type="search" name="q"
+                       placeholder="Search everything…" aria-label="Search"
+                       value="{{ request.args.get('q', '') }}">
+                <button class="btn btn-light ms-2" type="submit">Search</button>
+            </form>
             <span class="navbar-text text-white me-3">
                 Hi, {{ current_user.display_name }}!
             </span>
