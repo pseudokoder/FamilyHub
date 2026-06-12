@@ -634,6 +634,28 @@ never notices (humans manage 3–4 tries a minute); a robot hits a wall.
 
 ---
 
+## Chapter 13 — Continuous Integration (the robot reviewer)
+
+**What was built (June 12, 2026):** a GitHub Actions workflow
+(`.github/workflows/ci.yml`) that runs the entire pytest suite on a clean
+Ubuntu machine on **every push** — plus a live status badge in README.md.
+
+### Why CI is non-negotiable on a real project
+
+- The runner starts with **nothing installed**, so a missing pin in
+  requirements.txt fails the build instead of failing on the Lightsail
+  server at deploy time.
+- It runs on **Linux** — the same OS as production — so Windows-only
+  assumptions get caught while they're cheap to fix.
+- The repo now *proves* its own health: the badge is green only while
+  every test passes on a neutral machine. (D480 calls this continuous
+  integration; v2's Java track runs `mvn test` on the identical service.)
+
+The workflow file itself is heavily commented — read it top to bottom,
+it's only four steps: checkout → install Python → install pins → pytest.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

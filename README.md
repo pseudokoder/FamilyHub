@@ -1,5 +1,7 @@
 # FamilyHub v1 (Lite)
 
+[![CI](https://github.com/pseudokoder/FamilyHub/actions/workflows/ci.yml/badge.svg)](https://github.com/pseudokoder/FamilyHub/actions/workflows/ci.yml)
+
 A private family portal: photo albums, family-history blog, member wiki, and
 timeline — built with Python/Flask as both a real production app and a
 learning project for a future Java/Spring Boot rewrite (v2).
