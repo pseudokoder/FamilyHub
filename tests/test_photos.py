@@ -106,6 +106,42 @@ def test_exif_sideways_photo_gets_portrait_thumbnail(admin_client, app):
     assert height > width
 
 
+def test_uploads_are_stripped_of_exif_gps(admin_client, app):
+    """Privacy: a phone photo carries EXIF metadata, INCLUDING the GPS
+    coordinates of where it was taken — someone's home. Re-encoding at the
+    door must throw all of it away while still honoring the rotation tag."""
+    album_url = _create_album(admin_client)
+    src = make_image("JPEG", size=(800, 400), orientation=6, gps=True)
+    # Sanity check: the file we're about to upload really does carry EXIF.
+    assert len(Image.open(src).getexif()) > 0
+    src.seek(0)
+    admin_client.post(
+        album_url + "/photos",
+        data={"photos": [(src, "phone_photo.jpg")]},
+        content_type="multipart/form-data",
+    )
+    photo = Photo.query.one()
+    full_path, _ = photo_service.photo_paths(photo)
+    saved = Image.open(full_path)
+    assert len(saved.getexif()) == 0, "no EXIF (so no GPS) survives upload"
+    width, height = saved.size
+    assert height > width, "rotation was baked in BEFORE the tag was stripped"
+
+
+def test_gif_keeps_its_format(admin_client, app):
+    """GIFs pass through un-re-encoded (preserves animation; no EXIF risk)."""
+    album_url = _create_album(admin_client)
+    admin_client.post(
+        album_url + "/photos",
+        data={"photos": [(make_image("GIF"), "dancing_baby.gif")]},
+        content_type="multipart/form-data",
+    )
+    photo = Photo.query.one()
+    assert photo.filename.endswith(".gif")
+    full_path, _ = photo_service.photo_paths(photo)
+    assert Image.open(full_path).format == "GIF"
+
+
 def test_photo_bytes_are_login_walled(admin_client, app):
     album_url = _create_album(admin_client)
     admin_client.post(

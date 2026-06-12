@@ -115,18 +115,28 @@ def member_client(app, member):
 
 # --- Sample upload files (generated, never checked into git) -------------------
 
-def make_image(fmt="JPEG", size=(800, 600), color=(120, 80, 200), orientation=None):
+def make_image(fmt="JPEG", size=(800, 600), color=(120, 80, 200), orientation=None,
+               gps=False):
     """An in-memory image file, ready to 'upload' through the test client.
 
     orientation=6 simulates a phone held sideways (EXIF rotation tag) —
-    exactly what iPhones produce in portrait mode.
+    exactly what iPhones produce in portrait mode. gps=True embeds GPS
+    coordinates the way a real phone camera does, so tests can prove the
+    upload pipeline strips them (the privacy rule in photo_service).
     """
     buf = io.BytesIO()
     img = Image.new("RGB", size, color)
     kwargs = {}
-    if orientation:
+    if orientation or gps:
         exif = Image.Exif()
-        exif[274] = orientation  # 274 = the EXIF Orientation tag id
+        if orientation:
+            exif[274] = orientation  # 274 = the EXIF Orientation tag id
+        if gps:
+            # 0x8825 is the GPS sub-directory pointer inside EXIF. These are
+            # the exact tags a phone writes: hemisphere refs + lat/long as
+            # (degrees, minutes, seconds) rationals.
+            exif[0x8825] = {1: "N", 2: (40.0, 26.0, 46.3),
+                            3: "W", 4: (79.0, 58.0, 56.0)}
         kwargs["exif"] = exif
     img.save(buf, fmt, **kwargs)
     buf.seek(0)

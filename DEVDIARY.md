@@ -567,6 +567,39 @@ automatically a defect in the app.
 
 ---
 
+## Chapter 11 — EXIF/GPS Stripping (a privacy hole, found and closed)
+
+**What was built (June 12, 2026):** every uploaded photo is now re-encoded
+through Pillow before it touches disk, which discards the entire EXIF
+metadata block — including GPS coordinates.
+
+### The hole
+
+Phones embed metadata in every photo: camera model, timestamp, and — the
+scary one — **GPS coordinates of where the photo was taken**. Our HEIC
+conversion path already re-encoded (and so stripped) iPhone photos, but
+plain JPG/PNG/WebP uploads were copied to disk **byte-for-byte, metadata
+and all**. Anyone who could download a photo could read the family's home
+address out of it. That violates the CLAUDE.md PII rule even though the
+file sits behind the login wall — defense in depth (D315) says don't store
+the secret at all if you don't need it.
+
+### The fix (read photo_service.save_photos)
+
+- **Every raster image is re-encoded**: `Image.open()` → `exif_transpose()`
+  (bakes the rotation into the pixels FIRST) → `save()` with no `exif=`
+  argument → fresh file, zero metadata. JPEG stays JPEG, PNG stays PNG.
+- **GIF is the one passthrough** — re-encoding would flatten animations to
+  one frame, and the GIF format predates camera metadata entirely.
+- **Trade-off, documented honestly:** re-encoding a JPEG at quality=90 is a
+  second lossy pass. For family photos it's visually indistinguishable, and
+  privacy wins over byte-perfect originals. (The same number the HEIC path
+  already used — one rule to learn.)
+- Tests prove it: upload a file with orientation + GPS EXIF, assert the
+  saved file has **zero** EXIF entries but the correct (rotated) shape.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -711,6 +744,11 @@ Running log of judgment calls made mid-build, per the workflow rules
 23. **(Ch. 10)** CSRF is disabled globally in TestConfig but re-enabled
     and verified in one dedicated test — pragmatism for 73 tests,
     explicit proof the protection fires.
+24. **(Ch. 11)** Metadata stripping re-encodes (slightly lossy, quality=90)
+    instead of surgically removing GPS tags with an extra library (piexif).
+    Zero new dependencies, strips ALL metadata not just GPS, and matches
+    what the HEIC path already did. Animated GIFs pass through untouched —
+    no EXIF block in that format to worry about.
 
 ---
 

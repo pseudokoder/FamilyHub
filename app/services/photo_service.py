@@ -10,6 +10,9 @@ the classic way web apps get hacked. The rules enforced here (D315):
      tricks ("..\\..\\windows\\...") and no collisions.
   4. Outside the web root  — UPLOAD_FOLDER is not in app/static; every view
      of a photo goes through a @login_required route.
+  5. Metadata stripped     — uploads are re-encoded through Pillow, which
+     discards the EXIF block (including embedded GPS coordinates) before
+     anything touches disk. A photo should show the family, not map them.
 
 v2 mapping: PhotoService.java (@Service) + a StorageService.
 """
@@ -120,20 +123,45 @@ def save_photos(album, files, user):
         file.stream.seek(0)
 
         # Random name on disk; the human name goes in the database.
-        if ext in CONVERT_TO_JPEG:
-            # iPhone HEIC -> JPEG, once, right here. exif_transpose applies
-            # the photo's rotation metadata BEFORE we re-save, so portrait
-            # shots don't arrive sideways. quality=90 is visually lossless
-            # for family photos at a fraction of the size.
-            stored_name = f"{uuid.uuid4().hex}.jpg"
-            full_path = os.path.join(_album_dir(album.id), stored_name)
-            img = ImageOps.exif_transpose(Image.open(file.stream))
-            img.convert("RGB").save(full_path, "JPEG", quality=90)
-            ext = "jpg"
-        else:
-            stored_name = f"{uuid.uuid4().hex}.{ext}"
+        #
+        # SECURITY RULE 5 — strip the metadata (D315). Every phone photo
+        # carries an EXIF block, and EXIF includes the GPS coordinates of
+        # where the shutter clicked. Leave that in and "kids_backyard.jpg"
+        # quietly publishes the family's home address to anyone who can
+        # download the file. So uploads are never copied byte-for-byte:
+        # every image is RE-ENCODED through Pillow, which writes fresh
+        # pixels and none of the metadata. exif_transpose() runs FIRST so
+        # the one tag we DO care about (rotation) gets baked into the
+        # pixels before the rest is thrown away — strip without transposing
+        # and every portrait iPhone shot would lie down sideways.
+        if ext == "gif":
+            # The one passthrough: re-encoding would flatten an animated
+            # GIF to its first frame, and GIF predates camera metadata —
+            # the format has no EXIF/GPS block to leak.
+            stored_name = f"{uuid.uuid4().hex}.gif"
             full_path = os.path.join(_album_dir(album.id), stored_name)
             file.save(full_path)
+        else:
+            if ext in CONVERT_TO_JPEG:
+                # iPhone HEIC -> JPEG once, at the door — browsers can't
+                # display HEIC, and we're re-encoding anyway.
+                ext = "jpg"
+            stored_name = f"{uuid.uuid4().hex}.{ext}"
+            full_path = os.path.join(_album_dir(album.id), stored_name)
+            img = ImageOps.exif_transpose(Image.open(file.stream))
+            # Belt and suspenders: exif_transpose keeps the (rotation-less)
+            # EXIF dict in img.info, and some Pillow format plugins write
+            # it back out on save. Pop it so "stripped" means stripped.
+            for meta_key in ("exif", "xmp", "XML:com.adobe.xmp"):
+                img.info.pop(meta_key, None)
+            fmt = "JPEG" if ext in ("jpg", "jpeg") else ext.upper()
+            if fmt == "JPEG":
+                # JPEG can't store transparency, so flatten exotic modes.
+                # quality=90 is visually lossless for family photos at a
+                # fraction of the file size.
+                img.convert("RGB").save(full_path, fmt, quality=90)
+            else:
+                img.save(full_path, fmt)
         _make_thumbnail(full_path, ext)
 
         photo = Photo(
