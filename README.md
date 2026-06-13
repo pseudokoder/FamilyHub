@@ -33,6 +33,19 @@ flask run
 
 Then open http://127.0.0.1:5000 and log in.
 
+### Or run it with Docker (any machine with Docker installed)
+
+```bash
+cp .env.example .env   # set a real SECRET_KEY
+docker compose up --build
+# first run only — create your admin account inside the container:
+docker compose exec web flask create-admin yourusername
+```
+
+Then open http://127.0.0.1:8000. The database, photos, and backups live
+in bind-mounted folders (`instance/`, `uploads/`, `backups/`), so they
+survive container rebuilds.
+
 ## Management commands
 
 ```powershell

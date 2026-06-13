@@ -46,3 +46,13 @@ jobs:
       # Step 4: the whole point. Any failing test fails the build.
       - name: Run the test suite
         run: python -m pytest -q
+
+  # Second job: prove the Dockerfile actually builds. The dev machine is
+  # Windows without Docker installed, so this job IS the Docker test —
+  # a broken Dockerfile turns the badge red before deploy day finds it.
+  docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t familyhub:ci .

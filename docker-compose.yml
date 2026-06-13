@@ -1,0 +1,26 @@
+# One command to run FamilyHub:   docker compose up --build
+#
+# TEACHING NOTE — the volumes are the whole story here. A container's
+# filesystem VANISHES when the container is removed; anything that must
+# survive (the SQLite database, the family's photos, backups) lives in
+# bind-mounted folders on the host. Delete the container, keep the data.
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    # Secrets come from .env at RUNTIME — they are never baked into the
+    # image (.dockerignore excludes .env from the build context entirely).
+    env_file: .env
+    volumes:
+      - ./instance:/app/instance    # the SQLite database
+      - ./uploads:/app/uploads      # the family's photos
+      - ./backups:/app/backups      # local backup zips
+    restart: unless-stopped
+    healthcheck:
+      # The /health route from Chapter 17 — Docker itself now watches it.
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 60s
+      timeout: 5s
+      retries: 3

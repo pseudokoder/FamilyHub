@@ -27,3 +27,4 @@ WTForms==3.2.2              # The form/validation engine Flask-WTF builds on
 Flask-Limiter==4.1.1        # Rate limiting — brakes on the login form (D315)
 Flask-Mail==0.10.0          # Outbound email — password-reset links only
 PyYAML==6.0.3               # Reads docs/openapi.yaml for the /apidocs page
+gunicorn==26.0.0            # Production WSGI server (Linux/Docker; dev on Windows uses `flask run`)

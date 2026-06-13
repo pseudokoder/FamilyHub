@@ -926,6 +926,51 @@ survives.
 
 ---
 
+## Chapter 22 — Docker (the deployment story becomes one command)
+
+**What was built (June 12, 2026):** `Dockerfile` + `docker-compose.yml` +
+an entrypoint script. `docker compose up --build` runs the whole app —
+migrations applied, gunicorn serving, health-checked.
+
+### The four files and what each teaches
+
+1. **Dockerfile** — the frozen machine recipe. Read the comments top to
+   bottom: layer-caching (requirements before code), why `python:slim`,
+   and the non-root user rule (a compromised app should own one
+   unprivileged account, not the container).
+2. **scripts/docker-entrypoint.sh** — `flask db upgrade && exec gunicorn`.
+   Migrations on every boot (idempotent — applies only what's missing),
+   and `exec` so docker's stop signal reaches gunicorn for graceful
+   shutdown.
+3. **docker-compose.yml** — the volumes are the lesson: a container's
+   filesystem is disposable, so the SQLite DB, photos, and backups live
+   in bind-mounted host folders. Delete the container, keep the family's
+   data. Docker itself now watches `/health` (Ch. 17's route).
+4. **.dockerignore** — `.env` NEVER enters the image (secrets reach the
+   container at runtime via `env_file`); data folders and the venv stay
+   out as dead weight.
+
+### Two Windows-specific landmines, defused
+
+- **CRLF line endings**: a shell script checked out on Windows could
+  start `#!/bin/sh\r` — Linux then hunts for an interpreter named
+  `sh\r`. The new `.gitattributes` pins `*.sh` (and Dockerfile/yaml) to
+  LF on every machine.
+- **The executable bit**: git-on-Windows can lose it, so the Dockerfile
+  `chmod +x`'s the entrypoint itself. Belt and suspenders.
+
+### How it's verified without Docker on the dev box
+
+This desktop has no Docker installed — so CI grew a second job that runs
+`docker build` on every push. The Dockerfile is tested the same way the
+tests are: by a clean Linux machine, automatically. Actually *running*
+the composed app needs a Docker host → Manual Testing Checklist.
+
+This is the same Docker that D387 deploys Spring Boot with — in v2, only
+the base image and CMD line change.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -992,6 +1037,10 @@ about how it *looks and feels*.
       with the right names attached (Ch. 18)
 
 ### After deployment (server-only, can't be tested locally)
+- [ ] On the Fedora ThinkPad (or any Docker host): `docker compose up
+      --build` → site on :8000, log in, upload a photo, restart the
+      container — data survived (Ch. 22; CI already proves the image
+      *builds*, this proves it *runs*)
 - [ ] With real MAIL_* settings in the server's .env: request a reset
       link, receive the real email, and complete the reset (Ch. 20 —
       automated tests cover the logic, only real SMTP delivery needs eyes)

@@ -1,0 +1,18 @@
+# What NEVER goes into the Docker image.
+#
+# Two reasons to exclude things: SECRETS (.env must reach the container
+# at runtime via env_file, never baked into an image layer — images get
+# pushed to registries and shared) and SIZE/CHURN (data folders are
+# bind-mounted volumes; the venv and git history are dead weight).
+.env
+.git
+.venv
+__pycache__
+*.pyc
+instance/
+uploads/
+backups/
+export/
+.pytest_cache
+.idea
+.claude

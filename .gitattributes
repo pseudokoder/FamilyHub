@@ -1,0 +1,12 @@
+# Line-ending rules git enforces for every checkout, on every machine.
+#
+# TEACHING NOTE: Windows uses CRLF line endings, Linux uses LF. Git can
+# auto-convert — which is usually helpful and occasionally catastrophic:
+# a shell script checked out with CRLF endings starts with "#!/bin/sh\r",
+# and Linux looks for an interpreter literally named "sh\r". Boot failure
+# inside Docker, invisible in the editor. These rules pin the files where
+# endings MATTER to LF everywhere, no matter who checks out where.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
