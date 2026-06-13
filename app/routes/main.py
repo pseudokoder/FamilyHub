@@ -9,7 +9,10 @@ text count as family content, so they're login-walled too.
 
 import os
 
-from flask import Blueprint, Response, jsonify, render_template, send_from_directory
+from flask import (
+    Blueprint, Response, current_app, jsonify, render_template,
+    send_from_directory,
+)
 from flask_login import current_user, login_required
 from sqlalchemy import text
 
@@ -105,6 +108,41 @@ def health():
         return jsonify(status="ok", database="ok")
     except Exception:
         return jsonify(status="degraded", database="error"), 503
+
+
+# --- PWA plumbing (public: app shell only, zero family content) ---------------
+
+@main_bp.route("/manifest.webmanifest")
+def manifest():
+    """The web app manifest — name, icons, colors — that makes 'Add to
+    Home Screen' install a real-feeling app. Served through a route so
+    we control the MIME type (Windows dev boxes often don't know
+    .webmanifest)."""
+    return send_from_directory(
+        os.path.join(current_app.root_path, "static"),
+        "manifest.webmanifest",
+        mimetype="application/manifest+json",
+    )
+
+
+@main_bp.route("/sw.js")
+def service_worker():
+    """The service worker, served from the ROOT path on purpose: a worker
+    may only control pages within its own path, so controlling "/" means
+    serving from "/" — /static/js/sw.js could only control /static/."""
+    return send_from_directory(
+        os.path.join(current_app.root_path, "static", "js"),
+        "sw.js",
+        mimetype="text/javascript",
+    )
+
+
+@main_bp.route("/offline")
+def offline():
+    """The page the service worker shows when there's no connection.
+    Public and standalone — it must render entirely from cache, and it
+    contains no family content."""
+    return render_template("offline.html")
 
 
 @main_bp.route("/robots.txt")

@@ -1,0 +1,28 @@
+<!doctype html>
+{# STANDALONE on purpose — this page must render entirely from the
+   service worker's cache, so it can't extend base.html (whose Bootstrap
+   css and navbar URLs may be unreachable offline). One precached
+   stylesheet, zero family content (it's served without login). #}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>You're offline — FamilyHub</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<main class="container py-5">
+    <div class="text-center">
+        <h1>📡 You're offline</h1>
+        <p class="lead">
+            FamilyHub can't be reached right now — it looks like there's
+            no internet connection.
+        </p>
+        <p class="lead">
+            Your photos and stories are safe on the server. Reconnect to
+            Wi-Fi and try again.
+        </p>
+    </div>
+</main>
+</body>
+</html>

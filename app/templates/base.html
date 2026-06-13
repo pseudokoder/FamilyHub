@@ -30,6 +30,14 @@
        The site works even if a third-party CDN is down or blocked. #}
     {{ bootstrap.load_css() }}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {# PWA: lets phones "Add to Home Screen" as a real app icon (Ch. 25).
+       The manifest names the app + icons; theme-color tints the phone's
+       status bar; apple-touch-icon is the iPhone home-screen icon. #}
+    <link rel="manifest" href="{{ url_for('main.manifest') }}">
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="apple-touch-icon"
+          href="{{ url_for('static', filename='icons/icon-180.png') }}">
 </head>
 <body>
 
@@ -156,6 +164,8 @@
 {{ bootstrap.load_js() }}
 {# Site-wide behaviors (the data-confirm dialogs) — see the file itself. #}
 <script src="{{ url_for('static', filename='js/familyhub.js') }}"></script>
+{# Service-worker registration (PWA) — a no-op on unsupporting browsers. #}
+<script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
 {# Pages that need their own JavaScript add it here (e.g. the album page's
    drag-to-rearrange). Empty for most pages. #}
 {% block scripts %}{% endblock %}

@@ -54,6 +54,12 @@ paths:
         "503": {description: Database unreachable}
   /robots.txt:
     get: {tags: [Plumbing], summary: "Crawler policy: index nothing", responses: {"200": {description: text/plain}}}
+  /manifest.webmanifest:
+    get: {tags: [Plumbing], summary: PWA web-app manifest (name, icons, colors), responses: {"200": {description: application/manifest+json}}}
+  /sw.js:
+    get: {tags: [Plumbing], summary: Service worker (static shell cache + offline fallback; never caches photos), responses: {"200": {description: text/javascript}}}
+  /offline:
+    get: {tags: [Plumbing], summary: Standalone offline fallback page (precached by the service worker), responses: {"200": {description: HTML page}}}
   /.well-known/security.txt:
     get: {tags: [Plumbing], summary: RFC 9116 security contact, responses: {"200": {description: text/plain}}}
   /about:
