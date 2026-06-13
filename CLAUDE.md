@@ -132,11 +132,25 @@ mission:
   - Dependency fixed: Flask-Bootstrap → Bootstrap-Flask (Bootstrap 5)
 - (Note: "Day N" labels are from an earlier learn-as-you-go plan. Going forward,
   work is organized by FEATURE, not by day.)
+- **June 12, 2026 — all six core features are built and tested** (auth,
+  photos, blog, wiki, timeline, admin) plus the approved 26-item
+  improvement build: EXIF/GPS stripping, login rate limiting, CI with a
+  90% coverage floor, site-wide search, wiki revision history + restore,
+  album deletion, self-service + emailed password resets, comment
+  deletion, health/robots/security.txt, caption editing,
+  drag-to-rearrange, content **locking** ("Trial Period" rule:
+  creator-deletable until an admin locks it; then admin-only) + audit
+  trail, strict CSP security headers, OpenAPI spec (test-enforced),
+  Docker, What's New feed, photo↔wiki tagging, PWA, and portfolio
+  artifacts (architecture diagram, CONTRIBUTING.md, scripts/deploy/).
+- **133 tests, ~93% coverage.** 12 tables, all portable SQL, all via
+  migrations. DEVDIARY chapters 0–26 document everything.
+- Open question for Wes (DEVDIARY Ch. 18): locking currently guards
+  **deletion only** — edits stay collaborative. Confirm or tighten.
 
 ## Next Build Target
-- Evaluate the existing codebase, then build in this order:
-  1. `flask init-db` CLI command + Flask-Migrate setup
-  2. Authentication blueprint (register-by-invite or admin-created accounts,
-     login/logout)
-  3. Photo album upload + gallery (the parents' #1 feature)
-  4. Family history blog posts
+1. **Deploy to Lightsail** — follow `scripts/deploy/README.md` end to
+   end (instance + bucket, nginx, systemd, certbot, backup crontab).
+2. **Wes runs the Manual Testing Checklist** (DEVDIARY) once, on the
+   deployed site — real phones, real photos, PWA install, real SMTP.
+3. Then: create the family's accounts, upload the first albums, go live.

@@ -1062,6 +1062,30 @@ service workers (or with them disabled) just get the plain site.
 
 ---
 
+## Chapter 26 — Portfolio & Ops Polish (the build wraps)
+
+**What was built (June 12, 2026):** the four artifacts that make the repo
+legible to someone who didn't build it — a hiring manager, a future
+contributor, or Wes-in-2027 starting the v2 rewrite.
+
+1. **Architecture diagram in README** — Mermaid, so GitHub renders it
+   natively. Thirty seconds of reading now shows the whole system:
+   browser → nginx → gunicorn → routes → services → models → SQLite,
+   uploads outside the web root, nightly backups to S3.
+2. **Coverage with a floor** — `pytest --cov=app` reports **93%**, and CI
+   now fails below 90%. The floor matters more than the number: coverage
+   can't quietly erode. (Honest note: coverage measures *executed*, not
+   *proven* — the 133 tests' assertions are the real spec.)
+3. **CONTRIBUTING.md** — setup, test commands, and the seven house rules
+   (layers, teacher comments, DEVDIARY, migrations, spec-sync, no inline
+   JS/styles, commit style). Onboarding is a file, not folklore.
+4. **scripts/deploy/** — the Lightsail recipe as *files*: nginx site
+   config (TLS, static serving, proxy headers), a systemd unit (boot +
+   crash restart), and a step-by-step README ending in the nightly
+   backup crontab line. Chapter 8's prose became copy-paste-able.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -1270,25 +1294,33 @@ so the rewrite is a translation, not a redesign.
 | `flask export-data` (JSON + sha256 manifest) | the v2 import tool's input format |
 | bcrypt password hashes | read natively by Spring Security — logins carry over |
 
-**The final v1 schema** (9 tables, all created by migrations, all portable):
+**The final v1 schema** (12 tables, all created by migrations, all portable):
 
 | Table | What it holds | Belongs to feature |
 |-------|---------------|--------------------|
-| `users` | login accounts (bcrypt hashes, admin flag) | Auth (Ch. 2) |
-| `family_member` | wiki pages: bio, birth/death dates, edit tracking | Wiki (Ch. 5) |
-| `albums` → `photos` → `photo_comments` | albums, photo metadata (files on disk), comment threads | Photos (Ch. 3) |
-| `posts` → `post_comments` | written memories + comment threads | Blog (Ch. 4) |
-| `timeline_events` | year/month/day partial-date events | Timeline (Ch. 6) |
+| `users` | login accounts (bcrypt hashes, admin flag, reset email) | Auth (Ch. 2, 20) |
+| `family_member` | wiki pages: bio, birth/death dates, edit tracking, lock state | Wiki (Ch. 5, 18) |
+| `wiki_revisions` | full snapshot of every wiki save (the undo button) | Wiki history (Ch. 15) |
+| `albums` → `photos` → `photo_comments` | albums, photo metadata (files on disk), comment threads, lock state | Photos (Ch. 3, 18) |
+| `photo_tags` | who's in which photo (the photo↔wiki bridge) | Tagging (Ch. 24) |
+| `posts` → `post_comments` | written memories + comment threads (never lockable) | Blog (Ch. 4) |
+| `timeline_events` | year/month/day partial-date events, lock state | Timeline (Ch. 6, 18) |
 | `site_settings` | key/value admin text (tagline, about, contact) | Admin (Ch. 7) |
+| `audit_log` | append-only who-did-what trail | Audit (Ch. 18) |
 
 ---
 
 ## What's NOT in v1 (on purpose)
 
-Deferred per CLAUDE.md, logged so nothing is forgotten: video uploads,
-permission tiers beyond admin/member, wiki revision history, photo tagging
-into wiki pages, drag-to-rearrange photos (the `position` column is
-waiting), album deletion UI, pagination. The remaining **deployment** work
-(not features): Lightsail instance, gunicorn + nginx, Let's Encrypt, the
-nightly backup crontab line from Chapter 8, and `BACKUP_S3_BUCKET` in the
-server's `.env`.
+*(Updated June 12, 2026 — the improvement build shipped most of the
+original deferrals: wiki revision history → Ch. 15, photo tagging →
+Ch. 24, drag-to-rearrange → Ch. 17, album deletion → Ch. 16.)*
+
+Still deferred, still on purpose: **video uploads**, **permission tiers
+beyond admin/member** (the lock system covers v1's real need), and
+**pagination** (family-scale data; add it if any list ever feels slow).
+
+The remaining **deployment** work (not features): create the Lightsail
+instance and bucket, then follow `scripts/deploy/README.md` top to
+bottom — nginx, systemd, certbot, and the nightly backup crontab line
+are all files now, not prose.
