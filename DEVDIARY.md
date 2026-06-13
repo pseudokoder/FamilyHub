@@ -1273,6 +1273,44 @@ Running log of judgment calls made mid-build, per the workflow rules
 28. **(Ch. 18)** Lock/unlock are idempotent (locking twice = no-op, not
     an error) — admins double-click, and idempotent endpoints are also
     what v2's REST API will want anyway.
+29. **(Ch. 19)** The CSP keeps `style-src 'self'` (no 'unsafe-inline'
+    even for styles) — the six inline `style=""` attributes were moved
+    into named classes instead of weakening the policy. More work, no
+    escape hatches.
+30. **(Ch. 20)** Email validation is just "contains an @" — WTForms'
+    full Email() validator drags in an extra dependency to chase RFC
+    corner cases, and the real test of an address is whether the reset
+    mail arrives. Validate cheaply, verify by delivery.
+31. **(Ch. 21)** The approved idea said "Swagger UI"; what shipped is a
+    hand-written OpenAPI YAML plus a server-rendered /apidocs page.
+    Reason: stock Swagger UI injects inline styles, which Ch. 19's
+    strict CSP blocks by design — and a one-page exception would have
+    gutted the policy's story. The raw spec still works with any
+    external Swagger tooling. Spec completeness is *enforced by a test*
+    (every live route must appear in the YAML), which no auto-generator
+    would have given us.
+32. **(Ch. 22)** gunicorn runs 2 workers, and the rate limiter's
+    memory:// storage counts per worker — so the practical login budget
+    is up to 20/min/IP in Docker. Still robot-proof; documented in the
+    entrypoint with the Redis upgrade path.
+33. **(Ch. 23)** The What's New feed is derived from content tables at
+    read time, NOT from the audit log — the audit log is an admin
+    forensic tool (includes deletes/locks, outlives its subjects) and
+    feeding it to members would leak the wrong tone of information.
+34. **(Ch. 24)** Anyone may tag/untag photos (not just the uploader) —
+    naming faces is collaborative memory work, and the person who knows
+    "that's Aunt Ruth!" is rarely the person who scanned the slide.
+    Audited like everything else.
+35. **(Ch. 25)** The service worker never caches photos or family pages
+    — only the static shell. Offline galleries would be easy and wrong:
+    login-walled PII must not accumulate in a device cache that
+    outlives the session.
+36. **(Ch. 26)** Coverage floor set at 90% (measured 93%) and enforced
+    in CI rather than chasing 100% — the last few points are error
+    branches like "thumbnail write failed", and a floor that forbids
+    erosion beats a vanity number. The README badge is static text kept
+    honest by the CI gate, not a Codecov integration — one less
+    third-party service holding family code.
 
 ---
 
