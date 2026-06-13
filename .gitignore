@@ -41,6 +41,10 @@ export/
 /.sass-cache
 /connect.lock
 /coverage
+# pytest-cov's data file + HTML report — regenerated on every run, never
+# committed (it churns constantly and is meaningless in history).
+.coverage
+htmlcov/
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log
