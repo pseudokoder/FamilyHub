@@ -1,0 +1,22 @@
+{# 403 — you're logged in, but this particular action isn't yours to take
+   (e.g. deleting someone else's photo, or a non-admin opening an admin
+   page). Explains WITHOUT scolding — most 403s here are honest mistakes. #}
+{% extends "base.html" %}
+
+{% block title %}Not allowed{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+  <h1 class="display-6">That one's not yours to change</h1>
+  <p class="fs-4 mt-3">
+    You're signed in just fine — but this action is limited to the person
+    who created it, or to an admin.
+  </p>
+  <p class="fs-5 text-muted">
+    If you think you should have access, ask Wes.
+  </p>
+  <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('main.home') }}">
+    Back to the home page
+  </a>
+</div>
+{% endblock %}

@@ -59,14 +59,30 @@ def create_app(config_class=Config):
         from werkzeug.middleware.proxy_fix import ProxyFix
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-    # A friendly page for "slow down" instead of a bare error dump. The
-    # rate limiter raises 429 Too Many Requests; elderly-first means even
-    # the brakes are polite.
+    # Friendly error pages instead of bare status dumps. Elderly-first
+    # means even the failures guide rather than alarm — the visitor always
+    # gets a calm explanation and a button home. Each returns its real HTTP
+    # status code (so crawlers, monitors, and the browser still know the
+    # truth); only the PRESENTATION is gentler.
     from flask import render_template
+
+    @app.errorhandler(403)
+    def forbidden(error):
+        return render_template("errors/403.html"), 403
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return render_template("errors/404.html"), 404
 
     @app.errorhandler(429)
     def too_many_requests(error):
         return render_template("errors/429.html"), 429
+
+    @app.errorhandler(500)
+    def server_error(error):
+        # NB: a real 500 means an unhandled exception already rolled back
+        # the request; we render a static page and touch no database here.
+        return render_template("errors/500.html"), 500
 
     # --- HTTP security headers (D315) — sent with EVERY response. -----------
     # Each one closes a specific attack class. The star is the

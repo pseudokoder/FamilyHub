@@ -1,0 +1,17 @@
+{# 404 — the page wasn't found. A mistyped URL or a stale bookmark should
+   land somewhere calm with a way back, never a stark error code. #}
+{% extends "base.html" %}
+
+{% block title %}Page not found{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+  <h1 class="display-6">We couldn't find that page</h1>
+  <p class="fs-4 mt-3">
+    The link may be old, or there might be a small typo in the address.
+  </p>
+  <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('main.home') }}">
+    Back to the home page
+  </a>
+</div>
+{% endblock %}
