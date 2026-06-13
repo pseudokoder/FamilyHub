@@ -149,6 +149,14 @@ paths:
   /photos/comments/{comment_id}/delete:
     parameters: [{name: comment_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Albums & Photos], summary: Delete a photo comment (author/admin), responses: {"302": {description: Deleted}}}
+  /photos/{photo_id}/tags:
+    parameters: [{name: photo_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Albums & Photos], summary: 'Tag a family member into the photo (form field member_id; any member may tag — collaborative)', responses: {"302": {description: Tagged (or friendly already-tagged notice)}}}
+  /photos/{photo_id}/tags/{member_id}/delete:
+    parameters:
+      - {name: photo_id, in: path, required: true, schema: {type: integer}}
+      - {name: member_id, in: path, required: true, schema: {type: integer}}
+    post: {tags: [Albums & Photos], summary: Remove a member's tag from the photo, responses: {"302": {description: Removed}}}
 
   # --- Memories (blog) -------------------------------------------------------------
   /posts:

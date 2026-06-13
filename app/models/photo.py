@@ -104,6 +104,13 @@ class Photo(LockableMixin, db.Model):
         cascade="all, delete-orphan",
         order_by="PhotoComment.created_at",
     )
+    # Who's in this photo (see photo_tag.py). Deleting the photo deletes
+    # its tags — a tag without its photo is meaningless.
+    tags = db.relationship(
+        "PhotoTag",
+        back_populates="photo",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Photo {self.filename} in album {self.album_id}>"

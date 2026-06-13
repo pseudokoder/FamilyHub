@@ -61,6 +61,25 @@
             {% endif %}
         </div>
 
+        {# ---- Photos featuring this person ---------------------------------
+           Fed by photo tags ("Who's in this photo?" on any photo page).
+           The islands are connected: wiki -> photos and back. #}
+        {% if featured_photos %}
+        <h2 class="h4 mt-4 mb-3">📸 Photos featuring {{ member.name }}</h2>
+        <div class="row g-3 mb-4">
+            {% for photo in featured_photos %}
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{{ url_for('photos.view_photo', photo_id=photo.id) }}"
+                   class="card photo-card h-100 text-decoration-none">
+                    <img src="{{ url_for('photos.photo_thumb', photo_id=photo.id) }}"
+                         alt="{{ photo.caption or photo.original_filename }}"
+                         loading="lazy">
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% if member.last_editor %}
         <p class="text-muted">
             <small>Last edited by {{ member.last_editor.display_name }}{% if member.updated_at %}

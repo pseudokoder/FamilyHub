@@ -28,8 +28,8 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.forms.comment_forms import CommentForm
 from app.forms.photo_forms import AlbumForm, PhotoCaptionForm, UploadPhotosForm
-from app.models import Album, Photo, PhotoComment
-from app.services import lock_service, photo_service
+from app.models import Album, FamilyMember, Photo, PhotoComment
+from app.services import lock_service, photo_service, tag_service
 
 photos_bp = Blueprint("photos", __name__)
 
@@ -132,7 +132,35 @@ def view_photo(photo_id):
         photo=photo,
         comment_form=CommentForm(),
         can_delete=photo_service.can_delete(photo, current_user),
+        tagged_members=tag_service.members_tagged_in(photo),
+        taggable_members=tag_service.members_not_tagged_in(photo),
     )
+
+
+# --- Tagging ("who's in this photo?") ------------------------------------------
+
+@photos_bp.route("/photos/<int:photo_id>/tags", methods=["POST"])
+@login_required
+def add_tag(photo_id):
+    """Any member may name a face — collaborative, like the wiki."""
+    photo = db.get_or_404(Photo, photo_id)
+    member = db.get_or_404(FamilyMember, request.form.get("member_id", -1, type=int))
+    if tag_service.tag_photo(photo, member, current_user):
+        flash(f"{member.name} is tagged in this photo.", "success")
+    else:
+        flash(f"{member.name} was already tagged here.", "warning")
+    return redirect(url_for("photos.view_photo", photo_id=photo.id))
+
+
+@photos_bp.route("/photos/<int:photo_id>/tags/<int:member_id>/delete",
+                 methods=["POST"])
+@login_required
+def remove_tag(photo_id, member_id):
+    photo = db.get_or_404(Photo, photo_id)
+    member = db.get_or_404(FamilyMember, member_id)
+    tag_service.untag_photo(photo, member, current_user)
+    flash(f"{member.name}'s tag was removed.", "success")
+    return redirect(url_for("photos.view_photo", photo_id=photo.id))
 
 
 @photos_bp.route("/photos/<int:photo_id>/comments", methods=["POST"])

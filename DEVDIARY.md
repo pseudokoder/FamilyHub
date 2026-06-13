@@ -1001,6 +1001,36 @@ happened since I last looked?" — the question every visit silently asks.
 
 ---
 
+## Chapter 24 — Photo Tagging (the islands get a bridge)
+
+**What was built (June 12, 2026):** "Who's in this photo?" on every photo
+page — tag any family member, and their wiki page grows a "Photos
+featuring X" gallery. Resolves decision #16's deferral ("photo embedding
+needs a tagging system") — this IS the tagging system.
+
+### The data-modeling lesson (photo_tag.py)
+
+`photo_tags` is a **many-to-many join table with payload**: a photo holds
+many people, a person appears in many photos, and the relationship itself
+remembers who tagged and when. That payload is why it's a real model
+class instead of SQLAlchemy's bare `db.Table` helper. The
+`UniqueConstraint(photo_id, member_id)` makes double-tagging impossible
+*at the database level* — the service checks first (friendly message),
+the constraint backstops the race where two people tag simultaneously
+(caught IntegrityError = "already done", not a crash).
+
+### Policy + cascade decisions
+
+- **Anyone may tag/untag** — naming faces is collaborative memory work,
+  and the person who knows "that's Aunt Ruth!" is rarely the uploader.
+  Audited like everything else.
+- **Cascades from both ends:** delete the photo → its tags go; delete
+  the person → their tags go, photos stay. A tag never outlives either
+  end of its bridge (tested from both directions).
+- Tags ride along in `flask export-data`, so v2 inherits the bridge.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

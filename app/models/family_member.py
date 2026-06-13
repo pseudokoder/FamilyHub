@@ -65,6 +65,14 @@ class FamilyMember(LockableMixin, db.Model):
         order_by="desc(WikiRevision.id)",
     )
 
+    # Photos this person is tagged in (see photo_tag.py). Deleting the
+    # person removes the tags, never the photos.
+    photo_tags = db.relationship(
+        "PhotoTag",
+        back_populates="member",
+        cascade="all, delete-orphan",
+    )
+
     @property
     def lifespan(self):
         """'1947 – 2020', '1947 – ', or '' — for the page header."""

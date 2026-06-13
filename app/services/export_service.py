@@ -31,14 +31,14 @@ from sqlalchemy import text
 
 from app.extensions import db
 from app.models import (
-    Album, AuditLog, FamilyMember, Photo, PhotoComment, Post, PostComment,
-    SiteSetting, TimelineEvent, User, WikiRevision,
+    Album, AuditLog, FamilyMember, Photo, PhotoComment, PhotoTag, Post,
+    PostComment, SiteSetting, TimelineEvent, User, WikiRevision,
 )
 
 # Every model in the app, in an order a future importer can load without
 # tripping over foreign keys (users first — everything points at them).
 EXPORTED_MODELS = [
-    User, FamilyMember, Album, Photo, PhotoComment,
+    User, FamilyMember, Album, Photo, PhotoComment, PhotoTag,
     Post, PostComment, TimelineEvent, SiteSetting, WikiRevision, AuditLog,
 ]
 

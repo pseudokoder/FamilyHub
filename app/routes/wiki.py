@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.forms.wiki_forms import FamilyMemberForm
 from app.models import FamilyMember
-from app.services import lock_service, wiki_service
+from app.services import lock_service, tag_service, wiki_service
 
 wiki_bp = Blueprint("wiki", __name__)
 
@@ -56,6 +56,7 @@ def view_member(member_id):
     return render_template(
         "wiki/member.html", member=member,
         can_delete=wiki_service.can_delete(member, current_user),
+        featured_photos=tag_service.photos_featuring(member),
     )
 
 
