@@ -1,0 +1,25 @@
+# systemd unit — /etc/systemd/system/familyhub.service
+#
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now familyhub
+#
+# systemd is the production babysitter: starts gunicorn at boot,
+# restarts it if it ever crashes, and `journalctl -u familyhub` holds
+# the logs. (The Docker route replaces this file entirely — pick one.)
+
+[Unit]
+Description=FamilyHub (gunicorn)
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/FamilyHub
+Environment="PATH=/home/ubuntu/FamilyHub/.venv/bin"
+# Bind to localhost only — nginx is the sole public doorway.
+ExecStart=/home/ubuntu/FamilyHub/.venv/bin/gunicorn \
+    --bind 127.0.0.1:8000 --workers 2 --access-logfile - run:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

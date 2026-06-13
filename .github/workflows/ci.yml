@@ -43,9 +43,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      # Step 4: the whole point. Any failing test fails the build.
-      - name: Run the test suite
-        run: python -m pytest -q
+      # Step 4: the whole point. Any failing test fails the build — and so
+      # does coverage dropping below 90% (it's 93% today; the floor leaves
+      # headroom for new code while forbidding a slow slide into untested).
+      - name: Run the test suite with coverage
+        run: python -m pytest -q --cov=app --cov-fail-under=90
 
   # Second job: prove the Dockerfile actually builds. The dev machine is
   # Windows without Docker installed, so this job IS the Docker test —
