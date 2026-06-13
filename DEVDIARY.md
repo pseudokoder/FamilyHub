@@ -971,6 +971,36 @@ the base image and CMD line change.
 
 ---
 
+## Chapter 23 — The "What's New" Feed
+
+**What was built (June 12, 2026):** `/activity` — one page, one human
+sentence per happening, newest first: memories written, photo batches
+uploaded, wiki pages started/worked on, timeline events added, comments.
+"What's New" sits right next to Home in the navbar.
+
+### Why this is THE engagement feature
+
+The failure mode of a family site is Grandma logging in, seeing the same
+dashboard, and concluding nothing happens here. This page answers "what
+happened since I last looked?" — the question every visit silently asks.
+
+### Design decisions worth reading (activity_service.py)
+
+- **No new tables.** The feed is *derived* from the content tables at
+  read time. At family scale, merging five small queries in Python is
+  instant — and there's no second copy of the truth to drift. (The audit
+  log was deliberately NOT used: that's an admin forensic tool that
+  includes deletes and locks; this page is the friendly version.)
+- **Grouping beats spam:** forty photos uploaded to one album on one day
+  is ONE line ("Wes added 40 photos to..."), and four saves to the same
+  wiki page collapse to one "worked on" line. A page's very first
+  revision shows as "started a wiki page for X" — the revision history
+  from Ch. 15 doubling as a birth certificate.
+- **Services don't build URLs.** Feed items carry (endpoint, kwargs);
+  the template calls url_for. The web layer owns the web.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

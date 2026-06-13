@@ -58,6 +58,8 @@ paths:
     get: {tags: [Plumbing], summary: RFC 9116 security contact, responses: {"200": {description: text/plain}}}
   /about:
     get: {tags: [Plumbing], summary: Admin-written about/contact page, responses: {"200": {description: HTML page}}}
+  /activity:
+    get: {tags: [Plumbing], summary: "What's New — recent family activity, merged and grouped, newest first", responses: {"200": {description: HTML page}}}
   /site/hero:
     get: {tags: [Plumbing], summary: Dashboard banner image (login-walled), responses: {"200": {description: image bytes}}}
 

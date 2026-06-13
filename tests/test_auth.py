@@ -14,7 +14,7 @@ PROTECTED_ROUTES = [
     "/albums", "/albums/new", "/posts", "/posts/new",
     "/family", "/family/new", "/timeline", "/timeline/new",
     "/about", "/site/hero", "/search", "/auth/change-password",
-    "/apidocs", "/openapi.yaml",
+    "/apidocs", "/openapi.yaml", "/activity",
     "/admin/users", "/admin/settings", "/admin/backups",
 ]
 
