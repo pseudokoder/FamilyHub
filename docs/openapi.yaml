@@ -190,6 +190,8 @@ paths:
   # --- Wiki ---------------------------------------------------------------------------
   /family:
     get: {tags: [Wiki], summary: Every family member, alphabetically, responses: {"200": {description: HTML page}}}
+  /family/export.ged:
+    get: {tags: [Wiki], summary: "Download the whole wiki as a GEDCOM 5.5.1 file (Ancestry/FamilySearch/Gramps); admin-only, audited", responses: {"200": {description: application/x-gedcom attachment}, "403": {description: Admins only}}}
   /family/new:
     get: {tags: [Wiki], summary: New-person form, responses: {"200": {description: HTML form}}}
     post: {tags: [Wiki], summary: Create a page (duplicates redirect to the existing page), responses: {"302": {description: Redirect to the page}}}

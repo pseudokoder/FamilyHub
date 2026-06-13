@@ -11,13 +11,17 @@ the family's shared encyclopedia, Wikipedia-style. Trust the family; keep
 delete behind the admin.
 """
 
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask import (
+    Blueprint, Response, abort, flash, redirect, render_template, url_for,
+)
 from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.forms.wiki_forms import FamilyMemberForm
 from app.models import FamilyMember
-from app.services import lock_service, tag_service, wiki_service
+from app.services import (
+    audit_service, gedcom_service, lock_service, tag_service, wiki_service,
+)
 
 wiki_bp = Blueprint("wiki", __name__)
 
@@ -26,6 +30,26 @@ wiki_bp = Blueprint("wiki", __name__)
 @login_required
 def list_members():
     return render_template("wiki/members.html", members=wiki_service.get_all_members())
+
+
+@wiki_bp.route("/family/export.ged")
+@login_required
+def export_gedcom():
+    """Download the whole wiki as a GEDCOM file for Ancestry/FamilySearch/
+    Gramps. Admin-only, like every other BULK data export here (JSON
+    export and backups) — a single page is fine for any member to read,
+    but shipping everyone's birthdates out in one file is an admin call.
+    Audited, because bulk PII leaving the building should leave a trace."""
+    if not current_user.is_admin:
+        abort(403)
+    document = gedcom_service.build_gedcom()
+    audit_service.log_event(current_user, "export", "family tree (GEDCOM)")
+    db.session.commit()
+    return Response(
+        document,
+        mimetype="application/x-gedcom",
+        headers={"Content-Disposition": "attachment; filename=familyhub.ged"},
+    )
 
 
 @wiki_bp.route("/family/new", methods=["GET", "POST"])

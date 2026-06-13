@@ -1086,6 +1086,50 @@ contributor, or Wes-in-2027 starting the v2 rewrite.
 
 ---
 
+## Chapter 27 — GEDCOM Export (the family tree, in a format the world reads)
+
+**What was built (June 13, 2026):** a one-click "Download family tree"
+that turns the wiki into a standard **GEDCOM 5.5.1 `.ged` file** — the
+format Ancestry, FamilySearch, MyHeritage, and Gramps all import. Admin
+download button on the Family Wiki page, plus `flask export-gedcom` for
+the command line.
+
+### Why GEDCOM, and why it's a natural fit
+
+The wiki already stores names, birth/death dates, places, and bios — the
+exact fields an `INDI` (individual) record holds. So this is pure upside:
+no schema change, no new data to maintain, and the family can carry their
+tree into "real" genealogy software without retyping anyone. It's the
+same philosophy as the JSON export (Ch. 9): *the data belongs to the
+family — give them a portable copy in the format their tools expect.*
+
+### The honest limitation, documented (decision #37)
+
+GEDCOM's `FAM` records link parents/children/spouses — but v1 doesn't
+*model* typed relationships. The wiki's `[[Name]]` links are freeform
+("see also"), not "spouse of". Inventing relationships from untyped links
+would be guessing, and the timeline's partial-date rule already taught us
+the house value: **honest "unknown" beats invented precision.** So we
+export individuals; the family draws the lines in their genealogy tool —
+or in v2, once relationships become a real table, `FAM` records slot in
+next to the `INDI` records this already produces.
+
+### Two format details worth seeing (gedcom_service.py)
+
+- **Name splitting** is a *documented heuristic*: last word = surname,
+  the rest = given name (`Mary Jo /Leiter/`). A single-word name
+  ("Grandma") emits no surname slashes. It's a guess, clearly labelled —
+  and a genealogist fixes names first thing regardless.
+- **Long/multi-line text** obeys GEDCOM's 255-byte line cap: embedded
+  newlines become `CONT` lines, overflow becomes `CONC` continuations.
+  The fiddly-but-correct part of the spec, with a test pinning each.
+
+Admin-only and audited, consistent with the other bulk exports — one wiki
+page is fine for any member to read, but shipping everyone's birthdates
+out in a single file is an admin call that leaves a trace.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -1311,6 +1355,13 @@ Running log of judgment calls made mid-build, per the workflow rules
     erosion beats a vanity number. The README badge is static text kept
     honest by the CI gate, not a Codecov integration — one less
     third-party service holding family code.
+37. **(Ch. 27)** GEDCOM export covers INDIviduals only, no FAM
+    (relationship) records — v1 doesn't model typed relationships, and
+    guessing them from freeform [[links]] would be invented precision.
+    Honest individuals now; relationships when v2 models them.
+38. **(Ch. 27)** GEDCOM export is admin-only + audited, matching the JSON
+    export and backups — bulk PII leaving the building is an admin
+    action, even though any member can read one wiki page.
 
 ---
 

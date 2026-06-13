@@ -154,3 +154,19 @@ def register_cli(app):
             click.echo(f"  {name}: {count} row(s)")
         click.echo(f"  uploaded files in manifest: {file_count}")
         click.echo("Treat the export folder as sensitive — it's the whole archive.")
+
+    @app.cli.command("export-gedcom")
+    @click.argument("out_path", default="familyhub.ged")
+    def export_gedcom_command(out_path):
+        """Write the family wiki to a GEDCOM file (Ancestry/FamilySearch).
+
+        The same export the admin download button produces, as a CLI
+        one-liner for scripts or a quick server-side dump.
+        """
+        from app.services import gedcom_service
+
+        document = gedcom_service.build_gedcom()
+        with open(out_path, "w", encoding="utf-8", newline="") as handle:
+            handle.write(document)
+        click.echo(f"GEDCOM written: {out_path}")
+        click.echo("Contains family birthdates — treat it as sensitive PII.")
