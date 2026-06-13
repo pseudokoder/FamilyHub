@@ -117,6 +117,30 @@ body {
     padding: 1rem 1.25rem;
 }
 
+/* Skip-to-content link (accessibility): parked off-screen until a keyboard
+   user Tabs to it, then it snaps into the top-left corner as a real,
+   visible button. Mouse users never see it; keyboard/screen-reader users
+   skip the whole navbar with one press. */
+.skip-link {
+    position: absolute;
+    left: -999px;
+    top: 0;
+    z-index: 2000;
+    padding: 0.75rem 1.25rem;
+    background: #0d6efd;
+    color: #fff;
+    font-size: 1.1rem;
+    border-radius: 0 0 0.5rem 0;
+}
+.skip-link:focus {
+    left: 0;                    /* yanked on-screen the moment it's focused */
+}
+/* The target shouldn't show a focus outline when we send focus there
+   programmatically via the skip link (it's a landmark, not a control). */
+#main-content:focus {
+    outline: none;
+}
+
 /* Drag-to-rearrange: the "ghost" is the placeholder SortableJS shows in
    the spot where the dragged photo will land — faded + outlined so the
    eye can see the future position while the hand is mid-drag. */

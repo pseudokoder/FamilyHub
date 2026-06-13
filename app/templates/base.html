@@ -41,6 +41,12 @@
 </head>
 <body>
 
+{# Skip link (D277 / WCAG): the first thing a keyboard or screen-reader
+   user reaches. It's visually hidden until focused, then jumps past the
+   navbar straight to the page content — so they don't tab through every
+   menu item on every page. #}
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
 <nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4">
     <div class="container">
         <a class="navbar-brand" href="{{ url_for('main.home') }}">👪 FamilyHub</a>
@@ -142,7 +148,7 @@
     </div>
 </nav>
 
-<main class="container pb-5">
+<main class="container pb-5" id="main-content" tabindex="-1">
     {# Flash messages: one-time banners ("Welcome back!", "Photo uploaded!").
        Flask stores them in the session; they show once, then vanish.
        The category (success/danger/warning) picks the Bootstrap color. #}

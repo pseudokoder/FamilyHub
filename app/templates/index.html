@@ -42,16 +42,57 @@
 
     <div class="text-center py-5">
         <h1 class="display-4">👪 Welcome to FamilyHub</h1>
-        <p class="lead mt-3">
-            Our family's private home for photo albums, memories, and history.
+        <p class="lead mt-3 mb-4">
+            A private home for our family's photo albums, written memories,
+            family tree, and history — kept safe and just for us.
         </p>
-        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg mt-3 px-5">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg px-5">
             Log In
         </a>
-        <p class="text-muted mt-4">
-            Need an account? Ask Wes — accounts are created by the family admin.
-        </p>
     </div>
+
+    {# A gentle "what's inside" strip — describes the FEATURES, never the
+       family's actual content (this page is public; zero PII). Reassures a
+       new family member what they'll find before they sign in. #}
+    <div class="row g-4 justify-content-center text-center mt-2 mb-5">
+        <div class="col-sm-6 col-lg-3">
+            <div class="p-3">
+                <div class="display-5">📷</div>
+                <h2 class="h5 mt-2">Photo Albums</h2>
+                <p class="text-muted">Share and relive family pictures together.</p>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="p-3">
+                <div class="display-5">📖</div>
+                <h2 class="h5 mt-2">Memories</h2>
+                <p class="text-muted">Write down the stories worth keeping.</p>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="p-3">
+                <div class="display-5">🌳</div>
+                <h2 class="h5 mt-2">Family Tree</h2>
+                <p class="text-muted">A page for everyone, linked together.</p>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="p-3">
+                <div class="display-5">🕰️</div>
+                <h2 class="h5 mt-2">Timeline</h2>
+                <p class="text-muted">Our history, from way back to today.</p>
+            </div>
+        </div>
+    </div>
+
+    <p class="text-center text-muted">
+        Need an account? Ask Wes — accounts are created by the family admin.
+    </p>
+
+    <footer class="text-center text-muted small mt-5 pt-4 border-top">
+        🔒 FamilyHub is private. Everything inside is for family only and
+        kept behind a login.
+    </footer>
 
 {% endif %}
 {% endblock %}

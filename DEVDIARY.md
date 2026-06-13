@@ -1130,6 +1130,31 @@ out in a single file is an admin call that leaves a trace.
 
 ---
 
+## Chapter 28 — Public-Page Polish & Accessibility
+
+**What was built (June 13, 2026):** the one public page (the logged-out
+landing) got a warm "what's inside" strip and a privacy footer, and every
+page got a keyboard **skip-to-content link**.
+
+### The landing page — describe features, never content
+
+A stranger who lands on `/` now sees four feature cards (Photos,
+Memories, Family Tree, Timeline) and a "🔒 family only" reassurance — but
+**zero real family content**, because this page is public. The cards
+describe what the site *does*, not what's *in* it. The login-wall test
+was tightened to prove the dashboard's member-only nav never leaks here.
+
+### Skip-to-content (WCAG / D277)
+
+A keyboard or screen-reader user otherwise has to Tab through the entire
+navbar on every single page before reaching the content. The skip link is
+the standard fix: visually hidden until focused, then it snaps on-screen
+and jumps straight to `<main id="main-content">`. Mouse users never see
+it; keyboard users save a dozen keystrokes per page. Pure CSS — no
+JavaScript, so it works even before scripts load.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,

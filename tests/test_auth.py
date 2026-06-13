@@ -23,9 +23,22 @@ def test_home_is_public_but_empty(client):
     response = client.get("/")
     assert response.status_code == 200
     assert b"Log In" in response.data
-    # No family content or navigation for anonymous visitors.
-    assert b"Photo Albums" not in response.data
-    assert b"Memories" not in response.data
+    # The public landing page DESCRIBES features (a "what's inside" strip)
+    # but exposes zero real family content — no albums, posts, names, or
+    # the logged-in dashboard's navigation links.
+    assert b"Welcome to FamilyHub" in response.data
+    assert b"family only" in response.data  # the privacy reassurance footer
+    # No actual family content / member-only nav for anonymous visitors.
+    assert b"What's New" not in response.data
+    assert b"Log Out" not in response.data
+
+
+def test_skip_link_is_present(client):
+    """Accessibility: the skip-to-content link and its target exist on
+    every page (keyboard users jump past the navbar)."""
+    response = client.get("/")
+    assert b"Skip to main content" in response.data
+    assert b'id="main-content"' in response.data
 
 
 @pytest.mark.parametrize("route", PROTECTED_ROUTES)
