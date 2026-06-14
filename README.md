@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/pseudokoder/FamilyHub/actions/workflows/ci.yml/badge.svg)](https://github.com/pseudokoder/FamilyHub/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-93%25_(CI_floor_90%25)-brightgreen)
-![Tests](https://img.shields.io/badge/tests-133_passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-157_passing-brightgreen)
 
 A private family portal: photo albums, family-history blog, member wiki, and
 timeline — built with Python/Flask as both a real production app and a
@@ -21,6 +21,8 @@ whole codebase, written like textbook chapters. Contributors: see
   `[[Name]]` cross-links, full **revision history with one-click restore**,
   and a "Photos featuring X" gallery
 - **Timeline** with honest partial dates (1890 / March 1962 / June 12, 1947)
+- **Family Plans** — a shared space to plan trips/reunions together:
+  collaborative checklist + image/PDF file sharing (locked-down allow-list)
 - **Search** across everything; a **What's New** activity feed
 - **Admin**: invite-only accounts, content **locking** ("Trial Period" rule),
   audit trail, site settings, one-click verified **backups** (off-site to S3)

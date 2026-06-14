@@ -77,4 +77,15 @@
   {% endfor %}
 </ul>
 {% endif %}
+
+{% if results.plans %}
+<h2 class="h4 mt-4">🗂️ Plans</h2>
+<ul class="list-group mb-3">
+  {% for plan in results.plans %}
+  <li class="list-group-item">
+    <a class="fs-5" href="{{ url_for('plans.view_plan', plan_id=plan.id) }}">{{ plan.title }}</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endblock %}

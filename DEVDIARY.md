@@ -1155,6 +1155,54 @@ JavaScript, so it works even before scripts load.
 
 ---
 
+## Chapter 29 — Family Plans (the lean collaborative pillar)
+
+**What was built (June 13, 2026):** a shared space to plan things together
+— a trip, a reunion, a "neat ideas" board. Each **Plan** has a
+description, a collaborative **checklist**, and **shared files**
+(images + PDFs only). It's the 5th content pillar, and the design brief
+was *lean*: reuse what exists, invent no new architecture.
+
+### How much was reuse (the whole point)
+
+Almost all of it. A Plan is shaped like a blog Post; it's lockable via
+the **same `LockableMixin`** as photos/wiki/timeline (Trial Period rule);
+its checklist is the album→photos parent/child pattern; its attachments
+reuse the **photo upload security model** verbatim (validate by content,
+random names, stored outside the web root, served login-walled). It
+plugged into **search**, the **What's New** feed, the **audit log**, the
+**lock service**, and **export** by adding one entry to each — that's the
+layered architecture paying rent.
+
+### The security decision you flagged (decision #39)
+
+File sharing is limited to **images + PDFs**, never arbitrary files —
+because "upload anything" is a classic foothold (D315): a `.html` becomes
+a phishing page on your trusted domain, an `.svg` can carry JavaScript, an
+`.exe` is malware behind a friendly link. So the rule is an **allow-list
+validated by actual bytes**: images are re-encoded through Pillow (EXIF/GPS
+stripped, like the gallery), and a "PDF" must really begin with `%PDF-` or
+it's refused. Tests fire a fake `.exe`, `.html`, `.svg`, and a lying
+`.pdf` at it and prove all four bounce.
+
+### Permission shape (consistent with the rest of the app)
+
+- **Edit** the plan + checklist: any member (collaborative, like the wiki).
+- **Tick/untick** items: any member — that shared ticking *is* the
+  collaboration, so it's intentionally not audit-logged (it'd flood it).
+- **Delete** an item / attachment: its author / uploader, or an admin.
+- **Delete** the plan: the Trial Period rule (creator until an admin
+  locks it; admin-only after).
+
+### Lean line I held (decision #40)
+
+No per-plan comment thread in v1 — the checklist already carries the
+back-and-forth, and a comment table would be a 4th child concept for
+little gain. It's a near-verbatim copy of the existing comment pattern if
+the family ever asks.
+
+---
+
 ## Manual Testing Checklist
 
 Everything below needs **human eyes in a real browser** — visual layout,
@@ -1199,6 +1247,15 @@ about how it *looks and feels*.
 - [ ] Drag a photo to a new spot on desktop AND with a finger on a phone —
       "✓ New order saved" appears, the order survives a refresh, and a
       simple TAP still opens the photo (Ch. 17)
+
+### Family Plans (Ch. 29)
+- [ ] Create a plan, add a few checklist items, tick some off; log in as
+      another member and confirm they can add + tick too
+- [ ] Upload a photo and a PDF as attachments — both appear (photo shows a
+      preview, PDF shows a 📄 link that opens)
+- [ ] Try to upload a non-image/non-PDF (e.g. a .txt or .docx) — it's
+      politely refused
+- [ ] As admin: lock a plan, confirm its creator can no longer delete it
 
 ### Content rendering
 - [ ] Write a blog post with several paragraphs (typed like an email) —
@@ -1387,6 +1444,14 @@ Running log of judgment calls made mid-build, per the workflow rules
 38. **(Ch. 27)** GEDCOM export is admin-only + audited, matching the JSON
     export and backups — bulk PII leaving the building is an admin
     action, even though any member can read one wiki page.
+39. **(Ch. 29)** Plan file sharing is an allow-list (images + PDFs),
+    validated by content, not an "upload anything" box — arbitrary
+    uploads are a classic attack foothold. PDFs are checked for the
+    %PDF- magic bytes; images are re-encoded to strip metadata.
+40. **(Ch. 29)** Plans have no comment thread in v1 — the collaborative
+    checklist already carries the discussion, and a comment table would
+    be a 4th child concept for little gain. Easy to add later (it's the
+    existing photo/post comment pattern) if the family wants it.
 
 ---
 
@@ -1408,7 +1473,7 @@ so the rewrite is a translation, not a redesign.
 | `flask export-data` (JSON + sha256 manifest) | the v2 import tool's input format |
 | bcrypt password hashes | read natively by Spring Security — logins carry over |
 
-**The final v1 schema** (12 tables, all created by migrations, all portable):
+**The final v1 schema** (15 tables, all created by migrations, all portable):
 
 | Table | What it holds | Belongs to feature |
 |-------|---------------|--------------------|
@@ -1421,6 +1486,7 @@ so the rewrite is a translation, not a redesign.
 | `timeline_events` | year/month/day partial-date events, lock state | Timeline (Ch. 6, 18) |
 | `site_settings` | key/value admin text (tagline, about, contact) | Admin (Ch. 7) |
 | `audit_log` | append-only who-did-what trail | Audit (Ch. 18) |
+| `family_plans` → `plan_items` → `plan_attachments` | shared plans: checklist + image/PDF files | Plans (Ch. 29) |
 
 ---
 

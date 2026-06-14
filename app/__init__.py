@@ -133,6 +133,7 @@ def create_app(config_class=Config):
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.photos import photos_bp
+    from app.routes.plans import plans_bp
     from app.routes.posts import posts_bp
     from app.routes.search import search_bp
     from app.routes.timeline import timeline_bp
@@ -146,6 +147,7 @@ def create_app(config_class=Config):
     app.register_blueprint(wiki_bp)
     app.register_blueprint(timeline_bp)
     app.register_blueprint(search_bp)
+    app.register_blueprint(plans_bp)
 
     # Custom Jinja filters — tiny functions templates can pipe text through:
     # {{ post.body | family_text }} renders typed text as safe HTML.

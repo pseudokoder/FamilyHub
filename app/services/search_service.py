@@ -15,7 +15,9 @@ v2 mapping: SearchService.java (@Service) with Spring Data JPA
 
 from sqlalchemy import or_
 
-from app.models import Album, FamilyMember, Photo, Post, TimelineEvent
+from app.models import (
+    Album, FamilyMember, FamilyPlan, Photo, Post, TimelineEvent,
+)
 
 # Cap each section so one wildly common word can't render a 500-row page.
 PER_SECTION_CAP = 25
@@ -68,5 +70,10 @@ def search_all(query):
             TimelineEvent.query
             .filter(matches(TimelineEvent.title, TimelineEvent.description))
             .order_by(TimelineEvent.year).limit(PER_SECTION_CAP).all()
+        ),
+        "plans": (
+            FamilyPlan.query
+            .filter(matches(FamilyPlan.title, FamilyPlan.description))
+            .order_by(FamilyPlan.created_at.desc()).limit(PER_SECTION_CAP).all()
         ),
     }

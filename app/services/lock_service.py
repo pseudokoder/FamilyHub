@@ -10,7 +10,7 @@ identical — the mixin gave them the same shape, so one function fits all.
 """
 
 from app.extensions import db
-from app.models import Album, FamilyMember, Photo, TimelineEvent
+from app.models import Album, FamilyMember, FamilyPlan, Photo, TimelineEvent
 from app.services import audit_service
 
 # The human-readable name each type gets in the audit log and flash
@@ -20,6 +20,7 @@ TYPE_NAMES = {
     Photo: "photo",
     FamilyMember: "wiki page",
     TimelineEvent: "timeline event",
+    FamilyPlan: "plan",
 }
 
 

@@ -35,6 +35,8 @@ tags:
     description: One page per family member, with revision history (lockable)
   - name: Timeline
     description: Partial-date family history events (lockable)
+  - name: Plans
+    description: Lean collaborative space — checklist + image/PDF attachments (lockable)
   - name: Search
   - name: Admin
     description: Requires the admin flag
@@ -244,6 +246,47 @@ paths:
   /timeline/{event_id}/unlock:
     parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Timeline], summary: Unlock event (admin), responses: {"302": {description: Unlocked}}}
+
+  # --- Plans -------------------------------------------------------------------------------
+  /plans:
+    get: {tags: [Plans], summary: All plans, newest first, responses: {"200": {description: HTML page}}}
+  /plans/new:
+    get: {tags: [Plans], summary: New-plan form, responses: {"200": {description: HTML form}}}
+    post: {tags: [Plans], summary: Start a plan, responses: {"302": {description: Redirect to the plan}}}
+  /plans/{plan_id}:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Plans], summary: One plan — description, checklist, shared files, responses: {"200": {description: HTML page}}}
+  /plans/{plan_id}/edit:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Plans], summary: Edit form (any member — collaborative), responses: {"200": {description: HTML form}}}
+    post: {tags: [Plans], summary: Save changes, responses: {"302": {description: Saved}}}
+  /plans/{plan_id}/delete:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Delete a plan (creator during trial, admin always), responses: {"302": {description: Deleted}, "403": {description: Not permitted}}}
+  /plans/{plan_id}/lock:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Lock plan into the archive (admin), responses: {"302": {description: Locked}}}
+  /plans/{plan_id}/unlock:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Unlock plan (admin), responses: {"302": {description: Unlocked}}}
+  /plans/{plan_id}/items:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Add a checklist item, responses: {"302": {description: Added}}}
+  /plans/items/{item_id}/toggle:
+    parameters: [{name: item_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Tick / untick an item (any member), responses: {"302": {description: Toggled}}}
+  /plans/items/{item_id}/delete:
+    parameters: [{name: item_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Remove an item (author/admin), responses: {"302": {description: Removed}}}
+  /plans/{plan_id}/attachments:
+    parameters: [{name: plan_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: "Upload an attachment — images + PDFs only, validated by content", responses: {"302": {description: Shared (or a friendly rejection)}}}
+  /plans/attachments/{attachment_id}/file:
+    parameters: [{name: attachment_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Plans], summary: The attachment bytes (login-walled, like photos), responses: {"200": {description: file bytes}}}
+  /plans/attachments/{attachment_id}/delete:
+    parameters: [{name: attachment_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Plans], summary: Remove an attachment (uploader/admin), responses: {"302": {description: Removed}}}
 
   # --- Search ------------------------------------------------------------------------------
   /search:

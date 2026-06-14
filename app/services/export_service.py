@@ -31,8 +31,9 @@ from sqlalchemy import text
 
 from app.extensions import db
 from app.models import (
-    Album, AuditLog, FamilyMember, Photo, PhotoComment, PhotoTag, Post,
-    PostComment, SiteSetting, TimelineEvent, User, WikiRevision,
+    Album, AuditLog, FamilyMember, FamilyPlan, Photo, PhotoComment, PhotoTag,
+    PlanAttachment, PlanItem, Post, PostComment, SiteSetting, TimelineEvent,
+    User, WikiRevision,
 )
 
 # Every model in the app, in an order a future importer can load without
@@ -40,6 +41,7 @@ from app.models import (
 EXPORTED_MODELS = [
     User, FamilyMember, Album, Photo, PhotoComment, PhotoTag,
     Post, PostComment, TimelineEvent, SiteSetting, WikiRevision, AuditLog,
+    FamilyPlan, PlanItem, PlanAttachment,
 ]
 
 

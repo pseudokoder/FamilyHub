@@ -143,8 +143,13 @@ mission:
   trail, strict CSP security headers, OpenAPI spec (test-enforced),
   Docker, What's New feed, photo↔wiki tagging, PWA, and portfolio
   artifacts (architecture diagram, CONTRIBUTING.md, scripts/deploy/).
-- **133 tests, ~93% coverage.** 12 tables, all portable SQL, all via
-  migrations. DEVDIARY chapters 0–26 document everything.
+- **June 13, 2026 — post-build refinements:** friendly 404/403/500 pages,
+  **GEDCOM family-tree export** (Ancestry/FamilySearch — INDI records from
+  the wiki), public homepage polish + skip-to-content accessibility, and a
+  new **Family Plans** pillar (Ch. 29): shared collaborative checklist +
+  image/PDF file sharing (locked-down allow-list — no arbitrary uploads).
+- **157 tests, ~92% coverage.** 15 tables, all portable SQL, all via
+  migrations. DEVDIARY chapters 0–29 document everything.
 - Open question for Wes (DEVDIARY Ch. 18): locking currently guards
   **deletion only** — edits stay collaborative. Confirm or tighten.
 

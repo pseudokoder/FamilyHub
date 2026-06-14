@@ -23,7 +23,8 @@ DESIGN NOTES:
 from collections import defaultdict
 
 from app.models import (
-    Photo, PhotoComment, Post, PostComment, TimelineEvent, WikiRevision,
+    FamilyPlan, Photo, PhotoComment, Post, PostComment, TimelineEvent,
+    WikiRevision,
 )
 
 FEED_LIMIT = 50
@@ -137,9 +138,19 @@ def _comment_items():
     return items
 
 
+def _plan_items():
+    plans = FamilyPlan.query.order_by(FamilyPlan.created_at.desc()).limit(PER_SOURCE)
+    return [
+        _item(plan.created_at, "🗂️",
+              f"{plan.creator.display_name} started a plan: “{plan.title}”",
+              "plans.view_plan", plan_id=plan.id)
+        for plan in plans
+    ]
+
+
 def recent_activity(limit=FEED_LIMIT):
     """Everything recent, newest first, capped."""
     items = (_post_items() + _photo_upload_items() + _wiki_items()
-             + _timeline_items() + _comment_items())
+             + _timeline_items() + _comment_items() + _plan_items())
     items.sort(key=lambda item: item["when"], reverse=True)
     return items[:limit]
