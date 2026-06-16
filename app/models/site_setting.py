@@ -18,10 +18,14 @@ from app.extensions import db
 class SiteSetting(db.Model):
     __tablename__ = "site_settings"
 
+    # Column names match Master Plan §3.5 exactly (setting_key / setting_value)
+    # so the v1 schema and the v2 MySQL schema are the same shape — one less
+    # thing to reconcile during the migration.
+    #
     # The key IS the primary key — natural, unique, and there's no point
     # in a surrogate id for a lookup table this small.
-    key = db.Column(db.String(64), primary_key=True)
-    value = db.Column(db.Text, nullable=False, default="", server_default="")
+    setting_key = db.Column(db.String(80), primary_key=True)
+    setting_value = db.Column(db.Text, nullable=False, default="", server_default="")
 
     def __repr__(self):
-        return f"<SiteSetting {self.key}>"
+        return f"<SiteSetting {self.setting_key}>"

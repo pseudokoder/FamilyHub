@@ -17,7 +17,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import text
 
 from app.extensions import db
-from app.services import activity_service, settings_service, spec_service
+from app.services import settings_service, spec_service
 
 main_bp = Blueprint("main", __name__)
 
@@ -53,17 +53,6 @@ def hero_image():
     return send_from_directory(
         os.path.dirname(settings_service.hero_path()),
         settings_service.HERO_FILENAME,
-    )
-
-
-@main_bp.route("/activity")
-@login_required
-def activity_feed():
-    """What's New — "what happened since I last looked?" in one page.
-    (Distinct from /admin/activity, which is the forensic audit trail;
-    this is the friendly family-facing version.)"""
-    return render_template(
-        "activity.html", items=activity_service.recent_activity()
     )
 
 

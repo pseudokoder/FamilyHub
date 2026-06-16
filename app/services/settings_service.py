@@ -13,9 +13,15 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.extensions import db
 from app.models import SiteSetting
-from app.services.photo_service import ALLOWED_EXTENSIONS
 
 KNOWN_KEYS = ("tagline", "about_text", "contact_text")
+
+# The image types we accept for the dashboard hero banner. Defined HERE rather
+# than borrowed from a photo-upload module so this preserved settings feature
+# has no dependency on the (rebuilt-in-WP2) media layer — a small "depend on
+# nothing you don't need" win that keeps the home page booting during the
+# WP1 re-foundation.
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp", "heic", "heif"}
 
 # One fixed name: a new upload simply replaces the old hero. No gallery,
 # no history — it's a banner, not an archive.
@@ -24,16 +30,16 @@ HERO_FILENAME = "hero.jpg"
 
 def get(key, default=""):
     setting = db.session.get(SiteSetting, key)
-    return setting.value if setting else default
+    return setting.setting_value if setting else default
 
 
 def set_value(key, value):
     """Insert-or-update ("upsert") one setting."""
     setting = db.session.get(SiteSetting, key)
     if setting is None:
-        setting = SiteSetting(key=key)
+        setting = SiteSetting(setting_key=key)
         db.session.add(setting)
-    setting.value = (value or "").strip()
+    setting.setting_value = (value or "").strip()
     db.session.commit()
 
 

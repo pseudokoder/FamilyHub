@@ -9,13 +9,12 @@ import pytest
 
 from tests.conftest import ADMIN_PASSWORD
 
-# Every family-content URL in the app. New features should add theirs here.
+# Every login-walled URL in the app. WP1 trimmed this to the surviving
+# infrastructure surface; WP2 adds the genealogy pages back as they're built.
 PROTECTED_ROUTES = [
-    "/albums", "/albums/new", "/posts", "/posts/new",
-    "/family", "/family/new", "/timeline", "/timeline/new",
-    "/about", "/site/hero", "/search", "/auth/change-password",
-    "/apidocs", "/openapi.yaml", "/activity", "/plans", "/plans/new",
-    "/admin/users", "/admin/settings", "/admin/backups",
+    "/about", "/site/hero", "/auth/change-password",
+    "/apidocs", "/openapi.yaml",
+    "/admin/users", "/admin/settings", "/admin/backups", "/admin/activity",
 ]
 
 
@@ -108,11 +107,11 @@ def test_open_redirect_blocked(client, admin):
 
 def test_safe_next_is_honored(client, admin):
     response = client.post(
-        "/auth/login?next=/albums",
+        "/auth/login?next=/about",
         data={"username": "admin", "password": ADMIN_PASSWORD},
         follow_redirects=False,
     )
-    assert response.headers["Location"].endswith("/albums")
+    assert response.headers["Location"].endswith("/about")
 
 
 def test_csrf_actually_fires(tmp_path, admin):

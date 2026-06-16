@@ -155,18 +155,21 @@ def register_cli(app):
         click.echo(f"  uploaded files in manifest: {file_count}")
         click.echo("Treat the export folder as sensitive — it's the whole archive.")
 
-    @app.cli.command("export-gedcom")
-    @click.argument("out_path", default="familyhub.ged")
-    def export_gedcom_command(out_path):
-        """Write the family wiki to a GEDCOM file (Ancestry/FamilySearch).
+    @app.cli.command("seed")
+    def seed_command():
+        """Fill a FRESH database with realistic mock data (the Hartwell family).
 
-        The same export the admin download button produces, as a CLI
-        one-liner for scripts or a quick server-side dump.
+        For development only — it lets Cowork (WP3) and Wes see the app full of
+        believable three-generation data, and it doubles as a runnable proof
+        that the GEDCOM-7 schema holds together (see seed.py). Run it once on an
+        empty dev database, right after `flask db upgrade`.
+
+        NOTE: full GEDCOM-7 *file* import/export (reading/writing .ged) is WP6 /
+        a firm v2 deliverable — this command is mock data, not a GEDCOM importer.
         """
-        from app.services import gedcom_service
+        from seed import seed_all
 
-        document = gedcom_service.build_gedcom()
-        with open(out_path, "w", encoding="utf-8", newline="") as handle:
-            handle.write(document)
-        click.echo(f"GEDCOM written: {out_path}")
-        click.echo("Contains family birthdates — treat it as sensitive PII.")
+        counts = seed_all()
+        click.echo("Seeded the database with mock data:")
+        for name, count in counts.items():
+            click.echo(f"  {name}: {count} row(s)")

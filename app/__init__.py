@@ -129,32 +129,27 @@ def create_app(config_class=Config):
 
     # Register blueprints — each one is a self-contained feature area.
     # v2 mapping: one Blueprint ≈ one Spring Boot @Controller class.
+    #
+    # WP1 RE-FOUNDATION NOTE: this is deliberately a SHORT list. The old
+    # photo/blog/wiki/timeline/plans/search blueprints were built on the wrong
+    # data core and have been removed (Master Plan §1, "REBUILD the feature
+    # layer"). What's left is the preserved infrastructure — auth, the admin
+    # panel, and the public/plumbing routes in `main`. WP2 rebuilds the feature
+    # routes against the new GEDCOM-7 schema, registering them right here.
     from app.routes.admin import admin_bp
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
-    from app.routes.photos import photos_bp
-    from app.routes.plans import plans_bp
-    from app.routes.posts import posts_bp
-    from app.routes.search import search_bp
-    from app.routes.timeline import timeline_bp
-    from app.routes.wiki import wiki_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
-    app.register_blueprint(photos_bp)
-    app.register_blueprint(posts_bp)
-    app.register_blueprint(wiki_bp)
-    app.register_blueprint(timeline_bp)
-    app.register_blueprint(search_bp)
-    app.register_blueprint(plans_bp)
 
-    # Custom Jinja filters — tiny functions templates can pipe text through:
-    # {{ post.body | family_text }} renders typed text as safe HTML.
+    # Custom Jinja filter — {{ about_text | family_text }} renders admin-entered
+    # text as safe, paragraphed HTML (see text_service for the escaping story).
     from app.services.text_service import family_text
     app.jinja_env.filters["family_text"] = family_text
 
-    # Custom terminal commands (flask init-db, flask create-admin)
+    # Custom terminal commands (flask init-db, flask create-admin, flask seed)
     from app.cli import register_cli
     register_cli(app)
 

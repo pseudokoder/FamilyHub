@@ -40,14 +40,16 @@ def test_spec_parses_and_has_the_basics(app):
         spec = spec_service.load_spec()
     assert spec["openapi"].startswith("3.")
     assert spec["info"]["title"] == "FamilyHub API"
-    assert len(spec["paths"]) >= 40
+    # WP1 trimmed the spec to the preserved infrastructure surface (auth, admin,
+    # plumbing). WP2 grows it again with the genealogy CRUD endpoints.
+    assert len(spec["paths"]) >= 20
 
 
 def test_apidocs_page_renders(admin_client):
     page = admin_client.get("/apidocs")
     assert page.status_code == 200
     assert b"FamilyHub API" in page.data
-    assert b"/albums/{album_id}/reorder" in page.data
+    assert b"/admin/users" in page.data
 
     raw = admin_client.get("/openapi.yaml")
     assert raw.status_code == 200

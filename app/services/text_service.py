@@ -1,77 +1,45 @@
-"""Turning what the family TYPES into safe HTML the browser shows.
+"""text_service — turn admin-entered plain text into safe, tidy HTML.
 
-THE SECURITY PROBLEM (D315): if we drop user text straight into a page as
-HTML, anyone who types <script>...</script> in a comment is now running
-JavaScript in everyone else's browser — Cross-Site Scripting (XSS), the #1
-web vulnerability. Jinja auto-escapes template variables, but the moment WE
-build HTML strings ourselves (paragraphs, links), escaping becomes OUR job.
+USED BY: the `family_text` Jinja filter (registered in the app factory), which
+the About page pipes its admin-written text through:  {{ about_text | family_text }}
 
-The deal this module makes: it takes RAW text, escapes every character the
-user typed, and only adds HTML tags that *we* wrote. The result is wrapped
-in Markup(), which tells Jinja "this is safe, don't double-escape it."
+WHY A SERVICE FOR THIS? Two reasons, both about safety:
+  1. ESCAPING. Admin text could contain "<", "&", or a stray "<script>". We
+     escape every character that has meaning in HTML so the text is *shown*,
+     never *executed*. This is the server-side half of XSS defense (the CSP in
+     the app factory is the other half — defense in depth, D315).
+  2. ONE place to evolve. Today it's escape-and-paragraph. When WP2 adds
+     Markdown rendering for memories/bios, the upgrade happens here, behind the
+     same filter name, and every caller benefits at once.
 
-Used as a Jinja filter:   {{ post.body | family_text }}
+NOTE: the old version of this file also auto-linked [[Name]] mentions to wiki
+pages. That depended on the now-removed wiki feature; WP2 reintroduces rich
+rendering against the GEDCOM-7 schema. This trimmed version is intentionally
+dependency-free so the preserved About page keeps working during the rebuild.
 
-THE FUN FEATURE — [[wikilinks]]: typing [[Grandma Jo]] in any memory, bio,
-or comment-free text field turns into a link to Grandma Jo's wiki page,
-exactly like linking works on Wikipedia. If no page with that name exists
-(yet!), the name renders as plain text — never an error, never a broken
-link. CLAUDE.md asks for blog posts "linkable to wiki entries"; this is how.
+v2 mapping: a small TextService (or a Thymeleaf utility) doing the same escape.
 """
 
-import re
-
-from flask import url_for
 from markupsafe import Markup, escape
 
-# [[ anything that isn't brackets ]]  — non-greedy and bracket-free inside,
-# so "[[Jo]] and [[Bob]]" finds two links, not one giant one.
-WIKILINK_RE = re.compile(r"\[\[([^\[\]]+)\]\]")
 
-
-def _linkify(raw):
-    """Escape raw text and replace [[Name]] with a wiki link.
-
-    ORDER MATTERS: we escape each PIECE of user text individually and only
-    then weave in our own <a> tags. Escaping the finished HTML would break
-    our links; not escaping the user text would invite XSS. Walk the string
-    once, keep the two kinds of content separate.
-    """
-    from app.services import wiki_service  # imported here: avoids circular import
-
-    parts = []
-    cursor = 0
-    for match in WIKILINK_RE.finditer(raw):
-        parts.append(str(escape(raw[cursor:match.start()])))
-        name = match.group(1).strip()
-        member = wiki_service.find_by_name(name)
-        if member:
-            href = url_for("wiki.view_member", member_id=member.id)
-            parts.append(f'<a href="{href}">{escape(name)}</a>')
-        else:
-            # No page by that name (yet) — show the name, drop the brackets.
-            parts.append(str(escape(name)))
-        cursor = match.end()
-    parts.append(str(escape(raw[cursor:])))
-    return "".join(parts)
-
-
-def family_text(raw):
-    """Render user-typed text as safe paragraphs with [[wikilinks]].
-
-    Blank line  -> new paragraph     (how everyone naturally types)
-    Single \\n  -> line break <br>
-
-    WHY not Markdown or a rich-text editor? Elderly-first: the parents type
-    into a big plain box exactly like an email, and it comes out right.
-    No toolbar to learn, no syntax to remember, nothing to get "wrong".
-    """
-    if not raw:
+def family_text(text):
+    """Render admin/free text as safe HTML: escape everything, then honor
+    paragraph breaks (blank line → new <p>) and line breaks (single newline →
+    <br>). Returns a Markup object so Jinja prints it as HTML, not as escaped
+    source — safe because WE did the escaping first."""
+    if not text:
         return Markup("")
-    safe = _linkify(raw.strip())
-    paragraphs = [
-        "<p>" + p.strip().replace("\n", "<br>") + "</p>"
-        for p in re.split(r"\r?\n\s*\r?\n", safe)
-        if p.strip()
-    ]
-    return Markup("".join(paragraphs))
+    # Normalize Windows/Mac newlines so the split below is reliable.
+    normalized = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    paragraphs = [block for block in normalized.split("\n\n") if block.strip()]
+    rendered = []
+    for block in paragraphs:
+        # escape() makes each line safe; the <br> between lines is OUR markup.
+        # The `Markup("…") % safe` form is the key trick: markupsafe substitutes
+        # an already-safe value WITHOUT re-escaping it, while leaving our literal
+        # <p>/<br> tags intact. (Plain string concatenation would let markupsafe
+        # escape our own tags — a subtle gotcha worth knowing.)
+        safe_lines = Markup("<br>").join(escape(line) for line in block.split("\n"))
+        rendered.append(Markup("<p>%s</p>") % safe_lines)
+    return Markup("").join(rendered)

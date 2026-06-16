@@ -64,27 +64,14 @@
                template automatically. Logged-out visitors see almost nothing —
                all family content stays behind the login wall. #}
             {% if current_user.is_authenticated %}
+            {# WP1 RE-FOUNDATION: the family-content nav links (Photos, Memories,
+               Family Wiki, Timeline, Plans, What's New, Search) were removed
+               with the old feature layer. WP2/WP3 (Cowork) rebuild these as
+               views of the GEDCOM-7 schema and restore the links here. For now
+               the nav carries only what exists: Home, About, and admin tools. #}
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('main.home') }}">Home</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('main.activity_feed') }}">What's New</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('photos.list_albums') }}">Photos</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('posts.list_posts') }}">Memories</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('wiki.list_members') }}">Family Wiki</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('timeline.list_events') }}">Timeline</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('plans.list_plans') }}">Plans</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('main.about') }}">About</a>
@@ -104,17 +91,9 @@
                 </li>
                 {% endif %}
             </ul>
-            {# One search box that looks through everything: posts, wiki,
-               albums, captions, timeline. GET (not POST) so a results page
-               can be bookmarked or shared — and no CSRF token is needed,
-               because reading is not a state change. #}
-            <form method="get" action="{{ url_for('search.search') }}"
-                  class="d-flex me-3 my-2 my-md-0" role="search">
-                <input class="form-control" type="search" name="q"
-                       placeholder="Search everything…" aria-label="Search"
-                       value="{{ request.args.get('q', '') }}">
-                <button class="btn btn-light ms-2" type="submit">Search</button>
-            </form>
+            {# The site-wide search box was removed with the old feature layer.
+               WP4 rebuilds a richer search (people by name, date/place filters,
+               full-text over notes — Master Plan §12) and restores it here. #}
             {# The greeting doubles as a tiny account menu — one place for
                "things about ME" (just password for now; v2 adds more). #}
             <ul class="navbar-nav me-3">

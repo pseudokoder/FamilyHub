@@ -6,7 +6,6 @@ JavaScript anymore (the data-confirm refactor). The second test pins that
 refactor in place forever.
 """
 
-from app.models import Post
 from tests.conftest import ADMIN_PASSWORD
 
 
@@ -48,15 +47,14 @@ def test_hsts_only_when_https_is_on(client, app, tmp_path):
 
 
 def test_no_inline_javascript_in_rendered_pages(client, admin):
-    """The CSP bans inline handlers — so none may exist. This test walks
-    pages that USED to carry onsubmit= confirms and proves they're gone
-    (the dialogs now hang off data-confirm attributes instead)."""
+    """The CSP bans inline handlers — so none may exist. This test walks the
+    surviving authenticated pages and proves the dialogs hang off data-confirm
+    attributes (handled in static/js/familyhub.js), never inline onsubmit=."""
     client.post("/auth/login",
                 data={"username": "admin", "password": ADMIN_PASSWORD})
-    client.post("/posts/new", data={"title": "T", "body": "B"})
-    post_id = Post.query.one().id
 
-    for url in ("/", f"/posts/{post_id}", "/timeline", "/family", "/albums"):
+    for url in ("/", "/about", "/admin/users", "/admin/settings",
+                "/admin/backups", "/admin/activity"):
         page = client.get(url).data
         assert b"onsubmit=" not in page, url
         assert b"onclick=" not in page, url
