@@ -1,161 +1,163 @@
-# Project: FamilyHub Lite (v1)
+# Project: FamilyHub v1 ("Full")
+
+> **Source of truth:** [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) governs this
+> project — architecture, schema, scope, roadmap. When this file and the Master
+> Plan disagree, the **Master Plan wins**; fix this file and log it in
+> `BLOCKERS.md`. This file is the day-to-day working brief that points at it.
 
 ## Mission — Read This First
-Build a working, secure, production-ready family portal **quickly** so Wes's aging
-parents can start uploading family photo albums and writing blog-style family
-history memories **as soon as possible**. Speed to a usable, safe product is the
-top priority. This is a real production app for a real family, not a toy.
+FamilyHub is, at its core, a **GEDCOM 7–compliant genealogy database** with a
+**FamilySearch-style website** on top that lets logged-in family members do full
+**CRUD** on every genealogy element. Everything else — the wiki, timeline, photo
+album, memory blog — is **not a separate feature**; each is a different **view**
+of the one shared database (Master Plan §1–§2). Build the genealogy core once;
+every "feature" becomes a query against it.
 
-Second mission: the codebase itself is a **learning aid**. Wes will reverse-engineer
-this app to prepare for his WGU senior project — a full rewrite in Java/Spring Boot
-(FamilyHub v2). Every design decision must keep that migration painless.
+This is a real production app for a real family (Wes's aging parents will upload
+photos and write family-history memories), AND a **learning aid**: Wes will
+reverse-engineer it for his WGU senior project — a Java/Spring Boot rewrite
+(**v2, "Enterprise"**). Every decision must keep that migration painless.
 
-## Who Builds What
-- **Claude Code builds the app.** Wes reviews, learns, and gives feedback.
-- Wes is NOT writing the code alongside you. Do not leave TODOs for him to fill in.
-- Deliver complete, working, reviewable features. Wes often reviews the next morning.
+**Naming:** v1 = "Full" (Flask/Python, built now). v2 = "Enterprise" (Java/Spring
+Boot/Angular/MySQL/Docker). Never use "Lite" here (it means something else in the
+sibling Cowork project).
+
+## Who Builds What (two builders, one repo — Master Plan §7)
+- **Claude Code → backend + the whole repo/infra.** GEDCOM-7 schema, models,
+  migrations, services, REST routes, pytest, seed data, backups, Docker, deploy.
+- **Cowork → front-end ONLY.** Jinja templates, CSS, vanilla JS — UX/UI as
+  first-class concerns — built against the WP2 API contract.
+- **Only one builder is active at a time** (Wes is the switch operator). Cowork
+  does **not** start until WP2's contract exists.
+- Wes reviews, learns, and gives feedback; he is **not** writing code alongside
+  you. Deliver complete, working, reviewable work — no TODOs left for him.
+
+## Cross-Builder Blocker Protocol (Master Plan §7 — non-negotiable)
+- **Read `BLOCKERS.md` at the START of every session.** Resolve any `OPEN` item
+  addressed to you, mark it `RESOLVED`, then proceed.
+- When you hit a wall only the *other* builder can fix: **never fake or stub
+  around it.** Stop that item, log it in `BLOCKERS.md` (date · raised-by ·
+  what's blocked · what the other builder must do · status), continue other safe
+  in-scope work, and **surface it in your end-of-session summary**.
+- Design *preference* → pick a reasonable option and keep going (and note it).
+  Hard *dependency* on the other builder → log and flag, never fake.
 
 ## Educational Requirements (non-negotiable)
-- **Teacher-voice code comments.** Write comments as the world's greatest web-dev
-  tutor — enthusiastic, clear, explaining **WHY, not just WHAT**. Where applicable,
-  reference the WGU B.S. Software Engineering course that teaches the concept
-  (e.g., "Data Management – Foundations covers this normalization rule").
-- **DEVDIARY.md is a required, living deliverable.** A learning roadmap written like
-  textbook chapters: what was built, why it's best practice, every technology choice
-  and its WGU curriculum connection, and any mid-build decisions made.
-- Comments and DEVDIARY together should let a beginner-to-intermediate Python student
-  fully understand the system without outside help.
+- **Teacher-voice code comments.** Write as the world's greatest web-dev tutor —
+  explain **WHY, not just WHAT**, and reference the WGU B.S. Software Engineering
+  course that teaches the concept (e.g., "D426 Data Management – Foundations
+  covers this normalization rule") and the **v2 Spring Boot mapping**.
+- **Dev diaries are required, living deliverables** (split so the two builders
+  never edit the same file — Master Plan §7):
+  - [`DEVDIARY_BE.md`](DEVDIARY_BE.md) — backend (Code).
+  - [`DEVDIARY_FE.md`](DEVDIARY_FE.md) — frontend (Cowork). **Code does not write
+    this file.**
+  - [`DEVDIARY.md`](DEVDIARY.md) — thin index pointing to both.
+- Comments + dev diaries together should let a beginner-to-intermediate Python
+  student understand the system without outside help.
 
 ## Workflow Rules
-- **Front-load all clarifying questions before building. Never stop mid-task to ask.**
-- If something is ambiguous mid-build: make the simplest reasonable choice, document
-  it in DEVDIARY.md under "Decisions Made Without Wes," and keep going.
-- Every session ends with the app in a complete, running state. No broken builds.
-- Commit logically grouped changes to git with clear messages; push to GitHub.
-- **Never pause the build to ask Wes to manually test anything.** Verify your own
-  work with automated tests: pytest + Flask's test client covering routes, auth,
-  and file uploads (simulate uploads with generated sample files). Anything that
-  truly requires human eyes in a browser goes into the **"Manual Testing
-  Checklist"** section of DEVDIARY.md; Wes runs the entire checklist once at the
-  end of the build.
+- **Front-load clarifying questions before building. Don't stop mid-task to ask**
+  — except for genuine cross-boundary blockers (use `BLOCKERS.md`, above).
+- Ambiguous mid-build? Make the simplest reasonable choice, document it in
+  `DEVDIARY_BE.md` under "Decisions Made Without Wes," and keep going.
+- **One work package at a time** (Master Plan §6). Every session ends with the
+  app in a complete, running state — no broken builds.
+- **Verify your own work with pytest** — never pause to ask Wes to manually test.
+  Browser-only checks go in the **Manual Testing Checklist** in `DEVDIARY_BE.md`,
+  cleared once at each WP boundary.
+- **Commit** logically grouped changes with clear messages. **Do NOT push —
+  Wes reviews and pushes** (pushing hangs on credentials here anyway).
 
 ## About the Developer
-- Wes Leiter — WGU B.S. Software Engineering student (expected Fall 2027)
-- Currently in Python Intro: beginner-to-intermediate Python skill
-- Background in C/C++ (rusty), returning to coding after ~8-year gap
-- ADHD-inattentive: concise explanations, concrete examples, no rabbit holes
-- Communication: bullet points, **bold key terms**, short paragraphs, ONE next
-  action at a time, never more than one open question at a time
+- Wes Leiter — WGU B.S. Software Engineering (expected Fall 2027).
+- Currently in Python Intro; beginner-to-intermediate Python; rusty C/C++; back
+  after ~8 years.
+- ADHD-inattentive: concise explanations, concrete examples, no rabbit holes;
+  bullet points, **bold key terms**, short paragraphs, ONE next action at a time,
+  never more than one open question at a time.
 
-## FamilyHub v1 "Lite" — Scope
-A simplified version that performs the essential functions of the planned
-Full version and migrates to it later with **zero data loss**.
+## Scope (Master Plan §5 / §5A)
+Logged-in members can: add/edit/delete **individuals, names, families,
+parent/child links**; add **events & attributes** (birth, death, marriage,
+residence, occupation…) with fuzzy dates + reusable places; see a **person page**
+(vitals, names, events, relationships, sources, photos, stories); browse
+**pedigree/fan-chart** views; attach **sources/citations**; upload **photos** and
+attach them to people/families/events; write **memories** (Markdown); and (admins)
+manage users, edit site text, verify backups.
 
-### Core features (priority order)
-1. **Photo albums** — authenticated family members upload, arrange, and comment on
-   photos. Elderly-friendly upload flow is critical.
-2. **Family history blog** — blog-style memory posts (the parents' main activity),
-   linkable to wiki entries and the timeline.
-3. **Family member wiki** — Wikipedia-style entry per family member with links to
-   photos and other entries; editable by authenticated members via a simple editor.
-4. **Family history timeline** — editable by all authenticated members.
-5. **Authentication (simplified)** — per-member accounts, secure password storage,
-   session management. Small trusted user base (~6–10 people).
-6. **Admin panel (simplified)** — manage user accounts, basic site text fields
-   (about, contact, hero image/tagline), and trigger/verify backups.
+**Depth bar (§5A):** every *user-meaningful* schema field maps to a real input
+control. MVP = **fewer features, each fully realized** — never all features, each
+hollow. (System/auto fields — `id`, timestamps, `gedcom_xref`, `author_id` — are
+not user input.)
 
-### Explicitly deferred to v2 (Full version)
-- Video uploads
-- Robust permission tiers / extended-family sharing
-- Full-featured admin control panel (feature toggles, etc.)
+**Deferred to v2** (additive, no lock-in — Master Plan §3.6): ASSO (associations),
+SUBM (submitters), video/audio, merge, change-history/restore. Full GEDCOM-7
+file import/export is tentative v1 **WP6**, firm v2.
 
-## UX/UI Requirements
-- **Elderly-first design**: large readable fonts, big tap/click targets, high
-  contrast, obvious buttons, minimal navigation depth, forgiving forms
-  (confirmations before destructive actions, no data loss on validation errors).
-- Bootstrap-based, clean and simple. Function over flash.
+## UX/UI (Master Plan §5B — Cowork owns this)
+Cross-generational warmth + **elderly-accessible**: large readable type, big tap
+targets, high contrast, forgiving forms, minimal nav depth. Polished and
+characterful (quality bar: Cinephile/Datumology — not a clone), calm by design
+(generous whitespace, one primary action per screen, progressive disclosure).
 
-## Security & Privacy (PII) — Critical
-- Family PII (dates of birth, mother's maiden name, etc.) must NEVER be publicly
-  visible. All family content lives behind authentication.
-- Passwords hashed (bcrypt/argon2 via a maintained library), CSRF protection,
-  secure session cookies, HTTPS in production (Let's Encrypt).
-- Uploaded files validated (type/size) and stored outside the web root with
-  DB-tracked metadata.
-- Secrets in `.env` only; never committed. `.env.example` stays current.
+## Security & Privacy (PII) — Critical (Master Plan §9)
+Nearly everything is sensitive family PII. **Tier 1 (present, carry forward):**
+bcrypt hashing, CSRF, strict CSP, login rate limiting, security headers,
+login-walled photo serving, secure session cookies, password reset, HTTPS, PII
+hidden for `living` individuals, upload validation, files stored outside the web
+root. **Tier 2 (mid-project):** RBAC (§10), audit logging, encrypted backups,
+secrets management, dependency scanning. Secrets in `.env` only, never committed;
+`.env.example` stays current.
 
-## Backups — Required Feature, Not an Afterthought
-- Nightly automated backup of the SQLite DB + uploaded photos to AWS object
-  storage (Lightsail bucket), plus periodic Lightsail instance snapshots.
-- Backup/restore procedure documented in DEVDIARY.md and tested at least once.
+## Backups — Required Feature (Master Plan, §9)
+Nightly automated backup of the SQLite DB + uploads to an AWS (Lightsail) bucket,
+plus periodic instance snapshots. Backup/restore documented and tested
+(`flask backup` / `flask restore-backup`; round trip covered by pytest).
 
 ## Stack
-- Python 3, Flask (Blueprint structure), SQLite, SQLAlchemy, Flask-Migrate,
-  Bootstrap (Bootstrap-Flask), venv
-- Dev machine: Windows 11 desktop, repo at JW\PyCharmProjects\FamilyHub
-  (cloned from GitHub via PyCharm; also cloned on a Fedora ThinkPad —
-  GitHub is the sync layer, always pull before starting work)
-- Production target: **AWS Lightsail** Linux instance (~$12/mo plan), gunicorn +
-  nginx, Let's Encrypt SSL
-- Dev/staging URL: https://familyhub.pseudokoder.com
-- Future production: https://leiters.org (public) + https://family.leiters.org
-  (authenticated members area)
+- Python 3.14, Flask (Blueprint structure), SQLite, SQLAlchemy, Flask-Migrate,
+  Bootstrap (Bootstrap-Flask 5), venv. **Work inside the project `.venv`; never
+  install to global Python; keep `requirements.txt` current.**
+- Dev: Windows 11 desktop at `JW\PycharmProjects\FamilyHub` (also a Fedora
+  ThinkPad; GitHub is the sync layer — always pull before starting).
+- Production target: **AWS Lightsail** Linux (~$12/mo), gunicorn + nginx,
+  Let's Encrypt SSL. Dev/staging: https://familyhub.pseudokoder.com.
+  Future prod: https://leiters.org (public) + https://family.leiters.org (members).
 
-## Design for the v2 Migration (verified WGU Java-track stack)
-v2 will use the exact stack taught in Wes's WGU courses D286/D287/D288/D387:
-**Java + Spring Boot (backend), Angular (frontend), MySQL (database), Docker
-(deployment)**. Make these choices now so v2 is a translation, not a rescue
-mission:
-- **Clean relational schema** — portable SQL, no SQLite-only features; must move
-  to **MySQL** without surgery. Use Flask-Migrate from the start.
-- **Stable IDs** — integer or UUID primary keys that survive export/import.
-- **Layered architecture** — routes (controllers) thin; business logic in a
-  service layer; data access via models. This maps 1:1 to Spring Boot's
-  Controller → Service → Repository pattern; say so in the comments.
-- **API-friendly RESTful route design** — v2's Angular frontend will consume a
-  REST API, so keep v1 routes resource-oriented (e.g., /photos, /posts/<id>)
-  and keep view rendering cleanly separated from data logic, so endpoints can
-  later return JSON for Angular instead of HTML templates.
-- **Data export** — provide a management command that dumps all data (DB + file
-  manifest) to a documented, portable format (JSON/CSV + files). This is the
-  zero-data-loss migration guarantee.
-- Document the v1 → v2 mapping in DEVDIARY.md as the schema evolves.
+## Design for the v2 Migration (WGU D286/D287/D288/D387)
+v2 = **Java + Spring Boot + Angular + MySQL + Docker.** So now: clean portable
+relational schema (no SQLite-only features; moves to MySQL without surgery);
+stable integer PKs that survive export/import; **layered architecture** (routes =
+Controller, services = Service, models = Repository — say so in comments);
+RESTful, resource-oriented routes with view rendering separated from data logic;
+a **data-export** management command (`flask export-data` → portable JSON + file
+manifest) as the zero-data-loss guarantee. Document the v1→v2 mapping in
+`DEVDIARY_BE.md` as the schema evolves.
 
 ## Current Status
-- Day 2: Flask skeleton with Blueprint structure — complete
-- Day 3: config + database — complete
-  - `Config` class in app/config.py reads SECRET_KEY and DATABASE_URL from env
-  - `.env` loaded explicitly; untracked from git; `.env.example` committed
-  - SQLAlchemy wired via `db.init_app(app)`
-  - First model: `FamilyMember` (app/models/family_member.py)
-  - DB: SQLite at instance/familyhub.db (gitignored)
-  - Dependency fixed: Flask-Bootstrap → Bootstrap-Flask (Bootstrap 5)
-- (Note: "Day N" labels are from an earlier learn-as-you-go plan. Going forward,
-  work is organized by FEATURE, not by day.)
-- **June 12, 2026 — all six core features are built and tested** (auth,
-  photos, blog, wiki, timeline, admin) plus the approved 26-item
-  improvement build: EXIF/GPS stripping, login rate limiting, CI with a
-  90% coverage floor, site-wide search, wiki revision history + restore,
-  album deletion, self-service + emailed password resets, comment
-  deletion, health/robots/security.txt, caption editing,
-  drag-to-rearrange, content **locking** ("Trial Period" rule:
-  creator-deletable until an admin locks it; then admin-only) + audit
-  trail, strict CSP security headers, OpenAPI spec (test-enforced),
-  Docker, What's New feed, photo↔wiki tagging, PWA, and portfolio
-  artifacts (architecture diagram, CONTRIBUTING.md, scripts/deploy/).
-- **June 13, 2026 — post-build refinements:** friendly 404/403/500 pages,
-  **GEDCOM family-tree export** (Ancestry/FamilySearch — INDI records from
-  the wiki), public homepage polish + skip-to-content accessibility, and a
-  new **Family Plans** pillar (Ch. 29): shared collaborative checklist +
-  image/PDF file sharing (locked-down allow-list — no arbitrary uploads).
-- **157 tests, ~92% coverage.** 15 tables, all portable SQL, all via
-  migrations. DEVDIARY chapters 0–29 document everything.
-- Open question for Wes (DEVDIARY Ch. 18): locking currently guards
-  **deletion only** — edits stay collaborative. Confirm or tighten.
+- **2026-06-16 — WP1 (Database Foundation) complete.** Path A re-foundation: the
+  preserved infrastructure (auth, admin, backups, CI, Docker, security headers,
+  OpenAPI, PWA, management commands, layered architecture) was kept; the old
+  feature data model (FamilyMember/photos/blog/wiki/timeline/plans) was
+  **removed** and replaced with the **GEDCOM-7 schema** (16 tables): individuals,
+  names, families, family_children, places, events, repositories, sources,
+  citations, media_objects, media_links, notes, note_links + users, site_settings,
+  audit_log. Polymorphic `subject_type`/`subject_id` attachment; dual
+  `date_original`/`date_sort` dates; standard SQL only (MySQL-ready).
+- One fresh Flask-Migrate baseline; `seed.py` (3 generations of mock data) +
+  `flask seed`; pytest green at **~93% coverage** (floor 90%). See `DEVDIARY_BE.md`
+  "WP1 — Database Foundation."
+- See `BLOCKERS.md`: `users` is intentionally **not yet** aligned to §3.5
+  (email/role) — that's a WP2 task per §10.
 
-## Next Build Target
-1. **Deploy to Lightsail** — follow `scripts/deploy/README.md` end to
-   end (instance + bucket, nginx, systemd, certbot, backup crontab).
-2. **Wes runs the Manual Testing Checklist** (DEVDIARY) once, on the
-   deployed site — real phones, real photos, PWA install, real SMTP.
-3. Then: create the family's accounts, upload the first albums, go live.
+## Next Build Target — WP2 (Backend CRUD + API contract)
+Per Master Plan §6 build order (do ONE work package at a time; phase-gate review
+before the next):
+1. **WP2 — Backend CRUD.** Service + REST-shaped routes for individuals,
+   families, events, sources, media, notes; role scaffolding (§10 enum + auth
+   layer) + basic USER/ADMIN; pytest per resource. **Deliverable: the API
+   contract** (endpoints + JSON shapes in `docs/openapi.yaml`) — the interface
+   Cowork builds against. **Publishing it is the handoff to Cowork (WP3).**
+2. Then WP3 (Cowork front-end) → WP4 (views + search) → WP5 (deploy) →
+   WP6 (GEDCOM import/export, tentative).
