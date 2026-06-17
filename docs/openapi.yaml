@@ -27,9 +27,11 @@ info:
   version: "1.0"
   description: >
     Private, GEDCOM-7-backed family portal. All family content requires a
-    session cookie (login). This WP1 contract covers the preserved
-    infrastructure only — authentication, the admin panel, and plumbing;
-    the genealogy CRUD/view endpoints land in WP2.
+    session cookie (login). The /api/* surface is the WP2 JSON CRUD + search
+    contract Cowork builds the WP3 front-end against; reads need any logged-in
+    member, writes need at least the USER role (§10). State-changing /api calls
+    must send the CSRF token in an X-CSRFToken header. The auth/admin/plumbing
+    routes render HTML today; v2 can serve JSON from the same URLs.
 
 tags:
   - name: Auth
@@ -38,6 +40,22 @@ tags:
     description: Requires the admin flag
   - name: Plumbing
     description: Health, crawler policy, PWA shell, security contact, docs
+  - name: Individuals
+    description: People in the tree (INDI) and their names
+  - name: Families
+    description: Partnerships (FAM) and parent/child links
+  - name: Events
+    description: Events & attributes (BIRT, DEAT, MARR, OCCU…), polymorphic
+  - name: Places
+    description: Reusable PLAC records
+  - name: Sources
+    description: Repositories, sources, and citations (the evidence layer)
+  - name: Media
+    description: Photo uploads (OBJE), login-walled, with polymorphic links
+  - name: Notes
+    description: Markdown memories/bios (NOTE/SNOTE) with polymorphic links
+  - name: Search
+    description: People by name + filters, and full-text over notes (§12)
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -121,3 +139,359 @@ paths:
     get: {tags: [Admin], summary: Download a backup zip, responses: {"200": {description: zip bytes}, "404": {description: Unknown filename}}}
   /admin/activity:
     get: {tags: [Admin], summary: The audit trail — who did what, newest first, responses: {"200": {description: HTML page}}}
+
+  # ============================================================================
+  # GENEALOGY JSON API (WP2) — the contract Cowork builds WP3 against.
+  # Every write (POST/PUT/DELETE) needs the USER role and an X-CSRFToken header.
+  # Standard responses: 200/201 ok, 204 deleted, 400 validation, 401 not logged
+  # in, 403 wrong role, 404 missing, 409 duplicate link.
+  # ============================================================================
+
+  # --- Individuals + Names ----------------------------------------------------
+  /api/individuals:
+    get:
+      tags: [Individuals]
+      summary: List individuals (light — primary name + counts)
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individuals: {type: array, items: {$ref: '#/components/schemas/Individual'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+    post:
+      tags: [Individuals]
+      summary: Create an individual (optional inline primary `name` object)
+      requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}
+      responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/individuals/{individual_id}:
+    parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Individuals], summary: One individual with all names, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Individuals], summary: Update fields (sex/living/restriction/gedcom_xref), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+    delete: {tags: [Individuals], summary: Delete the individual + names + all polymorphic attachments, responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/individuals/{individual_id}/names:
+    parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Individuals], summary: Add a name (needs a given or surname), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, "400": {$ref: '#/components/responses/BadRequest'}}}
+  /api/names/{name_id}:
+    parameters: [{name: name_id, in: path, required: true, schema: {type: integer}}]
+    put: {tags: [Individuals], summary: Update a name (is_primary steals primary from the others), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, responses: {"200": {description: Updated}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Individuals], summary: Delete a name, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Families + Children ----------------------------------------------------
+  /api/families:
+    get: {tags: [Families], summary: List families, responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {families: {type: array, items: {$ref: '#/components/schemas/Family'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    post: {tags: [Families], summary: Create a family (partner ids must exist), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/families/{family_id}:
+    parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Families], summary: One family with children, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Families], summary: Update partners / gedcom_xref, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
+    delete: {tags: [Families], summary: Delete the family + child links + polymorphic attachments, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/families/{family_id}/children:
+    parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Families], summary: "Add a child link (child_id required; pedigree_type: birth|adopted|foster|step)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/FamilyChild'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Child already in this family}}}
+  /api/families/{family_id}/children/{child_id}:
+    parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}, {name: child_id, in: path, required: true, schema: {type: integer}}]
+    delete: {tags: [Families], summary: Remove a child link, responses: {"204": {description: Removed}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Events -----------------------------------------------------------------
+  /api/events:
+    get:
+      tags: [Events]
+      summary: List events (optionally filtered to one subject), timeline-ordered
+      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family]}}, {name: subject_id, in: query, schema: {type: integer}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {events: {type: array, items: {$ref: '#/components/schemas/Event'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+    post: {tags: [Events], summary: Create an event (subject_type/subject_id + event_tag required), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/events/{event_id}:
+    parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Events], summary: One event, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Events], summary: Update an event, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
+    delete: {tags: [Events], summary: Delete an event + its attachments, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Places -----------------------------------------------------------------
+  /api/places:
+    get: {tags: [Places], summary: List places, responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {places: {type: array, items: {$ref: '#/components/schemas/Place'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    post: {tags: [Places], summary: Create a place (full_name required), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Place'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Place'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/places/{place_id}:
+    parameters: [{name: place_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Places], summary: One place, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Place'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Places], summary: Update a place, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Place'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
+    delete: {tags: [Places], summary: Delete a place (events that used it are detached), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Sources / Repositories / Citations -------------------------------------
+  /api/repositories:
+    get: {tags: [Sources], summary: List repositories, responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {repositories: {type: array, items: {$ref: '#/components/schemas/Repository'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    post: {tags: [Sources], summary: Create a repository (name required), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Repository'}}}}, responses: {"201": {description: Created}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/repositories/{repo_id}:
+    parameters: [{name: repo_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Sources], summary: One repository, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Repository'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Sources], summary: Update a repository, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Repository'}}}}, responses: {"200": {description: Updated}}}
+    delete: {tags: [Sources], summary: Delete a repository (its sources are detached), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/sources:
+    get: {tags: [Sources], summary: List sources, responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {sources: {type: array, items: {$ref: '#/components/schemas/Source'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    post: {tags: [Sources], summary: Create a source (title required), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, responses: {"201": {description: Created}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/sources/{source_id}:
+    parameters: [{name: source_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Sources], summary: One source, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Sources], summary: Update a source, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
+    delete: {tags: [Sources], summary: Delete a source (cascades its citations), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/citations:
+    get:
+      tags: [Sources]
+      summary: List citations (optionally for one subject)
+      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event, name]}}, {name: subject_id, in: query, schema: {type: integer}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {citations: {type: array, items: {$ref: '#/components/schemas/Citation'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+    post: {tags: [Sources], summary: Create a citation (source_id + subject required; quality 0–3), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, responses: {"201": {description: Created}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/citations/{citation_id}:
+    parameters: [{name: citation_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Sources], summary: One citation, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Sources], summary: Update a citation, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
+    delete: {tags: [Sources], summary: Delete a citation, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Media ------------------------------------------------------------------
+  /api/media:
+    get:
+      tags: [Media]
+      summary: List media (optionally for one subject)
+      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event]}}, {name: subject_id, in: query, schema: {type: integer}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {media: {type: array, items: {$ref: '#/components/schemas/Media'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+    post:
+      tags: [Media]
+      summary: Upload an image (multipart); EXIF/GPS stripped, stored outside web root
+      requestBody: {content: {multipart/form-data: {schema: {type: object, required: [file], properties: {file: {type: string, format: binary}, title: {type: string}, description: {type: string}, subject_type: {type: string}, subject_id: {type: integer}}}}}}
+      responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/media/{media_id}:
+    parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Media], summary: One media object (with links), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Media], summary: Update metadata (title/description/gedcom_xref; bytes are immutable), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, responses: {"200": {description: Updated}}}
+    delete: {tags: [Media], summary: Delete the media object + its files + links, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/media/{media_id}/file:
+    parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Media], summary: Full image bytes (login-walled), responses: {"200": {description: image bytes}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/media/{media_id}/thumb:
+    parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Media], summary: Thumbnail bytes (login-walled), responses: {"200": {description: image bytes}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/media/{media_id}/links:
+    parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Media], summary: Attach the photo to a subject, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Link'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Already linked}}}
+  /api/media/{media_id}/links/{subject_type}/{subject_id}:
+    parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}, {name: subject_type, in: path, required: true, schema: {type: string}}, {name: subject_id, in: path, required: true, schema: {type: integer}}]
+    delete: {tags: [Media], summary: Remove an attachment, responses: {"204": {description: Removed}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Notes ------------------------------------------------------------------
+  /api/notes:
+    get:
+      tags: [Notes]
+      summary: List notes (optionally for one subject), newest first
+      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event]}}, {name: subject_id, in: query, schema: {type: integer}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {notes: {type: array, items: {$ref: '#/components/schemas/Note'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+    post: {tags: [Notes], summary: Write a note (content required; author set from the session; optional inline subject), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/notes/{note_id}:
+    parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Notes], summary: One note (with links), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Notes], summary: Update a note (title/content/content_type/is_shared), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
+    delete: {tags: [Notes], summary: Delete a note + its links, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/notes/{note_id}/links:
+    parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Notes], summary: Attach the note to a subject, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Link'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Already linked}}}
+  /api/notes/{note_id}/links/{subject_type}/{subject_id}:
+    parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}, {name: subject_type, in: path, required: true, schema: {type: string}}, {name: subject_id, in: path, required: true, schema: {type: integer}}]
+    delete: {tags: [Notes], summary: Remove an attachment, responses: {"204": {description: Removed}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Search -----------------------------------------------------------------
+  /api/search:
+    get:
+      tags: [Search]
+      summary: People by name + filters, and full-text over notes (§12)
+      parameters:
+        - {name: q, in: query, schema: {type: string}, description: free text — matches names AND notes}
+        - {name: given, in: query, schema: {type: string}}
+        - {name: surname, in: query, schema: {type: string}}
+        - {name: sex, in: query, schema: {type: string, enum: [M, F, X, U]}}
+        - {name: living, in: query, schema: {type: boolean}}
+        - {name: birth_from, in: query, schema: {type: integer}}
+        - {name: birth_to, in: query, schema: {type: integer}}
+        - {name: place, in: query, schema: {type: string}}
+      responses: {"200": {description: Grouped results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchResults'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+
+components:
+  responses:
+    Unauthorized: {description: Not logged in, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Forbidden: {description: Logged in but lacking the required role, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    NotFound: {description: No such record, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    BadRequest: {description: Validation failed, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: {type: string}
+        fields: {type: object, additionalProperties: {type: string}, description: per-field problems (present on validation errors)}
+    Name:
+      type: object
+      description: A name belonging to an individual (system fields are read-only).
+      properties:
+        id: {type: integer, readOnly: true}
+        individual_id: {type: integer, readOnly: true}
+        name_type: {type: string, example: birth, description: birth|married|aka|immigrant|maiden}
+        name_prefix: {type: string, nullable: true}
+        given: {type: string, nullable: true}
+        nickname: {type: string, nullable: true}
+        surname_prefix: {type: string, nullable: true}
+        surname: {type: string, nullable: true}
+        name_suffix: {type: string, nullable: true}
+        is_primary: {type: boolean}
+        sort_order: {type: integer}
+        display: {type: string, readOnly: true, description: reassembled full name}
+    Individual:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        gedcom_xref: {type: string, nullable: true}
+        sex: {type: string, nullable: true, enum: [M, F, X, U, null]}
+        living: {type: boolean, default: true}
+        restriction: {type: string, nullable: true, description: GEDCOM RESN}
+        created_at: {type: string, format: date-time, readOnly: true}
+        updated_at: {type: string, format: date-time, readOnly: true}
+        primary_name: {type: string, nullable: true, readOnly: true}
+        names_count: {type: integer, readOnly: true}
+        names: {type: array, items: {$ref: '#/components/schemas/Name'}, description: present on detail GET}
+        name: {$ref: '#/components/schemas/Name', description: write-only — an optional inline primary name on create}
+    FamilyChild:
+      type: object
+      properties:
+        family_id: {type: integer, readOnly: true}
+        child_id: {type: integer}
+        child_name: {type: string, readOnly: true}
+        pedigree_type: {type: string, enum: [birth, adopted, foster, step], default: birth}
+        child_order: {type: integer, default: 0}
+    Family:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        gedcom_xref: {type: string, nullable: true}
+        partner1_id: {type: integer, nullable: true}
+        partner2_id: {type: integer, nullable: true}
+        partner1: {type: string, nullable: true, readOnly: true}
+        partner2: {type: string, nullable: true, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+        updated_at: {type: string, format: date-time, readOnly: true}
+        children_count: {type: integer, readOnly: true}
+        children: {type: array, items: {$ref: '#/components/schemas/FamilyChild'}}
+    Place:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        full_name: {type: string}
+        city: {type: string, nullable: true}
+        county: {type: string, nullable: true}
+        state: {type: string, nullable: true}
+        country: {type: string, nullable: true}
+        latitude: {type: number, nullable: true}
+        longitude: {type: number, nullable: true}
+    Event:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        subject_type: {type: string, enum: [individual, family]}
+        subject_id: {type: integer}
+        subject_label: {type: string, nullable: true, readOnly: true}
+        event_tag: {type: string, example: BIRT, description: GEDCOM tag}
+        event_value: {type: string, nullable: true, description: attribute value, e.g. an occupation}
+        date_original: {type: string, nullable: true, example: ABT 1850}
+        date_sort: {type: string, nullable: true, example: "1850-00-00"}
+        place_id: {type: integer, nullable: true}
+        place: {type: string, nullable: true, readOnly: true}
+        age: {type: string, nullable: true}
+        cause: {type: string, nullable: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+    Repository:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        gedcom_xref: {type: string, nullable: true}
+        name: {type: string}
+        address: {type: string, nullable: true}
+        website: {type: string, nullable: true}
+        sources_count: {type: integer, readOnly: true}
+    Source:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        gedcom_xref: {type: string, nullable: true}
+        title: {type: string}
+        author: {type: string, nullable: true}
+        publication: {type: string, nullable: true}
+        repository_id: {type: integer, nullable: true}
+        repository: {type: string, nullable: true, readOnly: true}
+        citations_count: {type: integer, readOnly: true}
+    Citation:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        source_id: {type: integer}
+        source_title: {type: string, nullable: true, readOnly: true}
+        subject_type: {type: string, enum: [individual, family, event, name]}
+        subject_id: {type: integer}
+        subject_label: {type: string, nullable: true, readOnly: true}
+        page: {type: string, nullable: true}
+        quality: {type: integer, nullable: true, minimum: 0, maximum: 3, description: GEDCOM QUAY}
+        notes: {type: string, nullable: true}
+    Link:
+      type: object
+      description: A polymorphic attachment target.
+      required: [subject_type, subject_id]
+      properties:
+        subject_type: {type: string, enum: [individual, family, event]}
+        subject_id: {type: integer}
+        subject_label: {type: string, nullable: true, readOnly: true}
+    Media:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        gedcom_xref: {type: string, nullable: true}
+        file_path: {type: string, readOnly: true}
+        media_type: {type: string, readOnly: true, example: image/jpeg}
+        title: {type: string, nullable: true}
+        description: {type: string, nullable: true}
+        uploaded_by: {type: integer, nullable: true, readOnly: true}
+        uploader: {type: string, nullable: true, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+        file_url: {type: string, readOnly: true}
+        thumb_url: {type: string, readOnly: true}
+        links_count: {type: integer, readOnly: true}
+        links: {type: array, items: {$ref: '#/components/schemas/Link'}}
+    Note:
+      type: object
+      properties:
+        id: {type: integer, readOnly: true}
+        gedcom_xref: {type: string, nullable: true}
+        title: {type: string, nullable: true}
+        content: {type: string, description: raw Markdown}
+        content_type: {type: string, enum: [markdown, plain], default: markdown}
+        is_shared: {type: boolean, default: false}
+        author_id: {type: integer, nullable: true, readOnly: true}
+        author: {type: string, nullable: true, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+        updated_at: {type: string, format: date-time, readOnly: true}
+        links_count: {type: integer, readOnly: true}
+        links: {type: array, items: {$ref: '#/components/schemas/Link'}}
+        subject_type: {type: string, writeOnly: true, description: optional inline attachment on create}
+        subject_id: {type: integer, writeOnly: true}
+    SearchResults:
+      type: object
+      properties:
+        query: {type: string}
+        counts: {type: object, properties: {people: {type: integer}, notes: {type: integer}}}
+        people:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              name: {type: string, nullable: true}
+              sex: {type: string, nullable: true}
+              living: {type: boolean}
+              birth_year: {type: integer, nullable: true}
+              death_year: {type: integer, nullable: true}
+        notes:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: integer}
+              title: {type: string, nullable: true}
+              snippet: {type: string}
+              author: {type: string, nullable: true}

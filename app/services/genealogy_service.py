@@ -20,7 +20,9 @@ fair trade — and v2/Hibernate can formalize it with `@Any` if desired.
 """
 
 from app.extensions import db
-from app.models import Citation, Event, Individual, MediaLink, NoteLink
+from app.models import (
+    Citation, Event, Family, Individual, MediaLink, Name, NoteLink,
+)
 
 # --- Subject-type constants ---------------------------------------------------
 # One spelling of each polymorphic type, defined ONCE. Every place that writes a
@@ -30,6 +32,62 @@ SUBJECT_INDIVIDUAL = "individual"
 SUBJECT_FAMILY = "family"
 SUBJECT_EVENT = "event"
 SUBJECT_NAME = "name"
+
+# Maps each polymorphic subject_type string to the model it points at — the
+# lookup the database can't do for a polymorphic FK, so the app does (§8).
+SUBJECT_MODELS = {
+    SUBJECT_INDIVIDUAL: Individual,
+    SUBJECT_FAMILY: Family,
+    SUBJECT_EVENT: Event,
+    SUBJECT_NAME: Name,
+}
+
+
+def subject_exists(subject_type, subject_id):
+    """Does the polymorphic target actually exist? (The referential check the DB
+    can't enforce for a subject_type/subject_id pair.)"""
+    model = SUBJECT_MODELS.get(subject_type)
+    return model is not None and db.session.get(model, subject_id) is not None
+
+
+def subject_label(subject_type, subject_id):
+    """A human-readable label for an attachment's subject, for serialization —
+    so an event reads as 'John Hartwell', not just 'individual #5'."""
+    model = SUBJECT_MODELS.get(subject_type)
+    obj = db.session.get(model, subject_id) if model else None
+    if obj is None:
+        return None
+    if subject_type == SUBJECT_INDIVIDUAL:
+        return obj.primary_name.display if obj.primary_name else None
+    if subject_type == SUBJECT_NAME:
+        return obj.display
+    if subject_type == SUBJECT_FAMILY:
+        partners = [p.primary_name.display for p in (obj.partner1, obj.partner2)
+                    if p is not None and p.primary_name is not None]
+        return " & ".join(partners) if partners else None
+    if subject_type == SUBJECT_EVENT:
+        return obj.event_tag
+    return None
+
+
+def require_subject(subject_type, subject_id, allowed):
+    """Validate a polymorphic attachment's target: the type must be allowed for
+    THIS attachment, and the row it names must exist. Raises ApiError(400) with
+    a precise field on any problem; returns the validated (type, id) pair. This
+    is the one gate every polymorphic write goes through."""
+    from app.services.api_errors import ApiError
+    if subject_type not in allowed:
+        raise ApiError(
+            f"subject_type must be one of: {', '.join(sorted(allowed))}.",
+            400, fields={"subject_type": "invalid"},
+        )
+    if subject_id is None:
+        raise ApiError("subject_id is required.", 400,
+                       fields={"subject_id": "required"})
+    if not subject_exists(subject_type, subject_id):
+        raise ApiError(f"No {subject_type} found with id {subject_id}.", 400,
+                       fields={"subject_id": "no such record"})
+    return subject_type, subject_id
 
 
 def _purge_links(model, subject_type, subject_ids):
@@ -104,6 +162,18 @@ def delete_family(family):
         subject_type=SUBJECT_FAMILY, subject_id=fam_id
     ).delete(synchronize_session=False)
     db.session.delete(family)
+    db.session.commit()
+
+
+def delete_event(event):
+    """Delete one event and the polymorphic attachments hanging off IT (a photo
+    of the wedding, a citation for the birth). Same DB-can't-cascade reason as
+    deleting a person."""
+    eid = event.id
+    _purge_links(Citation, SUBJECT_EVENT, [eid])
+    _purge_links(MediaLink, SUBJECT_EVENT, [eid])
+    _purge_links(NoteLink, SUBJECT_EVENT, [eid])
+    db.session.delete(event)
     db.session.commit()
 
 

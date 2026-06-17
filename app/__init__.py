@@ -64,24 +64,50 @@ def create_app(config_class=Config):
     # gets a calm explanation and a button home. Each returns its real HTTP
     # status code (so crawlers, monitors, and the browser still know the
     # truth); only the PRESENTATION is gentler.
-    from flask import render_template
+    from flask import jsonify, render_template, request
+
+    # WP2: the same error must speak the right language for its caller — a
+    # friendly HTML page for the website, clean JSON for the /api surface (an
+    # HTML error page would just confuse a fetch() call). One path check decides.
+    def _api_request():
+        return request.path.startswith("/api/")
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        if _api_request():
+            return jsonify(error=getattr(error, "description", "Bad request.")), 400
+        return error.get_response()  # web: the default page (e.g. CSRF rejection)
 
     @app.errorhandler(403)
     def forbidden(error):
+        if _api_request():
+            return jsonify(error="You don't have permission to do that."), 403
         return render_template("errors/403.html"), 403
 
     @app.errorhandler(404)
     def not_found(error):
+        if _api_request():
+            return jsonify(error="Not found."), 404
         return render_template("errors/404.html"), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        if _api_request():
+            return jsonify(error="That method isn't allowed on this URL."), 405
+        return error.get_response()
 
     @app.errorhandler(429)
     def too_many_requests(error):
+        if _api_request():
+            return jsonify(error="Too many requests — please slow down."), 429
         return render_template("errors/429.html"), 429
 
     @app.errorhandler(500)
     def server_error(error):
         # NB: a real 500 means an unhandled exception already rolled back
         # the request; we render a static page and touch no database here.
+        if _api_request():
+            return jsonify(error="Something went wrong on our end."), 500
         return render_template("errors/500.html"), 500
 
     # --- HTTP security headers (D315) — sent with EVERY response. -----------
@@ -137,12 +163,15 @@ def create_app(config_class=Config):
     # panel, and the public/plumbing routes in `main`. WP2 rebuilds the feature
     # routes against the new GEDCOM-7 schema, registering them right here.
     from app.routes.admin import admin_bp
+    from app.routes.api import api_bp
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    # The WP2 JSON API (Master Plan §6/§7) — the contract Cowork builds WP3 on.
+    app.register_blueprint(api_bp)
 
     # Custom Jinja filter — {{ about_text | family_text }} renders admin-entered
     # text as safe, paragraphed HTML (see text_service for the escaping story).
