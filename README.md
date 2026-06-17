@@ -1,49 +1,69 @@
-# FamilyHub v1 (Lite)
+# FamilyHub v1 ("Full")
 
 [![CI](https://github.com/pseudokoder/FamilyHub/actions/workflows/ci.yml/badge.svg)](https://github.com/pseudokoder/FamilyHub/actions/workflows/ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-93%25_(CI_floor_90%25)-brightgreen)
-![Tests](https://img.shields.io/badge/tests-157_passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-94%25_(CI_floor_90%25)-brightgreen)
+![Tests](https://img.shields.io/badge/tests-139_passing-brightgreen)
 
-A private family portal: photo albums, family-history blog, member wiki, and
-timeline — built with Python/Flask as both a real production app and a
-learning project for a future Java/Spring Boot rewrite (v2).
+A private family portal built around a **GEDCOM 7–compliant genealogy database**
+with a FamilySearch-style site on top — every "feature" (family tree, person
+page, timeline, photo album, memory blog) is just a different **view of one
+shared database**. Built with Python/Flask as both a real production app for a
+real family and a learning project for a future Java/Spring Boot rewrite (v2).
 
-**Start here:** read [DEVDIARY.md](DEVDIARY.md) — it's the guided tour of the
-whole codebase, written like textbook chapters. Contributors: see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+> **Status — under active, deliberate rebuild.** **WP1** (the GEDCOM-7 database
+> foundation) and **WP2** (the backend CRUD JSON API + role-based access control)
+> are complete. The genealogy **front-end is WP3** — it's built separately against
+> the published API contract, so today the genealogy features are exercised
+> through the JSON API, not yet through web pages.
 
-## Features
+**Start here:** [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) is the authoritative
+spec (architecture, schema, roadmap); [`DEVDIARY.md`](DEVDIARY.md) is the guided,
+textbook-style tour of how it was built. Contributors: [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- **Photo albums** — batch upload (iPhone HEIC converted at the door,
-  EXIF/GPS stripped for privacy), drag-to-rearrange, captions, comments,
-  tagging people into photos
-- **Family blog** ("Memories") and a **wiki** page per family member with
-  `[[Name]]` cross-links, full **revision history with one-click restore**,
-  and a "Photos featuring X" gallery
-- **Timeline** with honest partial dates (1890 / March 1962 / June 12, 1947)
-- **Family Plans** — a shared space to plan trips/reunions together:
-  collaborative checklist + image/PDF file sharing (locked-down allow-list)
-- **Search** across everything; a **What's New** activity feed
-- **Admin**: invite-only accounts, content **locking** ("Trial Period" rule),
-  audit trail, site settings, one-click verified **backups** (off-site to S3)
-- **Security**: bcrypt, CSRF everywhere, strict CSP (no `unsafe-inline`),
-  login rate limiting, security headers, login-walled photo serving,
-  stateless single-use password-reset emails
-- **Ops**: health endpoint, Docker one-command run, GitHub Actions CI with
-  a 90% coverage floor, OpenAPI 3.0 spec that tests keep in sync,
-  installable PWA with offline fallback, portable JSON export (the v2
-  zero-data-loss guarantee)
+## What's built today
+
+- **GEDCOM-7 schema** — individuals, names, families & parent/child links,
+  events & attributes (with fuzzy *and* sortable dates), reusable places,
+  sources/citations/repositories (the evidence layer), media objects, and
+  Markdown notes. One database; every view is a query against it.
+- **JSON REST API** (`/api/*`) — full CRUD for every resource above, plus their
+  sub-records and **polymorphic attachments** (a photo or memory linked to a
+  person, family, or event). The contract is in [`docs/openapi.yaml`](docs/openapi.yaml),
+  kept in sync by a test that fails if any route is undocumented.
+- **Search** — people by name (partial match) with filters (sex, living, birth
+  year range, place) and full-text over notes/memories.
+- **Access control (RBAC)** — email login and a four-rung role ladder
+  (GUEST · USER · POWER\_USER · ADMIN) routed through a single authorization
+  layer; reads need a logged-in member, writes need at least USER.
+- **Media** — image uploads with **EXIF/GPS stripping** for privacy (a photo
+  should show the family, not map their house), stored outside the web root and
+  served only behind the login.
+- **Admin panel** — invite-only accounts (no public signup), editable site text,
+  one-click **verified backups** (off-site to S3), and an audit trail.
+- **Security** — bcrypt, CSRF everywhere (including the JSON API), strict CSP
+  (no `unsafe-inline`), login rate limiting, security headers, stateless
+  single-use password-reset emails.
+- **Ops** — health endpoint, one-command Docker run, GitHub Actions CI with a
+  90% coverage floor, installable PWA with offline fallback, and a portable JSON
+  data export (the v2 zero-data-loss guarantee).
+
+## Roadmap
+
+WP1 Database Foundation ✅ → **WP2 Backend CRUD + API contract ✅** →
+WP3 Front-end (built against the API contract) → WP4 Views & Search UI →
+WP5 Deploy (AWS Lightsail) → WP6 GEDCOM import/export (tentative). See
+[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) §6.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    B["Browser<br/>(elderly-first UI, PWA)"] -->|HTTPS| N["nginx<br/>(TLS, static files)"]
+    B["Browser / API client"] -->|HTTPS| N["nginx<br/>(TLS, static files)"]
     N --> G[gunicorn]
     subgraph Flask application
-        G --> R["Routes (Blueprints)<br/>thin controllers"]
-        R --> S["Services<br/>business rules, one place"]
-        S --> M["Models<br/>SQLAlchemy"]
+        G --> R["Routes (Blueprints)<br/>thin controllers · JSON /api/*"]
+        R --> S["Services<br/>business rules + authz, one place"]
+        S --> M["Models<br/>SQLAlchemy (GEDCOM-7)"]
     end
     M --> D[("SQLite<br/>(MySQL in v2)")]
     S --> U[/"uploads/ on disk<br/>outside the web root"/]
@@ -56,70 +76,76 @@ The three layers map 1:1 onto v2's Spring Boot stack: Blueprints →
 ## Quick start (development)
 
 ```powershell
-# 1. Activate the virtual environment (Windows)
+# 1. Create/activate the project virtual environment (Windows)
+python -m venv .venv
 .venv\Scripts\activate
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Install dependencies (dev includes pytest)
+pip install -r requirements-dev.txt
 
 # 3. Copy .env.example to .env and set a real SECRET_KEY
 copy .env.example .env
 
-# 4. Create/upgrade the database (runs all migrations)
-flask init-db
+# 4. Create the database (runs all migrations)
+flask db upgrade
 
-# 5. Create your first admin account
-flask create-admin yourusername
+# 5. (optional) Fill a fresh dev DB with three generations of mock data
+flask seed
 
-# 6. Run the dev server
+# 6. Create your first admin account (email login)
+flask create-admin you@example.com
+
+# 7. Run the dev server, then explore the API at /api/* (or the spec at /apidocs)
 flask run
 ```
 
-Then open http://127.0.0.1:5000 and log in.
-
-### Or run it with Docker (any machine with Docker installed)
+### Or run it with Docker
 
 ```bash
 cp .env.example .env   # set a real SECRET_KEY
 docker compose up --build
-# first run only — create your admin account inside the container:
-docker compose exec web flask create-admin yourusername
+docker compose exec web flask create-admin you@example.com   # first run only
 ```
 
-Then open http://127.0.0.1:8000. The database, photos, and backups live
-in bind-mounted folders (`instance/`, `uploads/`, `backups/`), so they
-survive container rebuilds.
+The database, uploads, and backups live in bind-mounted folders (`instance/`,
+`uploads/`, `backups/`), so they survive container rebuilds.
 
 ## Management commands
 
 ```powershell
-flask init-db                  # create/upgrade the database (runs migrations)
-flask create-admin <username>  # bootstrap the first admin account
-flask backup                   # full backup zip: DB + photos, verified,
-                               # uploaded off-site if BACKUP_S3_BUCKET is set
-flask restore-backup <zip>     # DESTRUCTIVE: restore DB + photos from a backup
+flask db upgrade               # create/upgrade the database (runs migrations)
+flask seed                     # dev only: load demo users + 3 generations of data
+flask create-admin <email>     # bootstrap the first admin account
+flask backup                   # full backup zip: DB + files, verified, S3 if configured
+flask restore-backup <zip>     # DESTRUCTIVE: restore DB + files from a backup
 flask export-data              # portable JSON export of everything (v2 migration)
 ```
 
 ## Stack
 
-Python 3 · Flask · SQLAlchemy · Flask-Migrate · SQLite (dev) · Bootstrap 5
+Python 3.14 · Flask · SQLAlchemy · Flask-Migrate · SQLite (dev; MySQL in v2) ·
+Bootstrap 5
 
 ## Project layout
 
 ```
-run.py            # entry point — creates the app via the factory
 app/
   __init__.py     # application factory (create_app)
   config.py       # configuration, loaded from .env
-  cli.py          # custom flask commands (init-db, create-admin)
-  models/         # SQLAlchemy models        (≈ Spring Boot @Entity/Repository)
-  services/       # business logic           (≈ Spring Boot @Service)
-  routes/         # blueprints / view funcs  (≈ Spring Boot @Controller)
-  forms/          # WTForms form classes + validation
-  templates/      # Jinja2 HTML templates
+  cli.py          # custom flask commands (db, seed, create-admin, backup…)
+  models/         # SQLAlchemy GEDCOM-7 models   (≈ Spring Boot @Entity/Repository)
+  services/       # business logic + authz       (≈ Spring Boot @Service)
+  routes/
+    api/          # the JSON REST API blueprint   (≈ Spring Boot @RestController)
+    ...           # preserved web routes: auth, admin, main/plumbing
+  forms/          # WTForms (auth + admin only; the genealogy UI is WP3)
+  templates/      # Jinja2 templates (auth/admin/errors — genealogy UI is WP3)
   static/         # CSS/JS served by Flask
+docs/
+  MASTER_PLAN.md  # the authoritative spec
+  openapi.yaml    # the API contract (kept in sync by a test)
 migrations/       # Alembic database migration scripts
+seed.py           # development mock data (the Hartwell family)
 instance/         # SQLite DB lives here (git-ignored)
-uploads/          # uploaded photos (git-ignored, outside web root)
+uploads/          # uploaded images (git-ignored, outside web root)
 ```

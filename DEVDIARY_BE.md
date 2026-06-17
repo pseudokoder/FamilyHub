@@ -239,3 +239,126 @@ models, add the §10 role scaffolding, and — the key deliverable — publish t
 **API contract** in `docs/openapi.yaml`. That contract is the handoff that lets
 Cowork start WP3. Before starting WP2, read `BLOCKERS.md` (the `users` §3.5
 alignment is the one open item, and it's a WP2 task).
+
+---
+
+## WP2 — Backend CRUD + API Contract + RBAC (2026-06-17)
+
+**Goal (Master Plan §6):** build the backend that the front-end (WP3) consumes —
+a JSON CRUD + search API over the GEDCOM-7 schema — resolve the `users`/RBAC
+blocker (§3.5/§10), and **publish the API contract**. Code writes no genealogy
+templates; that's Cowork's WP3.
+
+### 1. The `users` migration — changing the lock without breaking the door
+
+The highest-risk change touched preserved, tested security. The key realization:
+**the security *mechanisms* are independent of the login *identifier*.** bcrypt,
+CSRF, login rate-limiting, the signed single-use reset tokens, the vague-error
+pattern, and the open-redirect guard all stayed byte-for-byte — only the lookup
+key moved from `username` to `email`. Two moves de-risked it:
+
+- **`is_admin` became a computed `@property`** over the new `role` (`role ==
+  'admin'`). So `base.html`, the admin gate, and every `current_user.is_admin`
+  check kept working with zero edits — the blast radius shrank to the handful of
+  places that genuinely needed email/role.
+- **The hardening tests kept their assertions** (CSRF-fires, rate-limit-fires,
+  open-redirect-blocked, vague-error) and stayed green — they're the *proof* the
+  migration preserved the security, not just a hope.
+
+`users` now matches §3.5: `email NOT NULL UNIQUE` (the login key), a four-rung
+`role` (`app/models/role.py` — GUEST/USER/POWER\_USER/ADMIN, stored as a portable
+`VARCHAR(20)`, with a rank order for "at least USER?" checks), and `is_active`
+(which Flask-Login reads, so deactivating an account is a one-column switch). The
+schema change rode in on a **new Alembic migration** using `batch_alter_table`
+(SQLite rebuilds the table to alter a column), with an `is_admin → role` data
+backfill. Gotcha learned: in a batch rebuild you must **explicitly `drop_index`**
+an index on a column you're dropping, or Alembic tries to recreate it on the new
+table and fails (`no such column: username`).
+
+### 2. The one authorization layer (§10 anti-lock-in)
+
+Every permission decision routes through `app/services/authz.py` — the
+`role_required(min_role)` decorator (and `admin_required = role_required(ADMIN)`).
+The old hand-rolled `admin_required` in `admin.py` now imports from here. Adding a
+role or a granular permission later is a change in ONE file. The decorator also
+returns the *right kind* of "no": a JSON 401/403 for `/api`, an HTML
+redirect/page for the website (one `request.path.startswith("/api/")` check).
+v2: this collapses into Spring Security's `@PreAuthorize("hasRole(...)")`.
+
+### 3. The JSON API — thin controllers, fat services (Controller→Service→Repository)
+
+Approved consumption model: a **JSON REST API under `/api/*`**. Every route is a
+thin controller — parse, call one service, `jsonify` — and all logic + the
+serialization shape lives in per-resource services (`individual_service`,
+`family_service`, …). Because the service returns plain dicts, Cowork's WP3 can
+fetch the JSON *or* server-render Jinja by calling the same service — identical
+shape either way. Uniform errors (`ApiError` → `{"error", "fields"}` with the
+right status) make the contract trustworthy.
+
+**Polymorphic writes** all go through one gate, `genealogy_service.require_subject`,
+which validates the `subject_type` is allowed for *this* attachment and that the
+target row exists — the referential check the database can't do for a polymorphic
+FK (§8). Deletes reuse the WP1 cascade helpers and gained a `delete_event` sibling.
+
+### 4. Media — the privacy-critical resource
+
+`media_service` salvages the first build's upload pipeline from git history (the
+five rules: extension allow-list, Pillow content-verify, random UUID names,
+storage outside the web root, and **EXIF/GPS stripping** by re-encoding). Files
+are served only through `@login_required` routes — a family photo never has a
+public URL. A pytest uploads a GPS-tagged image and asserts the stored file has no
+GPS block — the privacy promise, enforced forever.
+
+### 5. Search (§12) — and a scoping decision
+
+`GET /api/search`: people by name (`LIKE`, wildcards escaped) + filters (sex,
+living, birth-year range via `substr(date_sort,1,4)`, place) and a text search
+over notes. **Decision:** the notes search uses portable `LIKE` now; Master Plan
+§12 schedules **SQLite FTS5** for WP4, and doing it now would pull a SQLite-only
+virtual table into the schema, breaking the §3 "standard SQL only" rule. The
+endpoint *shape* is the contract — WP4 swaps the implementation behind it.
+
+### 6. The contract + tests
+
+`docs/openapi.yaml` documents every `/api` route with request/response component
+schemas; the route↔spec sync test fails the build if a route is undocumented.
+**139 tests, ~95% coverage** (floor 90%) — every resource has CRUD happy-path,
+validation-400, auth/role-enforcement, and polymorphic-link/cascade tests, all
+hittable as JSON with no UI required.
+
+### 7. v1 → v2 mapping (added this WP)
+
+| v1 (Flask) | v2 (Spring Boot) |
+|---|---|
+| `Role` enum + `role` VARCHAR | Spring Security authorities |
+| `authz.role_required(Role.ADMIN)` | `@PreAuthorize("hasRole('ADMIN')")` |
+| `/api/*` blueprint + `jsonify` | `@RestController` returning DTOs |
+| per-resource `*_service.serialize()` | DTO mappers (MapStruct) |
+| `ApiError` → uniform JSON | `@ControllerAdvice` exception handlers |
+
+### Decisions Made Without Wes (WP2)
+1. **`/api/*` prefix** for the JSON API — leaves the root URLs free for Cowork's
+   WP3 human pages; conventional; v2 Angular consumes `/api/*`.
+2. **`is_admin` kept as a computed property** (shrinks the migration blast radius).
+3. **Notes search = `LIKE` now, FTS5 in WP4** (§12; honors §3 portability).
+4. **Media metadata is immutable** after upload — re-uploading is a new object,
+   which keeps the strip-on-upload guarantee simple (no edit path that could
+   reintroduce EXIF).
+5. **`seed.py` gained demo users** (emails + varied roles, a dev-only password)
+   so the API and RBAC have real accounts to exercise.
+
+### Manual Testing Checklist (WP2)
+
+Still nothing browser-only for Code: the API is fully verified by pytest, and the
+preserved auth/admin pages are covered too. Carry-forward deployment checks
+(WP5) are unchanged from the WP1 entry above.
+
+### WP2 → WP3 Readiness
+
+**The contract is ready for Cowork.** `docs/openapi.yaml` is the stable interface:
+JSON CRUD for every genealogy resource + sub-records + polymorphic links, a search
+endpoint, uniform error shapes, and a documented auth model (login → reads;
+USER → writes; `X-CSRFToken` on writes). Cowork's WP3 builds the elderly-accessible,
+cross-generational UI (§5A/§5B) against it — server-rendering via the services or
+fetching the JSON, their choice. No cross-builder blockers are open; the one
+former blocker (`users` §3.5) is RESOLVED in `BLOCKERS.md`.
