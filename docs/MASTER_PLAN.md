@@ -4,10 +4,9 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 1.0** · Last updated 2026-06-16 · Status: Locked for WP1.
+**Version 1.1** · Last updated 2026-06-16 · Status: WP1 complete; WP2 next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version and add a line to the Revision History (bottom).*
-
 ---
 
 ## 1. The Corrected Vision
@@ -463,6 +462,11 @@ Code and Cowork must not write the same file. Split it:
 - **`DEVDIARY_FE.md`** — frontend (Cowork). H1 title: "FamilyHub — Frontend Dev Diary."
 - **`DEVDIARY.md`** — thin index pointing to both, so the README "start here" still works.
 
+### README ownership (Code keeps the portfolio face current)
+Owner: Claude Code — the README is repo presentation, which is Code's domain (Cowork is frontend-only). 
+Keep it accurate at each WP boundary (never describing removed features), and deliver the definitive, 
+capstone-grade professional rewrite by WP5 at the latest, matching the polish of the original presentation.
+
 ### Cross-builder blocker handoff (so you always know who to spin up)
 A builder will hit things only the *other* builder can fix (Cowork finds a missing or
 wrong endpoint; Code finds the front-end needs a different data shape). Protocol:
@@ -579,6 +583,8 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- v1.1 — 2026-06-16 — Added README ownership/maintenance directive (Code owns it; keep 
+  accurate per WP; definitive professional rewrite due by WP5). (§7)
 - **v1.0 — 2026-06-16** — Initial locked plan: Path A re-foundation, GEDCOM-7 schema,
   depth bar (§5A), visual design brief (§5B), orchestration + build sequence + blocker
   handoff (§7), Project+ roadmap (§6), security ladder (§9), RBAC ladder (§10), change
