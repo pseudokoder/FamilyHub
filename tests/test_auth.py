@@ -1,16 +1,18 @@
 """Authentication tests: the login wall, session security, CSRF.
 
-These encode the security PROMISES from CLAUDE.md as executable checks —
-if a future change accidentally exposes family content to anonymous
-visitors, this file fails the build before the family ever sees it.
+These encode the security PROMISES from CLAUDE.md as executable checks — if a
+future change accidentally exposes family content to anonymous visitors, this
+file fails the build before the family ever sees it. WP2 note: login is by
+EMAIL now, but every hardening assertion (vague errors, open-redirect guard,
+CSRF, rate limiting) is unchanged — proof the migration preserved the security.
 """
 
 import pytest
 
-from tests.conftest import ADMIN_PASSWORD
+from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD
 
 # Every login-walled URL in the app. WP1 trimmed this to the surviving
-# infrastructure surface; WP2 adds the genealogy pages back as they're built.
+# infrastructure surface; WP2 adds the genealogy API behind it too.
 PROTECTED_ROUTES = [
     "/about", "/site/hero", "/auth/change-password",
     "/apidocs", "/openapi.yaml",
@@ -51,16 +53,16 @@ def test_login_wall(client, route):
 def test_login_success(client, admin):
     response = client.post(
         "/auth/login",
-        data={"username": "admin", "password": ADMIN_PASSWORD},
+        data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
         follow_redirects=True,
     )
     assert b"Welcome back, Admin!" in response.data
 
 
-def test_login_is_case_insensitive_on_username(client, admin):
+def test_login_is_case_insensitive_on_email(client, admin):
     response = client.post(
         "/auth/login",
-        data={"username": "  ADMIN ", "password": ADMIN_PASSWORD},
+        data={"email": "  ADMIN@TEST.INVALID ", "password": ADMIN_PASSWORD},
         follow_redirects=True,
     )
     assert b"Welcome back" in response.data
@@ -69,10 +71,10 @@ def test_login_is_case_insensitive_on_username(client, admin):
 def test_login_wrong_password_is_vague(client, admin):
     response = client.post(
         "/auth/login",
-        data={"username": "admin", "password": "wrong-password"},
+        data={"email": ADMIN_EMAIL, "password": "wrong-password"},
         follow_redirects=True,
     )
-    # One vague message for bad user OR bad password — no username harvesting.
+    # One vague message for bad email OR bad password — no account harvesting.
     assert b"don&#39;t match" in response.data
     assert b"Welcome back" not in response.data
 
@@ -80,10 +82,25 @@ def test_login_wrong_password_is_vague(client, admin):
 def test_login_unknown_user_same_message(client):
     response = client.post(
         "/auth/login",
-        data={"username": "nobody", "password": "whatever123"},
+        data={"email": "nobody@nowhere.invalid", "password": "whatever123"},
         follow_redirects=True,
     )
     assert b"don&#39;t match" in response.data
+
+
+def test_inactive_account_cannot_log_in(client, member):
+    """A deactivated account is turned away exactly like a wrong password —
+    same vague message, no hint that the email is real but switched off."""
+    from app.extensions import db
+    member.is_active = False
+    db.session.commit()
+    response = client.post(
+        "/auth/login",
+        data={"email": member.email, "password": "MemberPass123"},
+        follow_redirects=True,
+    )
+    assert b"don&#39;t match" in response.data
+    assert b"Welcome back" not in response.data
 
 
 def test_logout_requires_post(admin_client):
@@ -98,7 +115,7 @@ def test_open_redirect_blocked(client, admin):
     for evil in ("https://evil.example", "//evil.example"):
         response = client.post(
             f"/auth/login?next={evil}",
-            data={"username": "admin", "password": ADMIN_PASSWORD},
+            data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
             follow_redirects=False,
         )
         assert response.headers["Location"] in ("/", "http://localhost/")
@@ -108,7 +125,7 @@ def test_open_redirect_blocked(client, admin):
 def test_safe_next_is_honored(client, admin):
     response = client.post(
         "/auth/login?next=/about",
-        data={"username": "admin", "password": ADMIN_PASSWORD},
+        data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
         follow_redirects=False,
     )
     assert response.headers["Location"].endswith("/about")
@@ -132,7 +149,7 @@ def test_csrf_actually_fires(tmp_path, admin):
 
     csrf_app = create_app(CsrfConfig)
     response = csrf_app.test_client().post(
-        "/auth/login", data={"username": "admin", "password": ADMIN_PASSWORD}
+        "/auth/login", data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
     )
     assert response.status_code == 400  # rejected: no CSRF token
 
@@ -141,7 +158,7 @@ def test_change_own_password(client, admin):
     """Self-service: wrong current password changes nothing; the right one
     changes it for real (provable by logging in with the new password)."""
     client.post("/auth/login",
-                data={"username": "admin", "password": ADMIN_PASSWORD})
+                data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD})
 
     # Wrong current password -> rejected, old password still works.
     response = client.post(
@@ -165,7 +182,7 @@ def test_change_own_password(client, admin):
     client.post("/auth/logout")
     response = client.post(
         "/auth/login",
-        data={"username": "admin", "password": "BrandNewPass1"},
+        data={"email": ADMIN_EMAIL, "password": "BrandNewPass1"},
         follow_redirects=True,
     )
     assert b"Welcome back" in response.data
@@ -194,7 +211,7 @@ def test_login_rate_limit_fires(tmp_path):
         db.create_all()
 
     client = rl_app.test_client()
-    bad_guess = {"username": "robot", "password": "guess-attempt"}
+    bad_guess = {"email": "robot@nowhere.invalid", "password": "guess-attempt"}
     statuses = [
         client.post("/auth/login", data=bad_guess).status_code
         for _ in range(11)

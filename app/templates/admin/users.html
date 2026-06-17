@@ -16,8 +16,7 @@
         <thead>
             <tr>
                 <th>Display name</th>
-                <th>Username</th>
-                <th>Email (for resets)</th>
+                <th>Email (login)</th>
                 <th>Role</th>
                 <th>Member since</th>
                 <th></th>
@@ -26,12 +25,16 @@
         <tbody>
             {% for user in users %}
             <tr>
-                <td>{{ user.display_name }}</td>
-                <td><code>{{ user.username }}</code></td>
-                <td>{{ user.email or "—" }}</td>
+                <td>{{ user.display_name }}{% if not user.is_active %}
+                    <span class="badge text-bg-warning ms-1">inactive</span>{% endif %}</td>
+                <td><code>{{ user.email }}</code></td>
                 <td>
                     {% if user.is_admin %}
                         <span class="badge text-bg-primary">Admin</span>
+                    {% elif user.role == "power_user" %}
+                        <span class="badge text-bg-info">Power user</span>
+                    {% elif user.role == "guest" %}
+                        <span class="badge text-bg-light border">Guest</span>
                     {% else %}
                         <span class="badge text-bg-secondary">Member</span>
                     {% endif %}

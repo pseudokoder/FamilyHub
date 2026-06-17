@@ -7,10 +7,10 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
-        <h1 class="mb-3">Edit account: <code>{{ user.username }}</code></h1>
+        <h1 class="mb-3">Edit account: <code>{{ user.email }}</code></h1>
         <p class="fs-5 text-muted">
-            The email address is only used for password-reset links —
-            leave it blank and this person resets through you instead.
+            The email is this person's login and where password-reset links
+            go. Changing the role changes what they're allowed to do.
         </p>
         {{ render_form(form, button_style="primary btn-lg") }}
     </div>

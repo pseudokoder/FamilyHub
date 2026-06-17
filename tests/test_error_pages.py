@@ -6,7 +6,7 @@ behavior, not ours. The handler is symmetric with these two and the
 template is static.)
 """
 
-from tests.conftest import ADMIN_PASSWORD
+from tests.conftest import MEMBER_EMAIL, MEMBER_PASSWORD
 
 
 def test_404_is_friendly(client):
@@ -22,7 +22,7 @@ def test_403_is_friendly(client, member):
     """A logged-in non-admin hitting an admin page gets the calm 403 page,
     not a stack trace — and the status code is still honestly 403."""
     client.post("/auth/login",
-                data={"username": "member", "password": "MemberPass123"})
+                data={"email": MEMBER_EMAIL, "password": MEMBER_PASSWORD})
     response = client.get("/admin/users")
     assert response.status_code == 403
     assert b"not yours to change" in response.data

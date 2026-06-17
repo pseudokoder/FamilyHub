@@ -9,13 +9,11 @@ v2 mapping: AdminController.java guarded by Spring Security's
 hand-rolled version of exactly that annotation.
 """
 
-from functools import wraps
-
 from flask import (
     Blueprint, abort, current_app, flash, redirect, render_template,
     send_from_directory, url_for,
 )
-from flask_login import current_user, login_required
+from flask_login import current_user
 
 from app.forms.admin_forms import SiteSettingsForm
 from app.forms.auth_forms import CreateUserForm, EditUserForm, ResetPasswordForm
@@ -23,28 +21,11 @@ from app.models import User, db
 from app.services import (
     audit_service, backup_service, settings_service, user_service,
 )
+# The admin gate now comes from the ONE authorization layer (Master Plan §10),
+# not a decorator hand-rolled here — so every permission rule lives in one place.
+from app.services.authz import admin_required
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-
-
-def admin_required(view):
-    """Decorator: the page needs a logged-in user AND the admin flag.
-
-    TEACHING NOTE: a decorator wraps a function in extra behavior without
-    touching its body — here, a bouncer at the door of every admin view.
-    @wraps preserves the original function's name so url_for() still works.
-    """
-
-    @wraps(view)
-    @login_required  # first hurdle: logged in at all? (else -> login page)
-    def wrapped(*args, **kwargs):
-        if not current_user.is_admin:
-            # 403 Forbidden = "I know who you are, and the answer is no."
-            # (401 would mean "I don't know who you are.")
-            abort(403)
-        return view(*args, **kwargs)
-
-    return wrapped
 
 
 @admin_bp.route("/users")
@@ -143,20 +124,20 @@ def create_user():
     if form.validate_on_submit():
         try:
             user = user_service.create_user(
-                username=form.username.data,
+                email=form.email.data,
                 display_name=form.display_name.data,
                 password=form.password.data,
-                is_admin=form.is_admin.data,
+                role=form.role.data,
                 actor=current_user,
             )
         except ValueError as err:
-            # Duplicate username. Re-render the form with everything the
-            # admin typed still in place — forgiving forms, always.
+            # Duplicate email. Re-render the form with everything the admin
+            # typed still in place — forgiving forms, always.
             flash(str(err), "danger")
         else:
             flash(
                 f"Account for {user.display_name} created! "
-                "Share the username and temporary password with them.",
+                "Share the email and temporary password with them.",
                 "success",
             )
             return redirect(url_for("admin.list_users"))
@@ -166,14 +147,21 @@ def create_user():
 @admin_bp.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
 @admin_required
 def edit_user(user_id):
-    """Fix a display name, or set the email that password-reset links go
-    to. (Accounts without an email simply have no self-service reset.)"""
+    """Fix a display name, change the login email, or change the role."""
     user = db.get_or_404(User, user_id)
+    # obj=user pre-fills the form (display_name, email, role) from the account.
     form = EditUserForm(obj=user)
     if form.validate_on_submit():
+        try:
+            # Email first — it's the one change that can be rejected (a clash
+            # with another account's address).
+            user_service.set_email(user, form.email.data, actor=current_user)
+        except ValueError as err:
+            flash(str(err), "danger")
+            return render_template("admin/edit_user.html", form=form, user=user)
         user_service.set_display_name(user, form.display_name.data,
                                       actor=current_user)
-        user_service.set_email(user, form.email.data, actor=current_user)
+        user_service.set_role(user, form.role.data, actor=current_user)
         flash(f"{user.display_name}'s account is updated.", "success")
         return redirect(url_for("admin.list_users"))
     return render_template("admin/edit_user.html", form=form, user=user)

@@ -1,11 +1,12 @@
-"""Admin panel tests: the 403 wall, user management, site settings."""
+"""Admin panel tests: the 403 wall, user management, roles, site settings."""
 
 import pytest
 from PIL import Image
 
+from app.extensions import db
 from app.models import User
 from app.services import settings_service
-from tests.conftest import make_image
+from tests.conftest import MEMBER_EMAIL, make_image
 
 ADMIN_ONLY_ROUTES = ["/admin/users", "/admin/users/new", "/admin/settings", "/admin/backups"]
 
@@ -13,7 +14,7 @@ ADMIN_ONLY_ROUTES = ["/admin/users", "/admin/users/new", "/admin/settings", "/ad
 @pytest.mark.parametrize("route", ADMIN_ONLY_ROUTES)
 def test_member_gets_403_not_404(member_client, route):
     """403 = 'I know who you are, and the answer is no' — the status-code
-    precision lesson from DEVDIARY Chapter 2."""
+    precision lesson from DEVDIARY Chapter 2. Enforced by the §10 authz layer."""
     assert member_client.get(route).status_code == 403
 
 
@@ -24,36 +25,61 @@ def test_member_sees_no_admin_menu(member_client):
 def test_admin_creates_account_and_it_works(admin_client, app):
     response = admin_client.post(
         "/admin/users/new",
-        data={"username": "GrandmaJo", "display_name": "Grandma Jo",
-              "password": "Tomatoes1969"},
+        data={"email": "GrandmaJo@example.com", "display_name": "Grandma Jo",
+              "password": "Tomatoes1969", "role": "user"},
         follow_redirects=True,
     )
     assert b"Account for Grandma Jo created" in response.data
 
-    # Username normalized to lowercase; the new person can actually log in.
-    assert User.query.filter_by(username="grandmajo").one()
+    # Email normalized to lowercase; the new person can actually log in.
+    assert User.query.filter_by(email="grandmajo@example.com").one()
     fresh = app.test_client()
     response = fresh.post(
         "/auth/login",
-        data={"username": "grandmajo", "password": "Tomatoes1969"},
+        data={"email": "grandmajo@example.com", "password": "Tomatoes1969"},
         follow_redirects=True,
     )
     assert b"Welcome back, Grandma Jo!" in response.data
 
 
-def test_duplicate_username_friendly_error(admin_client, member):
-    response = admin_client.post(
+def test_admin_can_create_a_power_user(admin_client):
+    """The role dropdown actually sets the role on the new account (§10)."""
+    admin_client.post(
         "/admin/users/new",
-        data={"username": "member", "display_name": "Clone", "password": "Whatever123"},
+        data={"email": "tech@example.com", "display_name": "Tech Cousin",
+              "password": "Gadgets123", "role": "power_user"},
         follow_redirects=True,
     )
-    assert b"already taken" in response.data
+    assert User.query.filter_by(email="tech@example.com").one().role == "power_user"
+
+
+def test_admin_can_change_a_members_role(admin_client, member):
+    """Editing an account can promote/demote it — the change is audited and
+    takes effect immediately."""
+    admin_client.post(
+        f"/admin/users/{member.id}/edit",
+        data={"display_name": "Member", "email": MEMBER_EMAIL,
+              "role": "power_user"},
+        follow_redirects=True,
+    )
+    assert db.session.get(User, member.id).role == "power_user"
+
+
+def test_duplicate_email_friendly_error(admin_client, member):
+    response = admin_client.post(
+        "/admin/users/new",
+        data={"email": MEMBER_EMAIL, "display_name": "Clone",
+              "password": "Whatever123", "role": "user"},
+        follow_redirects=True,
+    )
+    assert b"already in use" in response.data
 
 
 def test_short_password_rejected(admin_client):
     response = admin_client.post(
         "/admin/users/new",
-        data={"username": "shorty", "display_name": "S", "password": "abc"},
+        data={"email": "shorty@example.com", "display_name": "S",
+              "password": "abc", "role": "user"},
         follow_redirects=True,
     )
     assert b"at least 8 characters" in response.data
@@ -67,10 +93,26 @@ def test_password_reset(admin_client, member, app):
     )
     fresh = app.test_client()
     # Old password dead, new one works.
-    old = fresh.post("/auth/login", data={"username": "member", "password": "MemberPass123"}, follow_redirects=True)
+    old = fresh.post("/auth/login",
+                     data={"email": MEMBER_EMAIL, "password": "MemberPass123"},
+                     follow_redirects=True)
     assert b"Welcome back" not in old.data
-    new = fresh.post("/auth/login", data={"username": "member", "password": "BrandNewPass1"}, follow_redirects=True)
+    new = fresh.post("/auth/login",
+                     data={"email": MEMBER_EMAIL, "password": "BrandNewPass1"},
+                     follow_redirects=True)
     assert b"Welcome back, Member!" in new.data
+
+
+def test_admin_activity_and_backups_pages(admin_client):
+    assert admin_client.get("/admin/activity").status_code == 200
+    assert admin_client.get("/admin/backups").status_code == 200
+
+
+def test_admin_can_run_a_backup(admin_client):
+    """The 'Back Up Now' button: creates + verifies a backup and reports back."""
+    response = admin_client.post("/admin/backups/run", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"verified" in response.data.lower()
 
 
 def test_site_settings_save_and_show(admin_client, member_client):

@@ -22,12 +22,19 @@ from pillow_heif import register_heif_opener
 from app import create_app
 from app.config import Config
 from app.extensions import db
+from app.models.role import Role
 from app.services import user_service
 
 register_heif_opener()  # lets tests CREATE .heic files to upload
 
+# WP2: accounts log in by EMAIL (Master Plan §3.5). The fixtures below mint a
+# known admin and member so tests can act as each role.
+ADMIN_EMAIL = "admin@test.invalid"
 ADMIN_PASSWORD = "AdminPass123"
+MEMBER_EMAIL = "member@test.invalid"
 MEMBER_PASSWORD = "MemberPass123"
+GUEST_EMAIL = "guest@test.invalid"
+GUEST_PASSWORD = "GuestPass123"
 
 
 @pytest.fixture
@@ -95,19 +102,22 @@ def client(app):
 
 @pytest.fixture
 def admin(app):
-    return user_service.create_user("admin", "Admin", ADMIN_PASSWORD, is_admin=True)
+    return user_service.create_user(
+        ADMIN_EMAIL, "Admin", ADMIN_PASSWORD, role=Role.ADMIN
+    )
 
 
 @pytest.fixture
 def member(app):
-    return user_service.create_user("member", "Member", MEMBER_PASSWORD)
+    # No role given → defaults to USER, a normal family member.
+    return user_service.create_user(MEMBER_EMAIL, "Member", MEMBER_PASSWORD)
 
 
 @pytest.fixture
 def admin_client(client, admin):
     """A test client already logged in as the admin."""
     client.post(
-        "/auth/login", data={"username": "admin", "password": ADMIN_PASSWORD}
+        "/auth/login", data={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
     )
     return client
 
@@ -115,10 +125,27 @@ def admin_client(client, admin):
 @pytest.fixture
 def member_client(app, member):
     """A SECOND client, logged in as a regular member — for permission
-    tests ('member may not delete admin's photo')."""
+    tests ('a member may not do an admin-only thing')."""
     other = app.test_client()
     other.post(
-        "/auth/login", data={"username": "member", "password": MEMBER_PASSWORD}
+        "/auth/login", data={"email": MEMBER_EMAIL, "password": MEMBER_PASSWORD}
+    )
+    return other
+
+
+@pytest.fixture
+def guest(app):
+    """The lowest rung of the role ladder (§10) — can read, but not write."""
+    return user_service.create_user(
+        GUEST_EMAIL, "Guest", GUEST_PASSWORD, role=Role.GUEST
+    )
+
+
+@pytest.fixture
+def guest_client(app, guest):
+    other = app.test_client()
+    other.post(
+        "/auth/login", data={"email": GUEST_EMAIL, "password": GUEST_PASSWORD}
     )
     return other
 

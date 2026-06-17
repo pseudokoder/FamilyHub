@@ -48,11 +48,11 @@ def register_cli(app):
         click.echo("Database is up to date (all migrations applied).")
 
     @app.cli.command("create-admin")
-    @click.argument("username")
+    @click.argument("email")
     @click.option(
         "--display-name",
         default=None,
-        help="Name shown to the family (defaults to the username).",
+        help="Name shown to the family (defaults to the email).",
     )
     @click.option(
         "--password",
@@ -61,7 +61,7 @@ def register_cli(app):
         confirmation_prompt=True, # ...and ask twice to catch typos.
         help="Password for the new admin (omit to be prompted securely).",
     )
-    def create_admin_command(username, display_name, password):
+    def create_admin_command(email, display_name, password):
         """Create an ADMIN account — the bootstrap step after init-db.
 
         Every other account is created by an admin inside the app
@@ -69,20 +69,21 @@ def register_cli(app):
         and a terminal command is the safe somewhere: only a person with
         SSH access to the server (or sitting at this keyboard) can run it.
         """
+        from app.models.role import Role
         from app.services import user_service
 
         try:
             user = user_service.create_user(
-                username=username,
-                display_name=display_name or username,
+                email=email,
+                display_name=display_name or email,
                 password=password,
-                is_admin=True,
+                role=Role.ADMIN,
             )
         except ValueError as err:
             # raise a ClickException so the command exits with status 1 —
             # scripts and deploy pipelines can detect the failure.
             raise click.ClickException(str(err))
-        click.echo(f"Admin account '{user.username}' created. You can log in now.")
+        click.echo(f"Admin account '{user.email}' created. You can log in now.")
 
     @app.cli.command("backup")
     def backup_command():
@@ -167,9 +168,10 @@ def register_cli(app):
         NOTE: full GEDCOM-7 *file* import/export (reading/writing .ged) is WP6 /
         a firm v2 deliverable — this command is mock data, not a GEDCOM importer.
         """
-        from seed import seed_all
+        from seed import seed_all, seed_users
 
+        users = seed_users()
         counts = seed_all()
-        click.echo("Seeded the database with mock data:")
+        click.echo(f"Seeded {len(users)} demo user(s) + mock data:")
         for name, count in counts.items():
             click.echo(f"  {name}: {count} row(s)")

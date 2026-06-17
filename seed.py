@@ -19,11 +19,34 @@ Run it:   flask seed         (wipes nothing; meant for a fresh dev database)
 from app.extensions import db
 from app.models import (
     Citation, Event, Family, FamilyChild, Individual, MediaLink, MediaObject,
-    Name, Note, NoteLink, Place, Repository, Source, User,
+    Name, Note, NoteLink, Place, Repository, Role, Source, User,
 )
+from app.services import user_service
 from app.services.genealogy_service import (
     SUBJECT_EVENT, SUBJECT_FAMILY, SUBJECT_INDIVIDUAL, SUBJECT_NAME,
 )
+
+# DEV-ONLY demo password. These are mock accounts for a fresh dev database so the
+# API and the RBAC ladder have real users to exercise — never use this on a real
+# server (real accounts are made with `flask create-admin` + the admin panel).
+DEMO_PASSWORD = "FamilyHub123"
+DEMO_USERS = [
+    ("jo@example.com", "Grandma Jo", Role.USER),
+    ("robert@example.com", "Robert Hartwell", Role.POWER_USER),
+    ("pat@example.com", "Cousin Pat (by marriage)", Role.GUEST),
+]
+
+
+def seed_users():
+    """Create the demo accounts (dev only). Skips any that already exist, so
+    it's safe to re-run. Returns the users it created."""
+    created = []
+    for email, name, role in DEMO_USERS:
+        if user_service.find_by_email(email) is None:
+            created.append(
+                user_service.create_user(email, name, DEMO_PASSWORD, role=role)
+            )
+    return created
 
 
 def _individual(sex, living=False, **name_fields):

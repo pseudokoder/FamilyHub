@@ -30,6 +30,7 @@ from app.models.media import MediaLink, MediaObject  # noqa: E402,F401
 from app.models.note import Note, NoteLink  # noqa: E402,F401
 
 # --- Application layer (not GEDCOM — the website's own needs) -----------------
+from app.models.role import Role  # noqa: E402,F401
 from app.models.user import User  # noqa: E402,F401
 from app.models.site_setting import SiteSetting  # noqa: E402,F401
 from app.models.audit_log import AuditLog  # noqa: E402,F401
@@ -45,5 +46,5 @@ __all__ = [
     "Repository", "Source", "Citation",
     "MediaObject", "MediaLink",
     "Note", "NoteLink",
-    "User", "SiteSetting", "AuditLog",
+    "Role", "User", "SiteSetting", "AuditLog",
 ]

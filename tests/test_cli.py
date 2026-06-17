@@ -13,23 +13,25 @@ from app.models import Individual, User
 def test_create_admin_makes_an_admin(app):
     runner = app.test_cli_runner()
     result = runner.invoke(args=[
-        "create-admin", "wes", "--display-name", "Wes", "--password", "Secret123",
+        "create-admin", "wes@example.com", "--display-name", "Wes",
+        "--password", "Secret123",
     ])
     assert result.exit_code == 0
     assert "created" in result.output
 
     db.session.remove()  # see the row the command committed on its own connection
-    user = User.query.filter_by(username="wes").one()
+    user = User.query.filter_by(email="wes@example.com").one()
     assert user.is_admin is True
+    assert user.role == "admin"
 
 
 def test_create_admin_rejects_duplicate(app):
     runner = app.test_cli_runner()
-    runner.invoke(args=["create-admin", "dup", "--password", "Secret123"])
-    again = runner.invoke(args=["create-admin", "dup", "--password", "Secret123"])
+    runner.invoke(args=["create-admin", "dup@example.com", "--password", "Secret123"])
+    again = runner.invoke(args=["create-admin", "dup@example.com", "--password", "Secret123"])
     # A ClickException exits non-zero so deploy pipelines notice the failure.
     assert again.exit_code != 0
-    assert "already taken" in again.output
+    assert "already in use" in again.output
 
 
 def test_seed_command_populates_the_database(app):

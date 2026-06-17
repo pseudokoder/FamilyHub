@@ -48,10 +48,10 @@ def login():
     # validate_on_submit() is False for GET (just show the form) and runs
     # all validators + the CSRF check on POST. One route, both jobs.
     if form.validate_on_submit():
-        user = user_service.authenticate(form.username.data, form.password.data)
+        user = user_service.authenticate(form.email.data, form.password.data)
         if user is None:
             # Deliberately vague — see the security note in user_service.
-            flash("That username and password don't match. Please try again.", "danger")
+            flash("That email and password don't match. Please try again.", "danger")
         else:
             # login_user writes the signed session cookie. remember=True adds
             # a separate 30-day cookie so closing the browser doesn't log
@@ -66,8 +66,8 @@ def login():
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def forgot_password():
-    """Step 1: type your username, get an emailed link. Rate-limited even
-    tighter than login — each POST can trigger an outbound email."""
+    """Step 1: type your email, get an emailed link. Rate-limited even tighter
+    than login — each POST can trigger an outbound email."""
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
     if not mail_service.is_configured():
@@ -76,16 +76,16 @@ def forgot_password():
 
     form = ForgotPasswordForm()
     if form.validate_on_submit():
-        user = user_service.find_by_username(form.username.data)
-        if user is not None and user.email:
+        user = user_service.find_by_email(form.email.data)
+        if user is not None:
             token = user_service.generate_reset_token(user)
             reset_url = url_for("auth.reset_password", token=token, _external=True)
             mail_service.send_password_reset(user, reset_url)
-        # The SAME message whether the username exists, has an email, or
-        # neither — an attacker learns nothing by guessing names here.
+        # The SAME message whether the email exists or not — an attacker learns
+        # nothing by guessing addresses here.
         flash(
-            "If that account has an email on file, a reset link is on its "
-            "way. The link works for one hour — check spam if it's shy.",
+            "If that email matches an account, a reset link is on its way. "
+            "The link works for one hour — check spam if it's shy.",
             "success",
         )
         return redirect(url_for("auth.login"))
@@ -122,7 +122,7 @@ def change_password():
         # Re-authenticate with the CURRENT password before changing
         # anything — see the form's docstring for the threat this stops.
         verified = user_service.authenticate(
-            current_user.username, form.current_password.data
+            current_user.email, form.current_password.data
         )
         if verified is None:
             flash("That current password isn't right — nothing was changed.", "danger")

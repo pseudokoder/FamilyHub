@@ -1,11 +1,18 @@
 """The User model — a login account for one family member.
 
 DESIGN DECISION (documented in DEVDIARY): User is deliberately SEPARATE from
-FamilyMember. A FamilyMember is a person in the family tree — including
-great-grandparents born in 1890 who will obviously never log in. A User is a
-login account. Roughly 6-10 Users will ever exist; the FamilyMember wiki may
-hold dozens of people. Keeping them apart is basic normalization — one table
-per real-world concept (D426 Data Management – Foundations).
+Individual. An Individual is a person in the family tree — including great-
+grandparents born in 1890 who will obviously never log in. A User is a login
+account. Roughly 6-10 Users will ever exist; the individuals table may hold
+dozens of people. Keeping them apart is basic normalization — one table per
+real-world concept (D426 Data Management – Foundations).
+
+WP2 CHANGE — aligned to Master Plan §3.5 + §10 RBAC: the login identifier is now
+the **email address** (not a username), and a four-rung **role** replaces the old
+two-state ``is_admin`` boolean. The security *mechanisms* (bcrypt, reset tokens,
+rate limiting, CSRF) are unchanged — only the lookup key and the permission field
+moved. ``is_admin`` lives on as a computed property so every existing
+``current_user.is_admin`` check keeps working untouched.
 """
 
 from datetime import datetime, timezone
@@ -13,56 +20,78 @@ from datetime import datetime, timezone
 from flask_login import UserMixin
 
 from app.extensions import db, login_manager
+from app.models.role import Role
 
 
 class User(UserMixin, db.Model):
     """An authenticated account. v2 mapping: @Entity + Spring Security UserDetails.
 
-    UserMixin is Flask-Login's helper: it adds the four tiny methods
-    (is_authenticated, get_id(), ...) Flask-Login needs to track a logged-in
-    user in the session, so we don't write that boilerplate ourselves.
+    UserMixin is Flask-Login's helper: it adds the small methods
+    (is_authenticated, get_id(), …) Flask-Login needs to track a logged-in user
+    in the session, so we don't write that boilerplate ourselves. (Note: our
+    ``is_active`` COLUMN below intentionally overrides UserMixin's always-True
+    ``is_active`` — Flask-Login refuses to log in a user whose is_active is
+    False, so deactivating an account is a one-column switch.)
     """
 
     # Explicit plural table name. The default would be "user", which is a
     # RESERVED WORD in several databases (PostgreSQL, for one). Naming it
-    # "users" keeps the schema portable — remember, this exact schema must
-    # move to MySQL for v2 without surgery.
+    # "users" keeps the schema portable — this exact schema must move to MySQL
+    # for v2 without surgery.
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # index=True because we look users up by username on every single login.
-    # An index turns that lookup from "scan the whole table" into "binary
-    # search" — overkill for 10 users, but the habit matters (D427 Data
-    # Management – Applications covers indexes).
-    username = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    # THE LOGIN KEY (Master Plan §3.5). UNIQUE so no two accounts share an inbox;
+    # NOT NULL because it's how you sign in; indexed because we look it up on
+    # every single login (an index turns "scan the whole table" into "binary
+    # search" — overkill for 10 users, but the habit matters; D427).
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
 
-    # What the family actually sees: "Grandma Jo", not "jleiter1947".
+    # What the family actually sees: "Grandma Jo", not "jo@example.com".
     display_name = db.Column(db.String(120), nullable=False)
 
-    # Where password-reset links go. NULLABLE on purpose: an account
-    # without an email simply has no self-service reset — Wes resets it
-    # from the admin panel instead. unique=True still allows many NULLs
-    # (SQL treats NULLs as distinct), it only stops two accounts from
-    # sharing one inbox.
-    email = db.Column(db.String(255), unique=True, nullable=True)
+    # We store a bcrypt HASH, never the password itself (D315). bcrypt output is
+    # 60 chars; 255 leaves generous headroom and matches the §3.5 spec width.
+    password_hash = db.Column(db.String(255), nullable=False)
 
-    # We store a bcrypt HASH, never the password itself. bcrypt output is
-    # 60 characters; 128 leaves headroom if the algorithm's format grows.
-    # Even a full database leak doesn't reveal anyone's actual password —
-    # that's the whole point of one-way hashing (D315 Network and Security).
-    password_hash = db.Column(db.String(128), nullable=False)
+    # The RBAC rung (Master Plan §10), stored as the role's string value in a
+    # portable VARCHAR. Defaults to USER — a brand-new account is a normal member
+    # until an admin says otherwise. server_default makes the column safe to add
+    # to an existing table in a migration.
+    role = db.Column(
+        db.String(20), nullable=False,
+        default=Role.USER.value, server_default=Role.USER.value,
+    )
 
-    # Simple two-tier permission model for v1: admin or not. Robust
-    # permission tiers are explicitly deferred to v2 (see CLAUDE.md).
-    is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    # Soft on/off switch for an account. Flask-Login reads this on login, so a
+    # deactivated user simply can't sign in — no need to delete the row (which
+    # would orphan the content they authored). Defaults to active.
+    is_active = db.Column(
+        db.Boolean, nullable=False, default=True, server_default=db.text("1")
+    )
 
     created_at = db.Column(
         db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
+    # --- Role helpers (the model's slice of the §10 authorization layer) ------
+
+    @property
+    def is_admin(self):
+        """Back-compat shim: every old ``current_user.is_admin`` check (the nav
+        bar, the admin decorator) keeps working without edits, now answered by
+        the role instead of a dropped boolean column."""
+        return self.role == Role.ADMIN.value
+
+    def has_role(self, minimum):
+        """True if this account is at least ``minimum`` on the role ladder.
+        The actual permission decisions route through app/services/authz.py;
+        this is the per-user predicate that decorator calls."""
+        return Role.coerce(self.role).meets(minimum)
+
     def __repr__(self):
-        return f"<User {self.username}>"
+        return f"<User {self.email} ({self.role})>"
 
 
 @login_manager.user_loader
@@ -71,6 +100,6 @@ def load_user(user_id):
 
     The session cookie stores only the user's id (signed, so it can't be
     tampered with). This function turns that id back into a full User object,
-    available everywhere as `current_user`.
+    available everywhere as ``current_user``.
     """
     return db.session.get(User, int(user_id))

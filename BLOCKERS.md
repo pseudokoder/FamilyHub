@@ -45,20 +45,23 @@ so there are no cross-builder blockers right now.
 
 ## Forward notes (not blocking today, but the next builder must know)
 
-### [OPEN] `users` table not yet aligned to Master Plan §3.5
-- Date: 2026-06-16
+### [RESOLVED] `users` table aligned to Master Plan §3.5 + §10 RBAC
+- Date: 2026-06-16 (raised) → 2026-06-17 (resolved)
 - Raised by: Code
-- Blocks: Nothing today. A future reconciliation in **WP2** (the auth/RBAC layer).
-- Context: §3.5 specifies `users` with **email-as-login**, a `role` enum
-  (`admin`|`member`), and `is_active`. WP1 deliberately **kept the existing
-  table as-is** — username-login + an `is_admin` boolean — because that auth /
-  admin / password-reset code is already built, tested, and is the Tier-1
-  security hardening §7 says to *preserve*, and because §10 schedules the
-  role/auth layer for WP2. (Decision confirmed with Wes during WP1 planning.)
-- Needs (Code, in WP2): when building the §10 role scaffolding, decide
-  username-vs-email login and migrate `users` to the §3.5 shape (add `role` +
-  `is_active`, fold `is_admin` into `role`), updating auth/admin/user_service/
-  the create-admin CLI/test fixtures together. Then mark this RESOLVED.
+- Was blocking: the WP2 auth/RBAC layer.
+- Context: §3.5 specifies `users` with **email-as-login**, a `role`, and
+  `is_active`. WP1 deliberately kept the old username-login + `is_admin` shape to
+  preserve the tested Tier-1 hardening (§7), deferring the change to WP2 per §10.
+- Status: **RESOLVED 2026-06-17 (WP2).** `users` now has `email NOT NULL UNIQUE`
+  (the login key), a four-rung `role` (GUEST/USER/POWER_USER/ADMIN — §10), and
+  `is_active`; `username` + the `is_admin` column are dropped (`is_admin` lives on
+  as a computed property so existing checks keep working). The data migration maps
+  `is_admin=1 → 'admin'`, else `'user'`. All permission checks now route through
+  the single `app/services/authz.py` layer (§10 anti-lock-in). The hardening
+  (bcrypt, CSRF, rate limiting, signed single-use reset tokens, vague errors,
+  open-redirect guard) is unchanged and its tests stay green — only the login
+  *identifier* moved from username to email. Migration:
+  `8f1e6fa904a3_users_email_login_role_is_active_wp2_.py`.
 
 ---
 
