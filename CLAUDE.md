@@ -141,28 +141,25 @@ manifest) as the zero-data-loss guarantee. Document the v1→v2 mapping in
 `DEVDIARY_BE.md` as the schema evolves.
 
 ## Current Status
-- **2026-06-16 — WP1 (Database Foundation) complete.** Path A re-foundation: the
+- **WP1 (Database Foundation) complete (2026-06-16).** Path A re-foundation: the
   preserved infrastructure (auth, admin, backups, CI, Docker, security headers,
-  OpenAPI, PWA, management commands, layered architecture) was kept; the old
-  feature data model (FamilyMember/photos/blog/wiki/timeline/plans) was
-  **removed** and replaced with the **GEDCOM-7 schema** (16 tables): individuals,
-  names, families, family_children, places, events, repositories, sources,
-  citations, media_objects, media_links, notes, note_links + users, site_settings,
-  audit_log. Polymorphic `subject_type`/`subject_id` attachment; dual
-  `date_original`/`date_sort` dates; standard SQL only (MySQL-ready).
-- One fresh Flask-Migrate baseline; `seed.py` (3 generations of mock data) +
-  `flask seed`; pytest green at **~93% coverage** (floor 90%). See `DEVDIARY_BE.md`
-  "WP1 — Database Foundation."
-- See `BLOCKERS.md`: `users` is intentionally **not yet** aligned to §3.5
-  (email/role) — that's a WP2 task per §10.
+  OpenAPI, PWA, management commands, layered architecture) kept; the old feature
+  data model replaced with the **GEDCOM-7 schema** (16 tables). One fresh
+  Flask-Migrate baseline; `seed.py` + `flask seed`. See `DEVDIARY_BE.md` "WP1."
+- **WP2 (Backend CRUD + API contract + RBAC) complete (2026-06-17).** Migrated
+  `users` to §3.5 (email login + four-rung `role` + `is_active`); single
+  authorization layer (`app/services/authz.py`, §10). **JSON REST API under
+  `/api/*`** — full CRUD + search over the GEDCOM-7 schema, with polymorphic
+  links and login-walled media (EXIF/GPS stripped). The **contract is
+  `docs/openapi.yaml`** (route↔spec sync test enforced). **139 tests, ~95%
+  coverage** (floor 90%). See `DEVDIARY_BE.md` "WP2."
+- `BLOCKERS.md`: no open cross-builder blockers; the `users` §3.5 item is RESOLVED.
 
-## Next Build Target — WP2 (Backend CRUD + API contract)
-Per Master Plan §6 build order (do ONE work package at a time; phase-gate review
-before the next):
-1. **WP2 — Backend CRUD.** Service + REST-shaped routes for individuals,
-   families, events, sources, media, notes; role scaffolding (§10 enum + auth
-   layer) + basic USER/ADMIN; pytest per resource. **Deliverable: the API
-   contract** (endpoints + JSON shapes in `docs/openapi.yaml`) — the interface
-   Cowork builds against. **Publishing it is the handoff to Cowork (WP3).**
-2. Then WP3 (Cowork front-end) → WP4 (views + search) → WP5 (deploy) →
-   WP6 (GEDCOM import/export, tentative).
+## Next Build Target — WP3 (Front-end, Cowork)
+Per Master Plan §6 build order (one work package at a time; **branch-per-WP** per
+§7 — WP3 is built on the **`wp3-frontend-crud`** branch off master):
+1. **WP3 — Front-end (Cowork).** The elderly-accessible, cross-generational CRUD
+   UI (Master Plan §5A depth bar / §5B design brief), built against the WP2 API
+   contract in `docs/openapi.yaml`. Cowork owns Jinja templates, CSS, vanilla JS;
+   **Code does not build genealogy UI** — it's on-call for contract fixes.
+2. Then WP4 (views + search UI) → WP5 (deploy) → WP6 (GEDCOM import/export, tentative).
