@@ -4,7 +4,7 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 1.2** · Last updated 2026-06-18 · Status: WP2 complete; WP3 next.
+**Version 1.3** · Last updated 2026-06-18 · Status: WP2 complete; WP3 next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version and add a line to the Revision History (bottom).*
 ---
@@ -328,40 +328,40 @@ non-negotiable quality bar:
   photos · tags — mirroring the `notes`/`note_links` (+ optional event/place) schema
   instead of ignoring it.
 - **Cowork gets design leadership**, not micromanagement. Give it the data model +
-  §5B brief and let it architect rich, intuitive pages — to the *standard* of polish
+  §5B constraints and let it architect rich, intuitive pages — to the *standard* of polish
   and intuitiveness set by Wes's Datumology and CinephileHub sites (including
-  Cinephile's admin panel), **not as a copy of them.**
+  Cinephile's admin panel), **not as a copy of them.** The specific control, layout,
+  and visual expression is governed by **docs/FRONTEND_DESIGN.md** (Cowork-owned);
+  §5A still sets the **depth** bar — every user-meaningful field must be capturable,
+  however the page chooses to present it.
 
 ---
 
-## 5B. Visual Design Brief (frontend)
+## 5B. Visual *Requirements* & Constraints (frontend)
+Functionality models FamilySearch; appearance must NOT (FamilySearch looks corporate
+because its goal is data, not delight). The full, living visual + UX design language —
+palette, typography, motion, components, theme — is owned by Cowork in
+docs/FRONTEND_DESIGN.md, which Cowork may change freely WITHIN the constraints below
+(see §11 two-tier change control). This section holds only the durable constraints that
+do NOT change between work packages.
 
-**Functionality** models FamilySearch. **Appearance** must NOT — FamilySearch looks
-corporate because its goal is data, not delight. FamilyHub's look should match the
-*polish and intuitiveness* of **CinephileHub and Datumology** as a **quality bar, not a
-style to copy** (brief Cowork as "the world's best web designer"). FamilyHub has its
-own warm, cross-generational identity — it must not be a Cinephile clone.
+Durable visual constraints (verifiable, cross-WP):
+- Accessible: large readable type, big tap targets, WCAG-AA contrast on every surface
+  (including dark), forgiving forms.
+- Calm by design — must not overwhelm ADD or anxious visitors: generous whitespace, one
+  primary action per screen, progressive disclosure. Interest comes from imagery and
+  type, never density.
+- Cross-generational appeal goal — three generations at once, WITH a deliberate lean
+  toward the youngest generation to drive engagement and adoption (parents motivated;
+  Wes's generation warming; the nephew's generation pulled in by how it looks before
+  they know why it matters).
+- Identity guardrail: distinctive, characterful, polished to the Datumology/CinephileHub
+  quality bar — not a clone, never corporate.
+- Imagery as texture: family photos and "interesting family facts" may be woven
+  throughout, but must NEVER crowd the controls (subordinate to calm + accessibility).
 
-**Goal:** appeal across three generations at once —
-- **Parents (motivated):** want to preserve and pass on history — make it warm,
-  dignified, easy.
-- **Wes's generation (warming up):** make discovery feel rewarding and a little
-  addictive.
-- **Nephew's generation (not yet interested):** make it visually fun enough to pull
-  them in before they know why it matters.
-
-**Design directives:**
-- **Polished, characterful, and fun** — not a business CRUD form. Distinctive
-  typography, a warm inviting palette, tasteful motion.
-- **Family photos and "interesting family facts" woven throughout** — scattered around
-  and offsetting the UI as visual texture, never crowding the controls.
-- **Calm by design — must not overwhelm ADD or anxious visitors.** Generous
-  whitespace, clear visual hierarchy, one primary action per screen, progressive
-  disclosure (don't show everything at once). Visual interest comes from imagery and
-  type, not from density.
-- **Elderly-accessible at the same time:** large readable type, big tap targets, high
-  contrast, forgiving forms. (Polish and accessibility are not in tension here —
-  both favor clarity and space.)
+The expression of the above (exact palette/hex, fonts, dark/light, motion, component
+look) lives in docs/FRONTEND_DESIGN.md and is Cowork's to evolve.
 
 ---
 
@@ -396,8 +396,9 @@ Build ONE work package at a time; phase-gate review before the next.
 - **WP2 – Backend CRUD.** Service + REST-shaped route layer for individuals, families,
   events, sources, media, notes. *pytest each resource.* **Deliverable: the API
   contract** (endpoints + JSON shapes) — the interface the frontend builds against.
-- **WP3 – Frontend.** Cowork builds the UI per the §5B design brief against the WP2
-  API contract. Elderly-accessible + cross-generational polish.
+- **WP3 – Frontend.** Cowork builds the UI per the §5B constraints (design language in
+  `docs/FRONTEND_DESIGN.md`) against the WP2 API contract. Elderly-accessible +
+  cross-generational polish.
 - **WP4 – The Views & Search.** Tree/fan chart, timeline, album, memory blog, and a
   rich **Search** interface — all queries against the existing schema. (See §12.)
 - **WP5 – Deploy.** AWS Lightsail, gunicorn + nginx, SSL, DNS, nightly backups.
@@ -426,7 +427,8 @@ Build ONE work package at a time; phase-gate review before the next.
   backups, Docker, deployment. Commits as it goes.
 - **Cowork → front-end ONLY.** **HTML (Jinja2 templates), CSS, and vanilla JS — with
   UX and UI as first-class concerns** — for the v1 ("Full") site, per the §5A depth
-  bar and §5B design brief. Cowork does **not** own the backend, infra, or
+  bar and §5B constraints (the living design language is `docs/FRONTEND_DESIGN.md`).
+  Cowork does **not** own the backend, infra, or
   deployment — that's Code's domain. This is *less* than a normal Cowork "Scope B"
   site, so the Cowork project's "outgrown → split out" rule is **explicitly waived**
   for FamilyHub.
@@ -476,6 +478,20 @@ Code and Cowork must not write the same file. Split it:
 Owner: Claude Code — the README is repo presentation, which is Code's domain (Cowork is frontend-only). 
 Keep it accurate at each WP boundary (never describing removed features), and deliver the definitive, 
 capstone-grade professional rewrite by WP5 at the latest, matching the polish of the original presentation.
+
+### Document map & ownership (RACI)
+Who owns which document, and how each one changes:
+- **`docs/MASTER_PLAN.md`** — the durable **baseline** (requirements, schema, scope,
+  security, architecture, process). **Owner: Code.** Changes go through §11 Tier 1 +
+  a version bump.
+- **`docs/FRONTEND_DESIGN.md`** — the living **front-end design language** + design-
+  decision log + design parking lot. **Owner: Cowork.** Changes freely *within* the §5B
+  constraints (§11 Tier 2), logged in its own decision log — no Master Plan revision.
+- **`DEVDIARY_BE.md`** (Code) · **`DEVDIARY_FE.md`** (Cowork) · **`DEVDIARY.md`** (index).
+- **`README.md`** — Code (repo presentation).
+- **`BLOCKERS.md`** — shared (the cross-builder handoff log).
+- **`docs/openapi.yaml`** — Code (the API contract); the front-end may add `text/html`
+  routes on its WP branch with Code's approval at merge (per the §7 branch-per-WP rule).
 
 ### Cross-builder blocker handoff (so you always know who to spin up)
 A builder will hit things only the *other* builder can fix (Cowork finds a missing or
@@ -557,7 +573,7 @@ constraint is build time.
 
 ---
 
-## 11. Change Management & Parking Lot (Project+ change control)
+## 11. Change Management & Parking Lots (Project+ change control)
 
 New ideas or changes after handoff go through a lightweight Project+ flow instead of
 derailing an in-flight work package:
@@ -567,11 +583,29 @@ derailing an in-flight work package:
 3. **Decide** — approve into a WP, or **park** it.
 4. **Assign** — give approved changes a target WP.
 
-**Parking Lot (captured, not scheduled)** — revisit after the initial site is seen:
+### Two tiers of change (baseline vs. design)
+Not every change is the same weight. Route each by which document it touches:
+- **Tier 1 — Baseline (`docs/MASTER_PLAN.md`).** Any change to requirements, schema,
+  scope, security, architecture, process, or **any §5B visual constraint** → log it,
+  assess impact, **Wes approves**, then **version bump + a Revision History line**.
+- **Tier 2 — Design (`docs/FRONTEND_DESIGN.md`).** Visual/UX *expression* within the §5B
+  constraints (palette, fonts, dark/light, motion, component look) → **Cowork changes
+  directly** and logs it in that doc's design-decision log; **no Master Plan revision**.
+- **Escalation (Tier 2 → Tier 1).** A design idea that would **breach a §5B constraint**,
+  or that needs **new functionality/endpoints**, escalates to Tier 1: log it, Wes
+  approves, the baseline is updated before it ships.
+
+### Parking lots (two of them — captured, not scheduled)
+- **Master Plan parking lot (below)** — larger **feature / functionality** ideas
+  (Tier-1 scope), revisited after the initial site is seen.
+- **`docs/FRONTEND_DESIGN.md` parking lot** — the **visual / design** brainstorm
+  (Tier-2), Cowork's to keep.
+
+**Master Plan parking lot:**
 - Per-member **dashboard** (FamilySearch-style "my contributions" summary).
 - **Browse-vs-edit UX** split (subtle edit icon → inline/popup edit) so editing
   controls never intrude on the reading experience.
-- (Add future ideas here rather than expanding MVP scope.)
+- (Add future *feature* ideas here rather than expanding MVP scope.)
 
 ---
 
@@ -593,6 +627,12 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- v1.3 — 2026-06-18 — Separated fluid design from the baseline: trimmed §5B to durable
+  Visual Requirements & Constraints (accessibility, calm-by-design, cross-generational
+  goal with a lean toward the youngest generation, identity guardrail, imagery-as-
+  texture) and moved the living visual/UX design language to a new Cowork-owned
+  docs/FRONTEND_DESIGN.md. Added a document map + RACI (§7) and a two-tier change-control
+  model + dual parking lots (§11). (Raised by Wes.)
 - v1.2 — 2026-06-18 — Added the **branch-per-work-package** workflow to §7: each WP is
   built on its own branch off master; tests may be red on-branch (WIP); a branch merges
   to master only when green (the CI merge gate), so master is always green; cross-lane
