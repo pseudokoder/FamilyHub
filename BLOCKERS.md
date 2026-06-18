@@ -70,6 +70,15 @@ so there are no cross-builder blockers right now.
 Recorded here per the WP1 instruction to "note any conflicts with the Master
 Plan." These are **resolved decisions**, not blockers.
 
+### [RESOLVED] Adopted feature-branch-per-WP workflow
+- Date: 2026-06-18 · Raised by: Wes (management)
+- Change: per-WP branches off master; red tests allowed on-branch; merge to master
+  only when green (CI gate); FE may edit docs/openapi.yaml on-branch w/ Code approval
+  at merge; Wes integrates.
+- Rationale: contract-first + trunk-protection best practice; contains WIP red tests
+  without weakening the Definition of Done on master.
+- Status: RESOLVED 2026-06-18 — docs updated; wp3-frontend-crud branch created.
+
 ### [RESOLVED] `audit_log` kept even though it's not in the §3 table list
 - Date: 2026-06-16 · Raised by: Code
 - The §3 schema lists 15 tables; `audit_log` isn't one of them. It was kept as

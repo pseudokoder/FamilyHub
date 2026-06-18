@@ -17,9 +17,14 @@
 
 name: CI
 
+# Runs on master, on every work-package branch (wp*), and on every pull request.
+# This is the MERGE GATE for the branch-per-WP workflow (Master Plan §7): a WP
+# branch may be red mid-build, but the green check is required to merge to master
+# — so master is always green. The pull_request trigger covers any PR into master;
+# the wp* push trigger gives on-branch feedback while the work is in progress.
 on:
   push:
-    branches: [master]
+    branches: [master, "wp*"]
   pull_request:
 
 jobs:

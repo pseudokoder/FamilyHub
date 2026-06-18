@@ -4,7 +4,7 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 1.1** · Last updated 2026-06-16 · Status: WP1 complete; WP2 next.
+**Version 1.2** · Last updated 2026-06-18 · Status: WP2 complete; WP3 next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version and add a line to the Revision History (bottom).*
 ---
@@ -48,11 +48,11 @@ a patch, per this map:
                     └─────────────────────────────────┘
                                    ▲
               ┌──────────┬─────────┼─────────┬──────────┐
-              │          │         │          │          │
+              │          │         │         │          │
           Family      Person    Time-      Photo      Memory
-          Tree /       Page      line       Album      Blog
+          Tree /       Page      line      Album      Blog
           Fan Chart   (Wiki)
-              │          │         │          │          │
+              │          │         │         │          │
          INDI+FAM    one INDI   events    OBJE media   NOTE/SNOTE
          links       + facts    by DATE   (images)     narratives
 ```
@@ -456,6 +456,16 @@ Only one builder is active at a time, except WP4's controlled interleave.
 
 **The one rule that matters most:** Cowork does not start until WP2's contract exists.
 
+### Branch-per-work-package (trunk protection / the merge gate)
+Each WP is built on its **own branch off master** (e.g., `wp3-frontend-crud`).
+Tests MAY be red on a WP branch while it's mid-build (expected work-in-progress).
+A branch merges to master **ONLY when the full suite is green — the CI merge
+gate**. **master is always green.** Cross-lane contract edits (e.g., the
+front-end adding `text/html` routes to `docs/openapi.yaml`) are allowed **on the
+WP branch**; the owning builder (Code) reviews/approves them at merge. **Wes is
+the integrator:** he reviews and merges/pushes. One builder active at a time
+still holds.
+
 ### Two dev diaries (avoid the write conflict)
 Code and Cowork must not write the same file. Split it:
 - **`DEVDIARY_BE.md`** — backend (Code). H1 title: "FamilyHub — Backend Dev Diary."
@@ -583,6 +593,11 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- v1.2 — 2026-06-18 — Added the **branch-per-work-package** workflow to §7: each WP is
+  built on its own branch off master; tests may be red on-branch (WIP); a branch merges
+  to master only when green (the CI merge gate), so master is always green; cross-lane
+  contract edits are allowed on-branch with the owning builder's approval at merge; Wes
+  integrates. (Raised by Wes, 2026-06-18.)
 - v1.1 — 2026-06-16 — Added README ownership/maintenance directive (Code owns it; keep 
   accurate per WP; definitive professional rewrite due by WP5). (§7)
 - **v1.0 — 2026-06-16** — Initial locked plan: Path A re-foundation, GEDCOM-7 schema,

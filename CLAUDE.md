@@ -61,8 +61,13 @@ sibling Cowork project).
   — except for genuine cross-boundary blockers (use `BLOCKERS.md`, above).
 - Ambiguous mid-build? Make the simplest reasonable choice, document it in
   `DEVDIARY_BE.md` under "Decisions Made Without Wes," and keep going.
-- **One work package at a time** (Master Plan §6). Every session ends with the
-  app in a complete, running state — no broken builds.
+- **One work package at a time** (Master Plan §6), each on its **own branch off
+  master** (e.g., `wp3-frontend-crud`). **Branch-per-WP (Master Plan §7):** tests
+  MAY be red on a WP branch mid-build (expected WIP); a branch merges to master
+  **only when the full suite is green** (the CI merge gate). So **master stays
+  green via the merge gate**, and every WP branch ends in a **known state** —
+  green, or red with the remaining work written down in `DEVDIARY_BE.md`. Wes is
+  the integrator (reviews + merges/pushes).
 - **Verify your own work with pytest** — never pause to ask Wes to manually test.
   Browser-only checks go in the **Manual Testing Checklist** in `DEVDIARY_BE.md`,
   cleared once at each WP boundary.
