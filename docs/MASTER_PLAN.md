@@ -332,11 +332,7 @@ Logged-in members can:
 - **Write memories** (Markdown) attached to people or events
 - **Admin panel** (admin role): manage users, edit site text, verify backups
 
-[↑ Back to Contents](#contents)
-
----
-
-## 5A. Build Quality Bar — Depth, Not Stubs
+### 5A. Build Quality Bar — Depth, Not Stubs
 
 The first build failed by over-simplifying every feature into a hollow shell (e.g.
 "Memories" was two blank fields — no who, when, where, or photo). The rework's
@@ -364,11 +360,7 @@ non-negotiable quality bar:
   (FE-owned); §5A still sets the **depth** bar — every user-meaningful field must be
   capturable, however the page chooses to present it.
 
-[↑ Back to Contents](#contents)
-
----
-
-## 5B. Visual *Requirements* & Constraints (frontend)
+### 5B. Visual *Requirements* & Constraints (frontend)
 
 _(Intentionally empty. Visual requirements/constraints will be re-introduced here after the
 front end is built, stable, and tested — see docs/FRONTEND_DESIGN.md → Design Parking Lot for
