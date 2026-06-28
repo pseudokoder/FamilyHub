@@ -4,7 +4,7 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 1.3** · Last updated 2026-06-18 · Status: WP2 complete; WP3 next.
+**Version 1.4** · Last updated 2026-06-28 · Status: WP2 complete; WP3 next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version and add a line to the Revision History (bottom).*
 ---
@@ -338,30 +338,10 @@ non-negotiable quality bar:
 ---
 
 ## 5B. Visual *Requirements* & Constraints (frontend)
-Functionality models FamilySearch; appearance must NOT (FamilySearch looks corporate
-because its goal is data, not delight). The full, living visual + UX design language —
-palette, typography, motion, components, theme — is owned by Cowork in
-docs/FRONTEND_DESIGN.md, which Cowork may change freely WITHIN the constraints below
-(see §11 two-tier change control). This section holds only the durable constraints that
-do NOT change between work packages.
 
-Durable visual constraints (verifiable, cross-WP):
-- Accessible: large readable type, big tap targets, WCAG-AA contrast on every surface
-  (including dark), forgiving forms.
-- Calm by design — must not overwhelm ADD or anxious visitors: generous whitespace, one
-  primary action per screen, progressive disclosure. Interest comes from imagery and
-  type, never density.
-- Cross-generational appeal goal — three generations at once, WITH a deliberate lean
-  toward the youngest generation to drive engagement and adoption (parents motivated;
-  Wes's generation warming; the nephew's generation pulled in by how it looks before
-  they know why it matters).
-- Identity guardrail: distinctive, characterful, polished to the Datumology/CinephileHub
-  quality bar — not a clone, never corporate.
-- Imagery as texture: family photos and "interesting family facts" may be woven
-  throughout, but must NEVER crowd the controls (subordinate to calm + accessibility).
-
-The expression of the above (exact palette/hex, fonts, dark/light, motion, component
-look) lives in docs/FRONTEND_DESIGN.md and is Cowork's to evolve.
+_(Intentionally empty. Visual requirements/constraints will be re-introduced here after the
+front end is built, stable, and tested — see docs/FRONTEND_DESIGN.md → Design Parking Lot for
+candidates.)_
 
 ---
 
@@ -627,6 +607,9 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- v1.4 — 2026-06-28 — Emptied §5B durable visual constraints (moved to FRONTEND_DESIGN.md
+  design parking lot as post-stable candidates); §5B left as a placeholder to be re-populated
+  after the front end is built and tested. (Approved by Wes.)
 - v1.3 — 2026-06-18 — Separated fluid design from the baseline: trimmed §5B to durable
   Visual Requirements & Constraints (accessibility, calm-by-design, cross-generational
   goal with a lean toward the youngest generation, identity guardrail, imagery-as-
