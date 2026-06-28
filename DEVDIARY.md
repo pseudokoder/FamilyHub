@@ -31,6 +31,7 @@ at the same time (Master Plan §7).
 
 ## Current status
 
-WP1 (Database Foundation) is complete — see `DEVDIARY_BE.md` → "WP1 — Database
-Foundation." Next: **WP2 (Backend CRUD + API contract)**, which produces the
-interface Cowork builds the front-end against.
+- **WP1** (Database Foundation) — complete. See `DEVDIARY_BE.md` → "WP1."
+- **WP2** (Backend CRUD + API contract + RBAC) — complete. See `DEVDIARY_BE.md` → "WP2."
+- **WP3** (Front-end Chronicle home page) — implementation complete on
+  `wp3-frontend-crud`; pending Wes review + merge. See `DEVDIARY_FE.md` → "WP3."

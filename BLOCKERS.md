@@ -37,9 +37,17 @@ Entry format:
 
 ## Open items
 
-_None._ WP1 is a backend-only work package (database foundation); **the Frontend
-Builder (FE) is idle until the WP2 API contract is published** (Master Plan §7 build
-sequence), so there are no cross-builder blockers right now.
+### [OPEN] FE touched `app/routes/main.py` — BE review at merge
+
+- Date: 2026-06-28
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE must): review the one-line routing change in `app/routes/main.py`
+  (`render_template("index.html", ...)` → `render_template("dashboard.html", ...)`
+  inside the `if current_user.is_authenticated:` branch). This is view-routing
+  only — no business logic, no schema, no endpoints changed. Confirm it doesn't
+  break any existing BE tests and sign off at merge time.
+- Status: OPEN — awaiting BE review at WP3 merge.
 
 ---
 

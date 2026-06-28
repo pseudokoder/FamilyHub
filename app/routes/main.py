@@ -27,8 +27,10 @@ def home():
     # Settings only matter for the logged-in dashboard; don't even query
     # them for anonymous visitors.
     if current_user.is_authenticated:
+        # FE(WP3): authenticated users go to dashboard.html (extends base.html);
+        # index.html is now the standalone Chronicle public home page.
         return render_template(
-            "index.html",
+            "dashboard.html",
             tagline=settings_service.get("tagline"),
             hero_exists=settings_service.hero_exists(),
         )

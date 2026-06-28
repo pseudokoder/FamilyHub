@@ -1,0 +1,42 @@
+{# dashboard.html — the authenticated home page (the family's "what now?" screen).
+   Extends base.html; logged-in users are routed here from app/routes/main.py.
+   Content is unchanged from the original index.html authenticated block —
+   only the file boundary changed (index.html is now the standalone Chronicle
+   public home; this file carries the Bootstrap dashboard for logged-in users).
+   -> WGU: D276 (template inheritance), D280 (Flask/Jinja2 routing). #}
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+    {% if hero_exists is defined and hero_exists %}
+    <img src="{{ url_for('main.hero_image') }}" alt="Our family"
+         class="img-fluid rounded mb-4 w-100 hero-banner">
+    {% endif %}
+
+    <h1 class="display-5 mb-2">Welcome, {{ current_user.display_name }}!</h1>
+    {% if tagline is defined and tagline %}
+    <p class="lead">{{ tagline }}</p>
+    {% else %}
+    <p class="lead">What would you like to do today?</p>
+    {% endif %}
+
+    {# WP1 RE-FOUNDATION: the dashboard buttons (Photos, Memories, Wiki,
+       Timeline) pointed at the old feature pages, which have been removed while
+       the app is rebuilt on the GEDCOM-7 genealogy core. WP2/WP3 (Cowork)
+       rebuild these as views of the new schema and restore the buttons here. #}
+    <div class="row mt-4">
+        <div class="col-md-8 col-lg-6">
+            <div class="alert alert-info" role="alert">
+                <h2 class="h5">We're rebuilding the family pages 🛠️</h2>
+                <p class="mb-0">
+                    FamilyHub is being rebuilt on a proper family-tree database so
+                    your photos, memories, people, and timeline all connect to one
+                    another. The pages will return here soon.
+                </p>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
