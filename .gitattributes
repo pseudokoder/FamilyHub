@@ -6,6 +6,16 @@
 # and Linux looks for an interpreter literally named "sh\r". Boot failure
 # inside Docker, invisible in the editor. These rules pin the files where
 # endings MATTER to LF everywhere, no matter who checks out where.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.yml text eol=lf
