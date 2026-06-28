@@ -23,12 +23,12 @@ Boot/Angular/MySQL/Docker). Never use "Lite" here (it means something else in th
 sibling Cowork project).
 
 ## Who Builds What (two builders, one repo — Master Plan §7)
-- **Claude Code → backend + the whole repo/infra.** GEDCOM-7 schema, models,
+- **Backend Builder (BE) → backend + the whole repo/infra.** GEDCOM-7 schema, models,
   migrations, services, REST routes, pytest, seed data, backups, Docker, deploy.
-- **Cowork → front-end ONLY.** Jinja templates, CSS, vanilla JS — UX/UI as
+- **Frontend Builder (FE) → front-end ONLY.** Jinja templates, CSS, vanilla JS — UX/UI as
   first-class concerns — built against the WP2 API contract.
-- **Only one builder is active at a time** (Wes is the switch operator). Cowork
-  does **not** start until WP2's contract exists.
+- **Only one builder is active at a time** (Wes is the switch operator). The Frontend
+  Builder (FE) does **not** start until WP2's contract exists.
 - Wes reviews, learns, and gives feedback; he is **not** writing code alongside
   you. Deliver complete, working, reviewable work — no TODOs left for him.
 
@@ -49,8 +49,8 @@ sibling Cowork project).
   covers this normalization rule") and the **v2 Spring Boot mapping**.
 - **Dev diaries are required, living deliverables** (split so the two builders
   never edit the same file — Master Plan §7):
-  - [`DEVDIARY_BE.md`](DEVDIARY_BE.md) — backend (Code).
-  - [`DEVDIARY_FE.md`](DEVDIARY_FE.md) — frontend (Cowork). **Code does not write
+  - [`DEVDIARY_BE.md`](DEVDIARY_BE.md) — backend (BE).
+  - [`DEVDIARY_FE.md`](DEVDIARY_FE.md) — frontend (FE). **BE does not write
     this file.**
   - [`DEVDIARY.md`](DEVDIARY.md) — thin index pointing to both.
 - Comments + dev diaries together should let a beginner-to-intermediate Python
@@ -100,7 +100,7 @@ not user input.)
 SUBM (submitters), video/audio, merge, change-history/restore. Full GEDCOM-7
 file import/export is tentative v1 **WP6**, firm v2.
 
-## UX/UI (Master Plan §5B — Cowork owns this)
+## UX/UI (Master Plan §5B — Frontend Builder (FE) owns this)
 Cross-generational warmth + **elderly-accessible**: large readable type, big tap
 targets, high contrast, forgiving forms, minimal nav depth. Polished and
 characterful (quality bar: Cinephile/Datumology — not a clone), calm by design
@@ -155,11 +155,11 @@ manifest) as the zero-data-loss guarantee. Document the v1→v2 mapping in
   coverage** (floor 90%). See `DEVDIARY_BE.md` "WP2."
 - `BLOCKERS.md`: no open cross-builder blockers; the `users` §3.5 item is RESOLVED.
 
-## Next Build Target — WP3 (Front-end, Cowork)
+## Next Build Target — WP3 (Front-end, Frontend Builder (FE))
 Per Master Plan §6 build order (one work package at a time; **branch-per-WP** per
 §7 — WP3 is built on the **`wp3-frontend-crud`** branch off master):
-1. **WP3 — Front-end (Cowork).** The elderly-accessible, cross-generational CRUD
+1. **WP3 — Front-end (Frontend Builder (FE)).** The elderly-accessible, cross-generational CRUD
    UI (Master Plan §5A depth bar / §5B design brief), built against the WP2 API
-   contract in `docs/openapi.yaml`. Cowork owns Jinja templates, CSS, vanilla JS;
-   **Code does not build genealogy UI** — it's on-call for contract fixes.
+   contract in `docs/openapi.yaml`. The Frontend Builder (FE) owns Jinja templates, CSS, vanilla JS;
+   **the Backend Builder (BE) does not build genealogy UI** — it's on-call for contract fixes.
 2. Then WP4 (views + search UI) → WP5 (deploy) → WP6 (GEDCOM import/export, tentative).

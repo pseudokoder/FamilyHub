@@ -1,10 +1,10 @@
 # BLOCKERS — Cross-Builder Blocker Handoff Log
 
-> **Two builders, one repo.** **Claude Code** owns the backend + the whole
-> repo/infra; **Cowork** owns the front-end (Jinja templates, CSS, vanilla JS).
-> A builder will sometimes hit a wall only the *other* builder can fix (Cowork
-> finds a missing or wrong endpoint; Code finds the front-end needs a different
-> data shape). This file is how that handoff happens without anyone faking a
+> **Two builders, one repo.** The **Backend Builder (BE)** owns the backend + the
+> whole repo/infra; the **Frontend Builder (FE)** owns the front-end (Jinja templates,
+> CSS, vanilla JS). A builder will sometimes hit a wall only the *other* builder can
+> fix (the FE finds a missing or wrong endpoint; the BE finds the front-end needs a
+> different data shape). This file is how that handoff happens without anyone faking a
 > dependency. (Master Plan §7.)
 
 ## The protocol — read this, then the open items
@@ -15,7 +15,7 @@
 2. **Never fake or stub around a cross-boundary blocker.** That's what produced
    the hollow first build. Stop *that item*; continue other in-scope work if
    it's safe to.
-3. **Log it here** as an `OPEN` entry with: date · raised-by (Code/Cowork) ·
+3. **Log it here** as an `OPEN` entry with: date · raised-by (BE/FE) ·
    what's blocked · exactly what the other builder must do · status.
 4. **Surface it in your end-of-session summary** so Wes sees it and knows which
    tool to spin up next.
@@ -27,7 +27,7 @@ Entry format:
 ```
 ### [OPEN|RESOLVED] <short title>
 - Date: YYYY-MM-DD
-- Raised by: Code | Cowork
+- Raised by: BE | FE
 - Blocks: <what can't proceed>
 - Needs (the other builder must): <the exact action required>
 - Status: <OPEN / RESOLVED on YYYY-MM-DD — how>
@@ -37,9 +37,9 @@ Entry format:
 
 ## Open items
 
-_None._ WP1 is a backend-only work package (database foundation); **Cowork is
-idle until the WP2 API contract is published** (Master Plan §7 build sequence),
-so there are no cross-builder blockers right now.
+_None._ WP1 is a backend-only work package (database foundation); **the Frontend
+Builder (FE) is idle until the WP2 API contract is published** (Master Plan §7 build
+sequence), so there are no cross-builder blockers right now.
 
 ---
 
