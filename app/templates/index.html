@@ -45,7 +45,7 @@
 
 <body data-page="home">
 
-  <a href="#main" class="skip-link">Skip to content</a>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
   {# INTRO SPLASH — tree animation blooms, then logo flies up to the nav. #}
   <div class="splash" id="splash" aria-hidden="true">
@@ -97,7 +97,20 @@
     </div>
   </header>
 
-  <main id="main">
+  {# Flash messages — appear after login/logout redirect. Styled in
+     Chronicle's palette via .flash-tray / .flash-msg (chronicle-main.css).
+     -> WGU: D280 (Flask sessions), D276 (Jinja2 templating) #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-tray" role="status" aria-live="polite">
+      {% for category, message in messages %}
+      <p class="flash-msg flash-msg--{{ category }}">{{ message }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <main id="main-content">
 
     <!-- ===================== HERO: TITLE CARD + LOGO SHOWPIECE ========= -->
     <section class="hero">

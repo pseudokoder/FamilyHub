@@ -326,3 +326,21 @@ p  { color: var(--ink-soft); max-width: 64ch; }
 
 /* Noscript fallback message styling (replaces inline style for CSP) */
 .noscript-msg { text-align: center; padding: 1rem; color: #5f5037; }
+
+/* Flash toasts — one-time redirect messages (logout confirm, login error).
+ * Fixed below the sticky masthead; Chronicle palette; no inline styles (CSP). */
+.flash-tray {
+  position: fixed; top: 4.5rem; left: 50%; transform: translateX(-50%);
+  z-index: 900; display: flex; flex-direction: column; gap: 0.4rem;
+  min-width: 18rem; max-width: min(42rem, 90vw); pointer-events: none;
+}
+.flash-msg {
+  padding: 0.65rem 1.25rem; border-radius: 2px;
+  font-family: var(--font-serif); font-size: 0.875rem;
+  text-align: center; letter-spacing: 0.01em; line-height: 1.4;
+  color: var(--on-frame); background: var(--rust);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.22);
+}
+.flash-msg--success { background: var(--blue); }
+.flash-msg--warning { background: var(--amber); color: var(--ink); }
+.flash-msg--danger  { background: var(--danger); }

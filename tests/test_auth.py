@@ -21,17 +21,22 @@ PROTECTED_ROUTES = [
 
 
 def test_home_is_public_but_empty(client):
+    # WP3: the public home is now the Chronicle landing page (standalone
+    # template, no base.html).  Old copy ("Welcome to FamilyHub", "family
+    # only", "Log In") is gone; the contract is:
+    #   1. publicly reachable (200, no redirect)
+    #   2. a working path to the login page is present
+    #   3. no authenticated-session / real-member content is shown
     response = client.get("/")
     assert response.status_code == 200
-    assert b"Log In" in response.data
-    # The public landing page DESCRIBES features (a "what's inside" strip)
-    # but exposes zero real family content — no albums, posts, names, or
-    # the logged-in dashboard's navigation links.
-    assert b"Welcome to FamilyHub" in response.data
-    assert b"family only" in response.data  # the privacy reassurance footer
-    # No actual family content / member-only nav for anonymous visitors.
-    assert b"What's New" not in response.data
+    # All Chronicle CTAs ("Enter archive", "Open the archive", etc.) resolve
+    # to url_for('auth.login') — the literal path must appear in the HTML.
+    assert b"/auth/login" in response.data
+    # Demo data (SAMPLE_DATA: fictional Rivera/Okafor/Vega family) is
+    # intentional and not PII.  What must NOT appear is any content that
+    # belongs to an authenticated session.
     assert b"Log Out" not in response.data
+    assert b"What&#39;s New" not in response.data
 
 
 def test_skip_link_is_present(client):
