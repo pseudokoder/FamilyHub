@@ -37,7 +37,9 @@ Entry format:
 
 ## Open items
 
-### [OPEN] FE touched `app/routes/main.py` — BE review at merge
+_None._
+
+### [RESOLVED] FE touched `app/routes/main.py` — BE review at merge
 
 - Date: 2026-06-28
 - Raised by: FE
@@ -47,7 +49,8 @@ Entry format:
   inside the `if current_user.is_authenticated:` branch). This is view-routing
   only — no business logic, no schema, no endpoints changed. Confirm it doesn't
   break any existing BE tests and sign off at merge time.
-- Status: OPEN — awaiting BE review at WP3 merge.
+- Status: RESOLVED 2026-06-29 — tests green (139/139); view-routing only, no
+  business logic/schema/endpoints changed; BE sign-off complete.
 
 ---
 

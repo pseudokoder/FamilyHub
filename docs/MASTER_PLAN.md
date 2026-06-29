@@ -3,7 +3,7 @@
 > The single source of truth for the project's architecture, schema, scope, and
 > roadmap. Build one piece at a time; review each piece before starting the next.
 
-**Version 1.5.0** · Last updated 2026-06-28 · Status: WP2 complete; WP3 next.
+**Version 1.6.0** · Last updated 2026-06-29 · Status: WP2 complete; WP3 next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version and add a line to the Revision History (bottom).*
 ---
@@ -642,6 +642,28 @@ not carry a Master Plan version bump.
 - Per-member **dashboard** (FamilySearch-style "my contributions" summary).
 - **Browse-vs-edit UX** split (subtle edit icon → inline/popup edit) so editing
   controls never intrude on the reading experience.
+- **Public surface + PII guardrail.** A curated public landing — not a separate
+  feature, but a filtered view of the existing database ("One Database, Many Views").
+  Key decisions to carry in:
+  - **Per-item "public" flag** (default OFF) on individuals, photos, stories, and
+    events; an admin marks specific items public; the public page renders only flagged
+    items.
+  - **Living-person guardrail** — `living = true` individuals are NEVER eligible for
+    the public flag (enforced by the existing `living` field + §9; no exceptions).
+  - **Admin PII-gate** — before any item goes public, the admin console shows a
+    preview of exactly what would appear, warns/blocks on living-person data and flags
+    likely PII (DOB, places, contact info), requires explicit confirmation, and writes
+    an `audit_log` entry.
+  - **Configurable public layout** — the public page is composed of admin-toggled /
+    editable / reorderable sections, so marketing-only sections (e.g. a "Begin your
+    family's archive" CTA) can be removed or edited without code changes; section copy
+    uses the existing `site_settings` table.
+  - **Chronicle shared design system** — the public landing and the logged-in app
+    share one design language ("Chronicle"), including a Chronicle-consistent restyle
+    of the logged-in dashboard.
+  - **Scope + sequence:** spans BE (public flag + API + gate logic + serving rules)
+    and FE (curated public rendering + admin curation/layout UI + dashboard restyle).
+    Schedule as a focused WP after WP3 (core front-end CRUD UI) is complete.
 - (Add future *feature* ideas here rather than expanding MVP scope.)
 
 [↑ Back to Contents](#contents)
@@ -668,6 +690,12 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- v1.6.0 — 2026-06-29 — Parked the public-surface + PII-gate model in §11: curated
+  public view of the database (per-item "public" flag, default OFF; `living`-person
+  guardrail via §9; admin PII-gate + preview + `audit_log`; configurable section
+  layout via `site_settings`; Chronicle shared design system spanning public and
+  logged-in app). MINOR bump — parking-lot capture only; no scope committed.
+  (Approved by Wes.)
 - v1.5.0 — 2026-06-28 — Adopted SemVer (MAJOR.MINOR.PATCH; prior 1.4 = 1.4.0) with
   defined change tiers in §11; generalized the builder model to implementer-agnostic
   roles Frontend Builder (FE) / Backend Builder (BE) — implementer is now assigned at
