@@ -39,7 +39,7 @@ const SAMPLE_DATA = {
       ['NAME', 'Rosa María Vega'], ['BORN', 'May 1951 · San Antonio, TX'],
       ['DIED', 'Mar 2019 · Spring Hill, TN'], ['ROLE', 'Great-grandmother'], ['FILED', '38 yrs · schoolteacher']
     ],
-    quote: 'She kept a tin of butter cookies on the top shelf and a story for every one of us. The whole family ran on Sunday afternoons at Rosa's table.',
+    quote: 'She kept a tin of butter cookies on the top shelf and a story for every one of us. The whole family ran on Sunday afternoons at Rosa\'s table.',
     by: '— Narrated by Sofía Rivera, 2024'
   },
   events: [
@@ -51,7 +51,7 @@ const SAMPLE_DATA = {
     { year: 2017, title: 'Mateo Rivera is born',            place: 'Spring Hill, TN', cap: 'Mateo arrives',  tones: ['#caa066', '#43301a'] }
   ],
   photos: [
-    { kind: 'photo', cap: 'Sunday at Rosa's', date: 'c. 1971', size: 'cell--wide cell--tall', tones: ['#bd8a4e','#3a2714'] },
+    { kind: 'photo', cap: 'Sunday at Rosa\'s', date: 'c. 1971', size: 'cell--wide cell--tall', tones: ['#bd8a4e','#3a2714'] },
     { kind: 'photo', cap: 'Wedding day',      date: '1962',    size: '', tones: ['#c0894c','#33230f'] },
     { kind: 'photo', cap: 'First steps',      date: '2018',    size: '', tones: ['#caa066','#43301a'] },
     { kind: 'note',  q: '"Abuelo taught me to whistle on the porch in San Antonio."', by: '— Diego, 1992', size: 'cell--wide' },
@@ -117,14 +117,21 @@ document.addEventListener('DOMContentLoaded', function() {
     var vid    = document.getElementById('splashVid');
     var logoEl = document.getElementById('splashLogo');
     var skip   = document.getElementById('splashSkip');
-    var done   = false;
+    var done          = false;
+    var hardTimeout;
     document.body.style.overflow = 'hidden';
     var finish = function() {
+      /* Hard-timeout guard: clear the fallback before checking done so a
+       * normal finish and a timeout finish don't race. */
+      clearTimeout(hardTimeout);
       if (done) return; done = true;
       splash.style.transition = 'opacity 0.5s ease'; splash.style.opacity = '0';
       document.body.style.overflow = '';
       setTimeout(function() { splash.remove(); }, 560);
     };
+    /* ~3 s hard maximum — ensures the splash never blocks the page even if
+     * the video stalls or the logo-flip animation misfires. */
+    hardTimeout = setTimeout(finish, 3000);
     var flyToNav = function() {
       var nav = document.querySelector('.site-header .brand__mark');
       if (nav && logoEl) {
