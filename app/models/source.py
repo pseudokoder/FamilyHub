@@ -18,6 +18,7 @@ v2 mapping: three `@Entity` classes with `@ManyToOne` links up the chain.
 """
 
 from app.extensions import db
+from app.models.mixins import SoftDeleteMixin
 
 
 class Repository(db.Model):
@@ -37,7 +38,7 @@ class Repository(db.Model):
         return f"<Repository #{self.id} {self.name!r}>"
 
 
-class Source(db.Model):
+class Source(SoftDeleteMixin, db.Model):
     """A whole source document — GEDCOM SOUR."""
 
     __tablename__ = "sources"
@@ -65,7 +66,7 @@ class Source(db.Model):
         return f"<Source #{self.id} {self.title!r}>"
 
 
-class Citation(db.Model):
+class Citation(SoftDeleteMixin, db.Model):
     """One fact's pointer to one source — GEDCOM SOURCE_CITATION.
 
     POLYMORPHIC, like Event: a citation can back an individual, a family, an

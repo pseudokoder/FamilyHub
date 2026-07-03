@@ -33,16 +33,46 @@ textbook-style tour of how it was built. Contributors: [CONTRIBUTING.md](CONTRIB
 - **Search** — people by name (partial match) with filters (sex, living, birth
   year range, place) and full-text over notes/memories.
 - **Access control (RBAC)** — email login and a four-rung role ladder
-  (GUEST · USER · POWER\_USER · ADMIN) routed through a single authorization
-  layer; reads need a logged-in member, writes need at least USER.
+  (Viewer · Contributor · Curator · Admin) routed through a single authorization
+  layer; reads need a logged-in member, writes need at least Contributor.
+  Permissions are **modeled as data** (a role = a bundle of permission flags), so
+  new/custom roles are a data change later — with a read-only role→permission
+  matrix today.
+- **Write control (post-moderation)** — every create/update/delete is captured in
+  an **audit log with before/after snapshots**; delete is a **soft delete**
+  (recoverable), and a Curator can **restore** a deleted record or **revert** any
+  change from the audit trail (`/api/activity`, `/api/restore`,
+  `/api/audit/<id>/revert`).
+- **Account ↔ Person link** — a member account can be linked to its person in the
+  tree, so the tree roots on *you* and you can self-author your own record;
+  unlinked users fall back to the oldest ancestor as the root.
+- **Tree & relationships** — a pedigree/descendant **graph slice** from any node
+  (depth-bounded, lazy-expandable) and a **relationship finder** that names how
+  two people are related ("1st cousin once removed") with the path between them.
+- **Home & dashboard data** — aggregate **stats** (people, families, sources,
+  photos, storage…), an **"On This Day"** feed of family anniversaries, and a
+  bundled world/US **historical-events almanac** to give the timeline context.
 - **Media** — image uploads with **EXIF/GPS stripping** for privacy (a photo
   should show the family, not map their house), stored outside the web root and
   served only behind the login.
-- **Admin panel** — invite-only accounts (no public signup), editable site text,
-  one-click **verified backups** (off-site to S3), and an audit trail.
+- **Member requests** — a **suggestions inbox** (idea/bug/photo request → admin
+  triage with a prioritized queue) and **role-change requests** (a member asks to
+  be promoted; an admin approves, applying the change through the audit trail).
+- **Admin panel** — invite-only accounts (no public signup), a users view (role +
+  linked-person + verification status), **admin password-reset** (emails a link)
+  and a **secure change-email** flow (step-up re-auth, both addresses notified,
+  forced password reset), config-driven **site settings** (branding, security,
+  email, record defaults), a read-only **role→permission matrix**, and **backups**
+  with detail (size, disk headroom, schedule), a back-up-now action, and a
+  **guarded restore** (confirm + step-up + automatic safety backup first).
 - **Security** — bcrypt, CSRF everywhere (including the JSON API), strict CSP
-  (no `unsafe-inline`), login rate limiting, security headers, stateless
-  single-use password-reset emails.
+  (no `unsafe-inline`), security headers, and a **settings-driven baseline** an
+  admin can tune without a redeploy: min password length, **breach-list check**
+  (Have I Been Pwned via k-anonymity — only a hash prefix leaves the server),
+  per-IP login rate limiting **plus per-account lockout**, and session timeout.
+- **Transactional email** — configurable SMTP (host/port/user/from in settings,
+  the password in `.env`) powering self-serve **password reset** and **email
+  verification** for new/changed addresses, with an admin send-test.
 - **Ops** — health endpoint, one-command Docker run, GitHub Actions CI with a
   90% coverage floor, installable PWA with offline fallback, and a portable JSON
   data export (the v2 zero-data-loss guarantee).
@@ -115,6 +145,8 @@ The database, uploads, and backups live in bind-mounted folders (`instance/`,
 ```powershell
 flask db upgrade               # create/upgrade the database (runs migrations)
 flask seed                     # dev only: load demo users + 3 generations of data
+flask seed-historical          # load the world/US timeline almanac (prod-safe, idempotent)
+flask seed-settings            # seed admin/security/branding config defaults (prod-safe)
 flask create-admin <email>     # bootstrap the first admin account
 flask backup                   # full backup zip: DB + files, verified, S3 if configured
 flask restore-backup <zip>     # DESTRUCTIVE: restore DB + files from a backup

@@ -73,11 +73,14 @@ def test_media_links_inline_and_managed(member_client):
         f"/api/media/{media_id}/links/individual/{pid}").status_code == 204
 
 
-def test_delete_removes_files_from_disk(member_client):
+def test_delete_is_soft_and_keeps_files(member_client):
     media_id = _upload(member_client).get_json()["id"]
     media = db.session.get(MediaObject, media_id)
     path = media_service.disk_path(media)
     assert os.path.exists(path)
 
     member_client.delete(f"/api/media/{media_id}")
-    assert not os.path.exists(path)
+    # Soft delete (ADR-0001): the object reads as gone, but the bytes stay on disk
+    # so a Curator can restore it. The row is hidden, not the file destroyed.
+    assert member_client.get(f"/api/media/{media_id}").status_code == 404
+    assert os.path.exists(path)

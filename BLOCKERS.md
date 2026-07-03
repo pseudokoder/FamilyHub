@@ -37,8 +37,6 @@ Entry format:
 
 ## Open items
 
-_None._
-
 ### [RESOLVED] FE touched `app/routes/main.py` — BE review at merge
 
 - Date: 2026-06-28
@@ -51,6 +49,34 @@ _None._
   break any existing BE tests and sign off at merge time.
 - Status: RESOLVED 2026-06-29 — tests green (139/139); view-routing only, no
   business logic/schema/endpoints changed; BE sign-off complete.
+
+### [RESOLVED] Provided files for the docs reconciliation were missing from the tree
+- Date: 2026-07-03 (raised) → 2026-07-03 (resolved)
+- Raised by: Code
+- Was blocking: **Task A** of the docs-reconciliation run — committing the two
+  Wes-authored files **as-is** (the brief says *do not rewrite* them, so Code did
+  not author them):
+  1. `docs/adr/0002-account-person-link.md` (ADR-0002, Accepted)
+  2. `docs/CONTEXT_LOG.md` (cross-thread operational log)
+- Status: **RESOLVED 2026-07-03** — Wes placed both files; Code committed them
+  unmodified. The ADR index and Master Plan v2.0.0 references to ADR-0002 now
+  resolve; the CONTEXT_LOG's drift list (#1–4) matches the applied reconciliation.
+
+### [RESOLVED] wp3-frontend-crud (Chronicle FE work) merged forward onto master
+- Date: 2026-07-03
+- Raised by: FE
+- Was blocking: starting **WP4** — the FE builder was told to branch `wp4-fe-shell`
+  off `master`, but the prior WP3 Chronicle front-end work (public `index.html`,
+  `dashboard.html`, `chronicle.js`, self-hosted fonts/images, `FRONTEND_DESIGN.md`)
+  was sitting unmerged on `wp3-frontend-crud`, branched before the WP3 backend-gaps
+  and WP3 backend-admin work landed on master.
+- Needs (BE should): spot-check the merge at PR review — `docs/MASTER_PLAN.md` and
+  this file were the only textual conflicts (both doc-only; resolved by keeping
+  master's reconciled v2.0.0 plan and carrying forward the one Wes-approved parking-lot
+  entry the FE branch had added). No app code conflicted.
+- Status: **RESOLVED 2026-07-03** — merged `origin/master` into a new `wp4-fe-shell`
+  branch created from `origin/wp3-frontend-crud`; conflicts resolved as above; full
+  suite still green post-merge (see DEVDIARY_FE.md).
 
 ---
 

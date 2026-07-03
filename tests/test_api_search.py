@@ -23,7 +23,7 @@ def test_search_by_name(member_client):
     _person(member_client, "Thomas", "Hartwell")
     result = member_client.get("/api/search?q=berg").get_json()
     assert result["counts"]["people"] == 1
-    assert result["people"][0]["name"] == "Wilhelmina Berg"
+    assert result["people"][0]["primary_name"] == "Wilhelmina Berg"
 
 
 def test_search_filter_by_sex(member_client):

@@ -23,7 +23,7 @@ from app.models.role import Role
 
 def role_required(minimum):
     """Decorator: the view requires a logged-in, active account whose role is at
-    least ``minimum`` on the ladder (GUEST < USER < POWER_USER < ADMIN).
+    least ``minimum`` on the ladder (VIEWER < CONTRIBUTOR < CURATOR < ADMIN).
 
     Three outcomes, each the *correct* HTTP answer:
       * not logged in        → 401 (API) or a redirect to the login page (web)
@@ -50,9 +50,37 @@ def role_required(minimum):
 
 
 # The common rungs, named once so routes read like English:
-#   @admin_required            → ADMIN only
-#   @role_required(Role.USER)  → any normal member or above (the CRUD default)
+#   @admin_required                   → ADMIN only
+#   @role_required(Role.CONTRIBUTOR)  → any normal member or above (CRUD default)
 admin_required = role_required(Role.ADMIN)
+
+
+def permission_required(permission):
+    """Decorator: the view requires a logged-in, active account that HOLDS a
+    specific permission flag (see app/services/permissions.py).
+
+    This is the permissions-as-data half of the authorization layer (§10). Where
+    ``role_required`` asks "are you high enough on the ladder?", this asks "does
+    your role's *bundle* include this capability?" — the same question v2 will
+    answer from an editable ``role_permissions`` table without touching any route.
+
+    Same three outcomes as ``role_required``: 401 (not logged in), 403 (logged in
+    but the permission isn't in your bundle), or the view runs.
+    """
+    from app.services import permissions
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return login_manager.unauthorized()
+            if not permissions.can(current_user, permission):
+                return _forbidden()
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 def _wants_json():

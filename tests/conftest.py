@@ -33,8 +33,8 @@ ADMIN_EMAIL = "admin@test.invalid"
 ADMIN_PASSWORD = "AdminPass123"
 MEMBER_EMAIL = "member@test.invalid"
 MEMBER_PASSWORD = "MemberPass123"
-GUEST_EMAIL = "guest@test.invalid"
-GUEST_PASSWORD = "GuestPass123"
+VIEWER_EMAIL = "viewer@test.invalid"
+VIEWER_PASSWORD = "ViewerPass123"
 
 
 @pytest.fixture
@@ -133,19 +133,40 @@ def member_client(app, member):
     return other
 
 
+CURATOR_EMAIL = "curator@test.invalid"
+CURATOR_PASSWORD = "CuratorPass123"
+
+
 @pytest.fixture
-def guest(app):
+def viewer(app):
     """The lowest rung of the role ladder (§10) — can read, but not write."""
     return user_service.create_user(
-        GUEST_EMAIL, "Guest", GUEST_PASSWORD, role=Role.GUEST
+        VIEWER_EMAIL, "Viewer", VIEWER_PASSWORD, role=Role.VIEWER
     )
 
 
 @pytest.fixture
-def guest_client(app, guest):
+def curator(app):
+    """A Curator — elevated member who can revert/restore (ADR-0001, §10)."""
+    return user_service.create_user(
+        CURATOR_EMAIL, "Curator", CURATOR_PASSWORD, role=Role.CURATOR
+    )
+
+
+@pytest.fixture
+def curator_client(app, curator):
     other = app.test_client()
     other.post(
-        "/auth/login", data={"email": GUEST_EMAIL, "password": GUEST_PASSWORD}
+        "/auth/login", data={"email": CURATOR_EMAIL, "password": CURATOR_PASSWORD}
+    )
+    return other
+
+
+@pytest.fixture
+def viewer_client(app, viewer):
+    other = app.test_client()
+    other.post(
+        "/auth/login", data={"email": VIEWER_EMAIL, "password": VIEWER_PASSWORD}
     )
     return other
 

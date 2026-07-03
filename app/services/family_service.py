@@ -9,7 +9,7 @@ is readable, not just a bag of ids.
 
 from app.extensions import db
 from app.models import Family, FamilyChild, Individual
-from app.services import genealogy_service
+from app.services import write_control
 from app.services.api_errors import ApiError
 
 # GEDCOM pedigree linkage types — how a child belongs to a family.
@@ -33,7 +33,7 @@ def _require_individual(individual_id, field):
     if individual_id is None:
         return None
     individual = db.session.get(Individual, individual_id)
-    if individual is None:
+    if individual is None or individual.deleted_at is not None:
         raise ApiError(f"No individual with id {individual_id}.", 400,
                        fields={field: "no such individual"})
     return individual_id
@@ -51,7 +51,13 @@ def serialize_child(link):
     }
 
 
+def _live_children(family):
+    """A family's child links, excluding soft-deleted ones (ADR-0001)."""
+    return [c for c in family.children if not c.is_deleted]
+
+
 def serialize(family, with_children=True):
+    children = _live_children(family)
     data = {
         "id": family.id,
         "gedcom_xref": family.gedcom_xref,
@@ -61,10 +67,10 @@ def serialize(family, with_children=True):
         "partner2": _display(family.partner2),
         "created_at": _iso(family.created_at),
         "updated_at": _iso(family.updated_at),
-        "children_count": len(family.children),
+        "children_count": len(children),
     }
     if with_children:
-        data["children"] = [serialize_child(c) for c in family.children]
+        data["children"] = [serialize_child(c) for c in children]
     return data
 
 
@@ -72,7 +78,9 @@ def serialize(family, with_children=True):
 
 def list_all():
     return [serialize(f, with_children=False)
-            for f in Family.query.order_by(Family.id).all()]
+            for f in Family.query
+            .filter(Family.deleted_at.is_(None))
+            .order_by(Family.id).all()]
 
 
 def get(family_id):
@@ -87,6 +95,8 @@ def create(data):
         gedcom_xref=(data.get("gedcom_xref") or None),
     )
     db.session.add(family)
+    db.session.flush()
+    write_control.log_create("family", family)
     db.session.commit()
     return serialize(family)
 
@@ -94,12 +104,14 @@ def create(data):
 def update(family_id, data):
     from app.routes.api import get_or_404
     family = get_or_404(Family, family_id, "family")
+    before = write_control.snapshot(family)
     if "partner1_id" in data:
         family.partner1_id = _require_individual(data.get("partner1_id"), "partner1_id")
     if "partner2_id" in data:
         family.partner2_id = _require_individual(data.get("partner2_id"), "partner2_id")
     if "gedcom_xref" in data:
         family.gedcom_xref = data.get("gedcom_xref") or None
+    write_control.log_update("family", family, before)
     db.session.commit()
     return serialize(family)
 
@@ -107,7 +119,9 @@ def update(family_id, data):
 def delete(family_id):
     from app.routes.api import get_or_404
     family = get_or_404(Family, family_id, "family")
-    genealogy_service.delete_family(family)  # sweeps polymorphic attachments + commits
+    # SOFT delete (ADR-0001): the marriage record and its children stay intact,
+    # hidden from reads, and a Curator can restore the whole family.
+    write_control.soft_delete("family", family)
 
 
 # --- Children sub-resource ----------------------------------------------------
@@ -118,24 +132,41 @@ def add_child(family_id, data):
     require(data, "child_id")
     child_id = data["child_id"]
     _require_individual(child_id, "child_id")
-    if db.session.get(FamilyChild, (family.id, child_id)) is not None:
+    pedigree = one_of(data, "pedigree_type", PEDIGREE_TYPES) or "birth"
+    order = int(data.get("child_order") or 0)
+
+    existing = db.session.get(FamilyChild, (family.id, child_id))
+    if existing is not None and not existing.is_deleted:
         raise ApiError("That child is already in this family.", 409,
                        fields={"child_id": "already linked"})
-    pedigree = one_of(data, "pedigree_type", PEDIGREE_TYPES) or "birth"
-    link = FamilyChild(
-        family_id=family.id, child_id=child_id,
-        pedigree_type=pedigree, child_order=int(data.get("child_order") or 0),
-    )
-    db.session.add(link)
+    if existing is not None:
+        # A previously-removed (soft-deleted) link: bring it back rather than
+        # trip the composite primary key with a duplicate insert.
+        existing.deleted_at = None
+        existing.pedigree_type = pedigree
+        existing.child_order = order
+        link = existing
+        action = "restore"
+    else:
+        link = FamilyChild(family_id=family.id, child_id=child_id,
+                           pedigree_type=pedigree, child_order=order)
+        db.session.add(link)
+        action = "create"
+    write_control.log_action(action, "family_child", family.id,
+                             detail=f"child #{child_id}")
     db.session.commit()
     return serialize_child(link)
 
 
 def remove_child(family_id, child_id):
     from app.routes.api import get_or_404
+    from datetime import datetime, timezone
     link = db.session.get(FamilyChild, (family_id, child_id))
-    if link is None:
+    if link is None or link.is_deleted:
         get_or_404(Family, family_id, "family")  # 404 the family if THAT's wrong
         raise ApiError("That child isn't in this family.", 404)
-    db.session.delete(link)
+    # SOFT delete the link (ADR-0001) so re-adding can restore it.
+    link.deleted_at = datetime.now(timezone.utc)
+    write_control.log_action("delete", "family_child", family_id,
+                             detail=f"child #{child_id}")
     db.session.commit()

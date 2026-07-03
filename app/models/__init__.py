@@ -34,6 +34,9 @@ from app.models.role import Role  # noqa: E402,F401
 from app.models.user import User  # noqa: E402,F401
 from app.models.site_setting import SiteSetting  # noqa: E402,F401
 from app.models.audit_log import AuditLog  # noqa: E402,F401
+from app.models.historical_event import HistoricalEvent  # noqa: E402,F401
+from app.models.suggestion import Suggestion  # noqa: E402,F401
+from app.models.role_request import RoleRequest  # noqa: E402,F401
 
 # A tidy public surface: `from app.models import *` (and humans reading this)
 # get exactly the tables, nothing leaked from imports above.
@@ -46,5 +49,6 @@ __all__ = [
     "Repository", "Source", "Citation",
     "MediaObject", "MediaLink",
     "Note", "NoteLink",
-    "Role", "User", "SiteSetting", "AuditLog",
+    "Role", "User", "SiteSetting", "AuditLog", "HistoricalEvent",
+    "Suggestion", "RoleRequest",
 ]

@@ -16,10 +16,11 @@ of an association entity (Hibernate's answer to the same junction table).
 """
 
 from app.extensions import db
+from app.models.mixins import SoftDeleteMixin
 from app.models.individual import _utcnow
 
 
-class Family(db.Model):
+class Family(SoftDeleteMixin, db.Model):
     """A partnership that may have children — GEDCOM's FAM record."""
 
     __tablename__ = "families"
@@ -65,7 +66,7 @@ class Family(db.Model):
         return f"<Family #{self.id} ({self.partner1_id} + {self.partner2_id})>"
 
 
-class FamilyChild(db.Model):
+class FamilyChild(SoftDeleteMixin, db.Model):
     """One child's membership in one family — GEDCOM's FAM.CHIL link.
 
     This is an ASSOCIATION OBJECT: a junction-table row that also carries data

@@ -1,31 +1,18 @@
 # FamilyHub — Master Plan
 
 > The single source of truth for the project's architecture, schema, scope, and
-> roadmap. Build one piece at a time; review each piece before starting the next.
+> roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
+> piece at a time; review each piece before starting the next.
 
-**Version 1.6.0** · Last updated 2026-06-29 · Status: WP2 complete; WP3 next.
+**Version 2.1.0** · Last updated 2026-07-03 · Status: WP3 (backend) complete; WP4 (frontend) next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
-a change is approved, bump this version and add a line to the Revision History (bottom).*
----
+a change is approved, bump this version (SemVer) and add a line to the Revision History
+(bottom).*
 
-## Contents
-
-- [1. The Corrected Vision](#1-the-corrected-vision)
-- [2. Core Principle: One Database, Many Views](#2-core-principle-one-database-many-views)
-- [3. The Schema (the centerpiece)](#3-the-schema-the-centerpiece)
-- [4. Feature → View Mapping](#4-feature--view-mapping)
-- [5. FamilySearch-Modeled Functionality (v1 scope)](#5-familysearch-modeled-functionality-v1-scope)
-  - [5A. Build Quality Bar — Depth, Not Stubs](#5a-build-quality-bar--depth-not-stubs)
-  - [5B. Visual Requirements & Constraints (frontend)](#5b-visual-requirements--constraints-frontend)
-- [6. Roadmap (CompTIA Project+ aligned)](#6-roadmap-comptia-project-aligned)
-- [7. Orchestration & Division of Labor](#7-orchestration--division-of-labor)
-- [8. Decisions Made On Your Behalf (correct any of these)](#8-decisions-made-on-your-behalf-correct-any-of-these)
-- [9. Security & Privacy Maturity Ladder](#9-security--privacy-maturity-ladder)
-- [10. Access Control — Roles & Admin Panel (progressive)](#10-access-control--roles--admin-panel-progressive)
-- [11. Change Management & Parking Lots (Project+ change control)](#11-change-management--parking-lots-project-change-control)
-- [12. Search (a genealogy site is useless without it)](#12-search-a-genealogy-site-is-useless-without-it)
-- [Revision History](#revision-history)
-
+> **Design decisions live in ADRs.** Point-in-time architecture decisions are recorded
+> under [`docs/adr/`](adr/README.md): **ADR-0001** (write-control model — post-moderation:
+> RBAC + audit + soft-delete + revert) and **ADR-0002** (Account↔Person link). The Master
+> Plan cites them where they bite; the ADRs hold the full rationale.
 ---
 
 ## 1. The Corrected Vision
@@ -46,7 +33,7 @@ a patch, per this map:
   style, CI + test infrastructure, Docker, the layered architecture pattern, security
   hardening, the backup system, DEVDIARY/CONTRIBUTING, management commands.
 - **REBUILD:** the data model (→ the GEDCOM-7 core below) and the **entire feature +
-  UX layer** (→ full-depth, Frontend Builder (FE)-designed pages per §5A/§5B).
+  UX layer** (→ full-depth, Cowork-designed pages per §5A/§5B).
 
 **Version naming** (avoids collision with the Cowork Websites project's scope words):
 - **v1 = "Full"** (Flask/Python) — built now. **v2 = "Enterprise"** (Java/Spring
@@ -54,8 +41,6 @@ a patch, per this map:
 - **v1 / v2 are the durable anchors;** "Full"/"Enterprise" are edition labels. Never
   use "Lite" here — in the Cowork project "Lite" = static HTML and "Full" = Flask, so
   our v1 (Flask) aligns with their "Full."
-
-[↑ Back to Contents](#contents)
 
 ---
 
@@ -72,15 +57,13 @@ a patch, per this map:
               │          │         │         │          │
           Family      Person    Time-      Photo      Memory
           Tree /       Page      line      Album      Blog
-          Fan Chart   (Wiki)
+          Pedigree    (Wiki)
               │          │         │         │          │
          INDI+FAM    one INDI   events    OBJE media   NOTE/SNOTE
          links       + facts    by DATE   (images)     narratives
 ```
 
 Every view reads from the same tables. No feature gets its own private data store.
-
-[↑ Back to Contents](#contents)
 
 ---
 
@@ -102,6 +85,17 @@ in v2. Notes on engine differences are inline.
 - **Dates** keep BOTH the original GEDCOM string (`date_original`, e.g. `"ABT 1850"`)
   and a sortable normalized value (`date_sort`) so fuzzy dates display faithfully but
   still sort on a timeline.
+- **Soft-delete, never hard-delete** (per **ADR-0001**). Every user-editable record
+  carries a nullable `deleted_at` timestamp; "delete" sets it, queries filter it out,
+  and any state is recoverable. Paired with `audit_log` (§3.5) this gives full
+  provenance + one-click **Curator revert**. This is a v1 design rule, not a v2
+  deferral (see §3.6, §8, §9).
+- **The person graph is a graph, not a linked list.** Parent/child and partner links
+  (`families` + `family_children`) form a directed graph an individual can have many
+  ancestors, descendants, and spouses. Traversal code (pedigree, relationship view)
+  must treat it as such: no assumption of a single linear chain, and the traversal
+  endpoint supports **lazy subtree fetch from any node** (the seam for the v2 dynamic
+  pan/zoom canvas — §11).
 - **Standard SQL only** — no engine-specific tricks — so the schema is portable.
 
 ### 3.1 Genealogy core
@@ -276,15 +270,61 @@ CREATE TABLE users (
     email         VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,        -- bcrypt/argon2
     display_name  VARCHAR(120),
-    role          VARCHAR(20) DEFAULT 'member', -- 'admin' | 'member'
+    role          VARCHAR(20) DEFAULT 'contributor', -- viewer|contributor|curator|admin (§10)
     is_active     BOOLEAN DEFAULT 1,
+    email_verified_at TIMESTAMP,                 -- transactional-email verification (§9)
+    individual_id INTEGER REFERENCES individuals(id) ON DELETE SET NULL,  -- Account↔Person (ADR-0002)
+    timezone      VARCHAR(50),                   -- per-user override of the site default (§5)
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+-- Account↔Person (ADR-0002): individual_id is NULLABLE. A linked user is the same
+-- person as an INDI record (enables self-authored living-member records, §5). Unlinked
+-- users have no anchor, so the tree defaults to the OLDEST-ANCESTOR root.
 
--- SITE_SETTINGS  (admin-editable text: hero, about, contact — simple key/value)
+-- SITE_SETTINGS  (admin-editable config: branding, page text, security baseline — key/value)
 CREATE TABLE site_settings (
-    setting_key   VARCHAR(80) PRIMARY KEY,      -- 'hero_tagline', 'about_text'
+    setting_key   VARCHAR(80) PRIMARY KEY,      -- see the config groups below
     setting_value TEXT
+);
+-- White-label / config-driven branding (§5): 'site_name' and 'family_name' feed the app
+-- header, page <title>s, and the Chronicle masthead, so the app is forkable/rebrandable.
+-- Also holds the site default 'timezone' and the security baseline (§9): min password
+-- length, breach-list check on/off, login rate-limit/lockout thresholds, session timeout.
+
+-- AUDIT_LOG  (provenance — every mutating write, before -> after; ADR-0001, §9 Tier-1)
+-- Present since WP2 as preserved security infra; ADR-0001 promotes it to core v1 scope.
+CREATE TABLE audit_log (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- who
+    action        VARCHAR(20),                  -- create | update | delete | revert
+    subject_type  VARCHAR(20),                  -- table/entity acted on
+    subject_id    INTEGER,
+    before_json   TEXT,                          -- prior values (NULL on create)
+    after_json    TEXT,                          -- new values (NULL on delete)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- when
+);
+
+-- SUGGESTIONS  (Suggest-an-idea -> admin inbox; §5)
+CREATE TABLE suggestions (
+    id            INTEGER PRIMARY KEY,
+    author_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    topic         VARCHAR(120),
+    body          TEXT,
+    status        VARCHAR(20) DEFAULT 'new',    -- new | triaged | planned | done | declined
+    priority      INTEGER DEFAULT 0,            -- admin's priority-queue ordering
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ROLE_REQUESTS  (a member asks for elevated access -> admin approval; §5, §10)
+CREATE TABLE role_requests (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    requested_role VARCHAR(20),                 -- the role ladder rung being requested
+    reason        TEXT,
+    status        VARCHAR(20) DEFAULT 'pending',-- pending | approved | denied
+    decided_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -292,14 +332,21 @@ CREATE TABLE site_settings (
 These are **additive** — each is a new table or feature that Flask-Migrate can add
 later without disturbing existing data, so deferring them now does NOT lock anything
 in. Recommended home: **v2** (could land in a later v1 revision if ever needed).
-- **ASSO** (associations: godparent, witness, >2-partner families)
+- **ASSO** (associations — non-family relationships: apprenticeship, employment,
+  godparent, enslavement, household, neighbor, "relative"). This is the data behind the
+  Person Page **"Other Relationships"** section, which is **v2**. **Core family
+  relationships (parents / spouses / children / siblings via FAM links) remain v1** —
+  only the non-family associations defer.
 - **SUBM** (submitter / researcher records)
+- **Fan Chart** — the radial tree view. v1 ships **Pedigree + Family Group +
+  Relationship View** (§5); the fan chart is a v2 renderer.
 - **Video / audio** media (photos are in v1)
-- **Merge** duplicate individuals
-- **Change history / restore** (v1 uses created/updated timestamps instead)
+- **Merge** duplicate individuals (tools may land in **v1.x** — §5; firm by v2)
 - **Full GEDCOM-7 import/export** — see WP6 in §6 (tentative for v1, firm for v2)
 
-[↑ Back to Contents](#contents)
+> **No longer deferred:** change-history / restore has been **promoted to v1** per
+> **ADR-0001** — `audit_log` (before→after) + soft-delete + Curator revert are core v1
+> scope (§3.5, §8, §9), not the old "timestamps only" fallback.
 
 ---
 
@@ -307,32 +354,71 @@ in. Recommended home: **v2** (could land in a later v1 revision if ever needed).
 
 | User-facing "feature" | What it really is | Tables it reads |
 |---|---|---|
-| Family tree / fan chart | Graph of INDI via FAM links | individuals, families, family_children |
+| Family tree (pedigree) | Graph of INDI via FAM links, traversed from a root | individuals, families, family_children |
 | Person page (wiki) | One individual + all their facts | individuals, names, events, citations, media_links, note_links |
 | Timeline | A person's (or family's) events by date | events (ordered by `date_sort`), places |
 | Photo album | Image media filtered & grouped | media_objects, media_links |
 | Memory blog | Markdown narratives | notes, note_links |
 | Sources view | Evidence behind each fact | sources, citations, repositories |
+| Change history / revert | Provenance + one-click undo (ADR-0001) | audit_log |
+| Suggestions inbox | Suggest-an-idea → admin triage queue | suggestions |
+| Admin: role requests | Elevation requests → admin approval | role_requests, users |
 
-[↑ Back to Contents](#contents)
+> **v2 views (reserved, not built in v1):** **Fan Chart** (radial tree), the Person Page
+> **"Other Relationships"** section (non-family ASSO), and the **dynamic pan/zoom tree
+> canvas** (§11). The v1 pedigree renderer and traversal endpoint are built with the
+> seams for these (§3 design rules, §5).
 
 ---
 
 ## 5. FamilySearch-Modeled Functionality (v1 scope)
 
 Logged-in members can:
-- **Add / edit / delete** individuals, names, families, parent/child links (core CRUD)
+- **Add / edit / delete** individuals, names, families, parent/child links (core CRUD).
+  "Delete" is a **soft-delete** — recoverable, audited, revertible (ADR-0001, §3.5).
 - **Add events & attributes** (birth, death, marriage, residence, occupation…) with
   fuzzy dates and reusable places
-- **Person page** showing vitals, all names, life events, relationships, attached
-  sources, photos, and stories
-- **Pedigree + fan chart** views (start simple: a few generations, ancestor traversal)
+- **Person page** showing vitals, all names, life events, **core family relationships**
+  (parents / spouses / children / siblings), attached sources, photos, and stories.
+  *(Non-family "Other Relationships" — apprenticeship, employment, godparent, etc. — is
+  v2; see §3.6.)*
+- **Tree views:** **Pedigree** (ancestor traversal — vertical layout is the v1 default;
+  a horizontal orientation is reserved as a **v2 toggle**), a **Family Group** view, and
+  a **Relationship View**. *(Fan Chart is v2 — §3.6.)* The renderer is
+  **orientation-parameterized** and the traversal endpoint supports **lazy subtree fetch
+  from any node**, so the v2 horizontal toggle and pan/zoom canvas (§11) are seams, not
+  rewrites.
 - **Attach sources / citations** to facts; view the evidence behind a person
 - **Upload photos** and attach them to people, families, or events
 - **Write memories** (Markdown) attached to people or events
-- **Admin panel** (admin role): manage users, edit site text, verify backups
+- **Edit their own person record** — a member **linked** to an INDI (ADR-0002) may
+  self-author their living record (profession, achievements, life sketch): high-value
+  original data, not just transcription.
+- **See a tree even when unlinked** — a user with no `individual_id` gets the
+  **oldest-ancestor** as the default tree root (ADR-0002).
+- **Change their timezone** — the site has a default; each account can override it.
+- **Suggest an idea** (→ admin **Suggestions inbox**: topic + status lifecycle +
+  priority) and **request a role change** (→ admin approval).
+- **Self-serve account email** — password reset and **email verification** via
+  configurable **transactional email** (Option A: SMTP/provider — §9 Tier-1).
+- **Admin panel** (admin role): manage users + role requests, triage the suggestions
+  inbox, edit **branding** (`site_name` / `family_name`) and site text, tune the
+  **security baseline** (min password length, breach-list check, rate-limit/lockout,
+  session timeout — §9), verify backups, and **revert** any audited change.
 
-### 5A. Build Quality Bar — Depth, Not Stubs
+### v1.x — additive scope (lands *after* core CRUD, no schema lock-in)
+These are approved for v1 but sequenced after the core CRUD UI so they never block the
+parents-first launch. Each is additive (a new table/view), so deferring the *timing*
+costs nothing:
+- **Member Profile + privacy-controlled contact fields** and a **Family Address Book**
+  view — **default-deny, per-field sharing**, kept *inside* FamilyHub (not a separate
+  app). Feeds off the Account↔Person link (ADR-0002).
+- **Merge / duplicate** tools for individuals (also listed v2-adjacent in §3.6; may land
+  in v1.x).
+
+---
+
+## 5A. Build Quality Bar — Depth, Not Stubs
 
 The first build failed by over-simplifying every feature into a hollow shell (e.g.
 "Memories" was two blank fields — no who, when, where, or photo). The rework's
@@ -352,21 +438,41 @@ non-negotiable quality bar:
   selector) · when (fuzzy dates) · where (place) · the story (rich text) · attached
   photos · tags — mirroring the `notes`/`note_links` (+ optional event/place) schema
   instead of ignoring it.
-- **The Frontend Builder (FE) gets design leadership**, not micromanagement. Give it
-  the data model + §5B constraints and let it architect rich, intuitive pages — to the
-  *standard* of polish and intuitiveness set by Wes's Datumology and CinephileHub
-  sites (including Cinephile's admin panel), **not as a copy of them.** The specific
-  control, layout, and visual expression is governed by **docs/FRONTEND_DESIGN.md**
-  (FE-owned); §5A still sets the **depth** bar — every user-meaningful field must be
-  capturable, however the page chooses to present it.
+- **Cowork gets design leadership**, not micromanagement. Give it the data model +
+  §5B brief and let it architect rich, intuitive pages — to the *standard* of polish
+  and intuitiveness set by Wes's Datumology and CinephileHub sites (including
+  Cinephile's admin panel), **not as a copy of them.**
 
-### 5B. Visual *Requirements* & Constraints (frontend)
+---
 
-_(Intentionally empty. Visual requirements/constraints will be re-introduced here after the
-front end is built, stable, and tested — see docs/FRONTEND_DESIGN.md → Design Parking Lot for
-candidates.)_
+## 5B. Visual Design Brief (frontend)
 
-[↑ Back to Contents](#contents)
+**Functionality** models FamilySearch. **Appearance** must NOT — FamilySearch looks
+corporate because its goal is data, not delight. FamilyHub's look should match the
+*polish and intuitiveness* of **CinephileHub and Datumology** as a **quality bar, not a
+style to copy** (brief Cowork as "the world's best web designer"). FamilyHub has its
+own warm, cross-generational identity — it must not be a Cinephile clone.
+
+**Goal:** appeal across three generations at once —
+- **Parents (motivated):** want to preserve and pass on history — make it warm,
+  dignified, easy.
+- **Wes's generation (warming up):** make discovery feel rewarding and a little
+  addictive.
+- **Nephew's generation (not yet interested):** make it visually fun enough to pull
+  them in before they know why it matters.
+
+**Design directives:**
+- **Polished, characterful, and fun** — not a business CRUD form. Distinctive
+  typography, a warm inviting palette, tasteful motion.
+- **Family photos and "interesting family facts" woven throughout** — scattered around
+  and offsetting the UI as visual texture, never crowding the controls.
+- **Calm by design — must not overwhelm ADD or anxious visitors.** Generous
+  whitespace, clear visual hierarchy, one primary action per screen, progressive
+  disclosure (don't show everything at once). Visual interest comes from imagery and
+  type, not from density.
+- **Elderly-accessible at the same time:** large readable type, big tap targets, high
+  contrast, forgiving forms. (Polish and accessibility are not in tension here —
+  both favor clarity and space.)
 
 ---
 
@@ -401,11 +507,11 @@ Build ONE work package at a time; phase-gate review before the next.
 - **WP2 – Backend CRUD.** Service + REST-shaped route layer for individuals, families,
   events, sources, media, notes. *pytest each resource.* **Deliverable: the API
   contract** (endpoints + JSON shapes) — the interface the frontend builds against.
-- **WP3 – Frontend.** The Frontend Builder (FE) builds the UI per the §5B constraints
-  (design language in `docs/FRONTEND_DESIGN.md`) against the WP2 API contract.
-  Elderly-accessible + cross-generational polish.
-- **WP4 – The Views & Search.** Tree/fan chart, timeline, album, memory blog, and a
-  rich **Search** interface — all queries against the existing schema. (See §12.)
+- **WP3 – Frontend.** Cowork builds the UI per the §5B design brief against the WP2
+  API contract. Elderly-accessible + cross-generational polish.
+- **WP4 – The Views & Search.** Tree (pedigree + family-group + relationship view),
+  timeline, album, memory blog, and a rich **Search** interface — all queries against
+  the existing schema. (See §12; fan chart is v2 per §3.6.)
 - **WP5 – Deploy.** AWS Lightsail, gunicorn + nginx, SSL, DNS, nightly backups.
 - **WP6 (TENTATIVE) – GEDCOM Import/Export Engine.** Full GEDCOM-7 round-trip,
   validated against the gedcom.io registry. Technically possible in v1, but it's the
@@ -421,57 +527,46 @@ Build ONE work package at a time; phase-gate review before the next.
 - **WP-F** Full GEDCOM-7 import/export engine (firm v2 deliverable, if not done in WP6)
 - **WP-E** Containerize, deploy, capstone write-up
 
-[↑ Back to Contents](#contents)
-
 ---
 
 ## 7. Orchestration & Division of Labor
 
 **Two builders, one repo, a contract between them.**
 
-> FE and BE are distinct roles/lanes (separate ownership; the cross-builder blocker
-> protocol applies) regardless of whether the same or different implementer fills them.
-
-- **Backend Builder (BE) → backend + the whole repo/infra.** The preserved scaffolding,
+- **Claude Code → backend + the whole repo/infra.** The preserved scaffolding,
   GEDCOM-7 schema, models, migrations, services, REST routes, pytest, seed data,
   backups, Docker, deployment. Commits as it goes.
-- **Frontend Builder (FE) → front-end ONLY.** **HTML (Jinja2 templates), CSS, and
-  vanilla JS — with UX and UI as first-class concerns** — for the v1 ("Full") site,
-  per the §5A depth bar and §5B constraints (the living design language is
-  `docs/FRONTEND_DESIGN.md`). The Frontend Builder (FE) does **not** own the backend,
-  infra, or deployment — that's the BE's domain. This is *less* than a normal Cowork
-  "Scope B" site, so the Cowork project's "outgrown → split out" rule is **explicitly
-  waived** for FamilyHub.
+- **Cowork → front-end ONLY.** **HTML (Jinja2 templates), CSS, and vanilla JS — with
+  UX and UI as first-class concerns** — for the v1 ("Full") site, per the §5A depth
+  bar and §5B design brief. Cowork does **not** own the backend, infra, or
+  deployment — that's Code's domain. This is *less* than a normal Cowork "Scope B"
+  site, so the Cowork project's "outgrown → split out" rule is **explicitly waived**
+  for FamilyHub.
 - **v2 ("Enterprise") is handled entirely outside the Cowork project.**
 
 ### The contract that guarantees the pieces fit
 - **WP2 produces the API/route contract** — endpoints + JSON shapes (the existing
-  OpenAPI spec is the artifact). This is the stable interface the Frontend Builder (FE)
-  builds against.
-- **Build order:** the Backend Builder (BE) finishes the backend contract (WP1–WP2)
-  *before* the Frontend Builder (FE) starts the front-end (WP3). The Frontend Builder
-  (FE) builds to the contract, not a moving target.
+  OpenAPI spec is the artifact). This is the stable interface Cowork builds against.
+- **Build order:** Code finishes the backend contract (WP1–WP2) *before* Cowork starts
+  the front-end (WP3). Cowork builds to the contract, not a moving target.
 - **One canonical working folder.** Clone the repo once into the chosen location;
-  point all development tools and builders at that single folder. Never edit in two
-  copies.
+  point PyCharm, Code, and Cowork all at that single folder. Never edit in two copies.
 - **Deploy target = AWS (Lightsail).** DigitalOcean is at most a fallback and needs no
-  configuration. Deployment is the Backend Builder's (BE) job, not the Frontend
-  Builder's (FE).
+  configuration. Deployment is Code's job, not Cowork's.
 
 ### Build sequence (who's active when — Wes is the switch operator)
 Only one builder is active at a time, except WP4's controlled interleave.
 
 | WP | Active | Other | Sync / handoff |
 |---|---|---|---|
-| WP1 Database Foundation | BE | FE idle | schema + migrations + seed; pytest green |
-| WP2 Backend CRUD + API contract | BE | FE idle | **BE publishes the contract → handoff to FE** |
-| WP3 Front-end (core CRUD UI) | FE | BE on-call for contract fixes | built to the WP2 contract |
-| WP4 Views + Search | BE → FE per view | — | BE adds each query endpoint, then FE builds that view |
-| WP5 Deploy | BE | FE idle | AWS Lightsail, SSL, DNS, backups |
-| WP6 Import/Export (tentative) | BE | FE idle | decision gate at start of WP5 |
+| WP1 Database Foundation | Code | Cowork idle | schema + migrations + seed; pytest green |
+| WP2 Backend CRUD + API contract | Code | Cowork idle | **Code publishes the contract → handoff to Cowork** |
+| WP3 Front-end (core CRUD UI) | Cowork | Code on-call for contract fixes | built to the WP2 contract |
+| WP4 Views + Search | Code → Cowork per view | — | Code adds each query endpoint, then Cowork builds that view |
+| WP5 Deploy | Code | Cowork idle | AWS Lightsail, SSL, DNS, backups |
+| WP6 Import/Export (tentative) | Code | Cowork idle | decision gate at start of WP5 |
 
-**The one rule that matters most:** the Frontend Builder (FE) does not start until WP2's
-contract exists.
+**The one rule that matters most:** Cowork does not start until WP2's contract exists.
 
 ### Branch-per-work-package (trunk protection / the merge gate)
 Each WP is built on its **own branch off master** (e.g., `wp3-frontend-crud`).
@@ -479,43 +574,28 @@ Tests MAY be red on a WP branch while it's mid-build (expected work-in-progress)
 A branch merges to master **ONLY when the full suite is green — the CI merge
 gate**. **master is always green.** Cross-lane contract edits (e.g., the
 front-end adding `text/html` routes to `docs/openapi.yaml`) are allowed **on the
-WP branch**; the owning builder (BE) reviews/approves them at merge. **Wes is
+WP branch**; the owning builder (Code) reviews/approves them at merge. **Wes is
 the integrator:** he reviews and merges/pushes. One builder active at a time
 still holds.
 
 ### Two dev diaries (avoid the write conflict)
-FE and BE must not write the same file. Split it:
-- **`DEVDIARY_BE.md`** — backend (BE). H1 title: "FamilyHub — Backend Dev Diary."
-- **`DEVDIARY_FE.md`** — frontend (FE). H1 title: "FamilyHub — Frontend Dev Diary."
+Code and Cowork must not write the same file. Split it:
+- **`DEVDIARY_BE.md`** — backend (Code). H1 title: "FamilyHub — Backend Dev Diary."
+- **`DEVDIARY_FE.md`** — frontend (Cowork). H1 title: "FamilyHub — Frontend Dev Diary."
 - **`DEVDIARY.md`** — thin index pointing to both, so the README "start here" still works.
 
-### README ownership (the Backend Builder (BE) keeps the portfolio face current)
-Owner: the Backend Builder (BE) — the README is repo presentation, which is the BE's
-domain (FE is frontend-only). Keep it accurate at each WP boundary (never describing
-removed features), and deliver the definitive, capstone-grade professional rewrite by
-WP5 at the latest, matching the polish of the original presentation.
-
-### Document map & ownership (RACI)
-Who owns which document, and how each one changes:
-- **`docs/MASTER_PLAN.md`** — the durable **baseline** (requirements, schema, scope,
-  security, architecture, process). **Owner: BE.** Changes go through §11 Tier 1 +
-  a version bump.
-- **`docs/FRONTEND_DESIGN.md`** — the living **front-end design language** + design-
-  decision log + design parking lot. **Owner: FE.** Changes freely *within* the §5B
-  constraints (§11 Tier 2), logged in its own decision log — no Master Plan revision.
-- **`DEVDIARY_BE.md`** (BE) · **`DEVDIARY_FE.md`** (FE) · **`DEVDIARY.md`** (index).
-- **`README.md`** — BE (repo presentation).
-- **`BLOCKERS.md`** — shared (the cross-builder handoff log).
-- **`docs/openapi.yaml`** — BE (the API contract); the front-end may add `text/html`
-  routes on its WP branch with BE's approval at merge (per the §7 branch-per-WP rule).
+### README ownership (Code keeps the portfolio face current)
+Owner: Claude Code — the README is repo presentation, which is Code's domain (Cowork is frontend-only). 
+Keep it accurate at each WP boundary (never describing removed features), and deliver the definitive, 
+capstone-grade professional rewrite by WP5 at the latest, matching the polish of the original presentation.
 
 ### Cross-builder blocker handoff (so you always know who to spin up)
-A builder will hit things only the *other* builder can fix (the FE finds a missing or
-wrong endpoint; the BE finds the front-end needs a different data shape). Protocol:
+A builder will hit things only the *other* builder can fix (Cowork finds a missing or
+wrong endpoint; Code finds the front-end needs a different data shape). Protocol:
 - **Never fake or stub around a cross-boundary blocker** — that recreates the hollow
   failure mode. Stop *that item*; continue other in-scope work if safe.
 - **Record it in `BLOCKERS.md`** (repo root) as an OPEN entry: date · raised-by
-  (BE/FE) · what's blocked · exactly what the other builder must do · status.
+  (Code/Cowork) · what's blocked · exactly what the other builder must do · status.
 - **Surface it in the end-of-session summary** so Wes sees it unmistakably and knows
   which tool to spin up next.
 - **Start of every session:** each builder reads `BLOCKERS.md` first, resolves any OPEN
@@ -525,12 +605,10 @@ wrong endpoint; the BE finds the front-end needs a different data shape). Protoc
   flag, never fake.
 
 ### Workflow discipline (the lesson from the credits burned)
-- **One work package at a time.** Don't let either builder run the whole project
+- **One work package at a time.** Don't let either tool run the whole project
   unattended. Phase-gate review (run it, read the DEVDIARY entry) before the next WP.
 - **Self-verifying:** backend work includes pytest; no "please test this for me"
   pauses. Manual checks batch into a checklist cleared at each WP boundary.
-
-[↑ Back to Contents](#contents)
 
 ---
 
@@ -544,13 +622,28 @@ wrong endpoint; the BE finds the front-end needs a different data shape). Protoc
    rather than a partners junction table — simpler for v1.
 3. **v1 scope = the essential subset** (per §5): individual & family vital records,
    biographical narratives (= "memories"), photo uploads, events, sources, citations.
-   **Deferred to v2** (additive, no lock-in — see §3.6): ASSO, SUBM, video/audio, merge,
-   change-history/restore. **Full GEDCOM import/export:** tentative v1 WP6, firm v2.
+   **Deferred to v2** (additive, no lock-in — see §3.6): ASSO (non-family "Other
+   Relationships"), SUBM, video/audio, **Fan Chart**. **Full GEDCOM import/export:**
+   tentative v1 WP6, firm v2. **Merge** is v2-adjacent (may land v1.x — §5).
 4. **Markdown** for all narrative content (bios, memories).
 5. **`living` flag + `restriction`** drive PII hiding rather than a separate privacy
    subsystem.
-
-[↑ Back to Contents](#contents)
+6. **Post-moderation write-control is v1** (**ADR-0001**, reversing the earlier v2
+   deferral): direct writes gated by RBAC (§10), a full `audit_log` (before→after),
+   **soft-delete only**, and **Curator revert**. A pre-moderation approval queue stays
+   v2 (additive `change_request` table). This is the scope/schema change that makes this
+   revision a **MAJOR** bump.
+7. **Account↔Person link is v1** (**ADR-0002**): a nullable `users.individual_id` FK ties
+   an account to its INDI record (enables self-authored living-member records);
+   **unlinked users default the tree root to the oldest ancestor**.
+8. **RBAC roles renamed** to **Viewer / Contributor / Curator / Admin** (was GUEST / USER
+   / POWER USER / ADMIN — §10). Same ladder; **permissions modeled as data** (a role = a
+   bundle of permission flags) so custom roles are a later data change, not a rewrite.
+9. **App is white-labelable** — `site_name` / `family_name` in `site_settings` drive
+   header, page titles, and the Chronicle masthead, so the codebase is forkable.
+10. **Transactional email (Option A)** — configurable SMTP/provider powers self-serve
+    password reset + email verification (§9). A separate *notification* email stream is
+    v2 (§11).
 
 ---
 
@@ -563,24 +656,33 @@ deliberately. The first build already cleared the MVP tier — build upward from
   protection, strict CSP, login rate limiting, security headers, login-walled photo
   serving, secure session cookies, password reset, HTTPS, PII hidden for `living`
   individuals, upload validation, files stored outside the web root.
-- **Tier 2 — Hardening (mid-project WPs):** role-based access control (§10), audit
-  logging, encryption at rest for backups, secrets management, dependency/vulnerability
-  scanning in CI, granular per-record privacy.
-- **Tier 3 — Mature (v2 / ongoing):** MFA, penetration testing, PII minimization,
-  data export/delete (subject-rights) tooling, monitoring / intrusion detection.
+  **Now also v1-active (per ADR-0001):** **RBAC** (§10, shipped in WP2), **audit logging**
+  (before→after on every mutation), and **soft-delete + Curator revert**. **Email
+  verification** joins password reset on the configurable transactional-email stream
+  (§8.10). The **security baseline is admin-configurable** via `site_settings` (§3.5):
+  min password length, **breach-list check** (HaveIBeenPwned k-anonymity), login
+  rate-limit / lockout thresholds, and session timeout.
+- **Tier 2 — Hardening (mid-project WPs):** encryption at rest for backups, secrets
+  management, dependency/vulnerability scanning in CI, granular **per-record** privacy,
+  and the **permission-as-data** role→permission matrix (read-only view in v1; editable
+  toggle UI is v2 — §10).
+- **Tier 3 — Mature (v2 / ongoing):** **MFA (TOTP** — no SMS/phone dependency; §11),
+  penetration testing, PII minimization, data export/delete (subject-rights) tooling,
+  monitoring / intrusion detection.
 - Ties directly to Wes's **ISC2 CC** and the **WGU Security** coursework.
-
-[↑ Back to Contents](#contents)
 
 ---
 
 ## 10. Access Control — Roles & Admin Panel (progressive)
 
-Target model is standard **RBAC** with four roles:
-- **GUEST** — trusted outsider (e.g., relative by marriage): minimal, e.g. comment only.
-- **USER** — standard family member: normal CRUD on family content.
-- **POWER USER** — technically savvy member: elevated permissions just below admin.
-- **ADMIN** — full control.
+Target model is standard **RBAC** with four roles (renamed 2026-07-03 — same ladder,
+warmer/clearer labels):
+- **Viewer** — trusted outsider (e.g., relative by marriage): minimal, e.g. comment only.
+  *(was GUEST)*
+- **Contributor** — standard family member: normal CRUD on family content. *(was USER)*
+- **Curator** — technically savvy member: elevated permissions just below admin,
+  including the audit-driven **revert** (ADR-0001). *(was POWER USER)*
+- **Admin** — full control.
 
 **Anti-lock-in design (do this early):** put the `role` enum on `users` from the start
 and route every permission check through a **single authorization layer** (one
@@ -588,16 +690,22 @@ decorator/service), so adding roles or granular permissions later is a centraliz
 change, not a scattered rewrite. No technical limit in Flask/SQLite — the only
 constraint is build time.
 
-**Progressive ladder (a little more each WP):**
-- **WP2:** role scaffolding (enum + auth layer) + basic USER/ADMIN.
-- **WP3–WP4:** rich admin-panel UX (FE) + POWER USER and GUEST tiers.
-- **Dedicated later WP:** granular per-feature permissions + full admin dashboard.
+**Permissions modeled as data (do this in v1):** a role is a **bundle of permission
+flags**, not a hard-coded `if role == 'admin'` scattered through the code. Storing the
+role→permission mapping as data means a new or custom role is a **data change**, not a
+rewrite. v1 exposes a **read-only role→permission matrix** in the admin panel (so the
+model is legible); the **editable toggle UI** that lets an admin re-bundle permissions
+or mint custom roles is reserved for **v2**.
 
-[↑ Back to Contents](#contents)
+**Progressive ladder (a little more each WP):**
+- **WP2:** role scaffolding (enum + single auth layer) + basic Contributor/Admin. *(done)*
+- **WP3–WP4:** rich admin-panel UX (Cowork) + Curator and Viewer tiers + the read-only
+  permission matrix; role-change requests routed to admin approval (§5).
+- **v2:** editable permission-matrix UI + custom roles (the data model already allows it).
 
 ---
 
-## 11. Change Management & Parking Lots (Project+ change control)
+## 11. Change Management & Parking Lot (Project+ change control)
 
 New ideas or changes after handoff go through a lightweight Project+ flow instead of
 derailing an in-flight work package:
@@ -607,38 +715,7 @@ derailing an in-flight work package:
 3. **Decide** — approve into a WP, or **park** it.
 4. **Assign** — give approved changes a target WP.
 
-### Two tiers of change (baseline vs. design)
-Not every change is the same weight. Route each by which document it touches:
-- **Tier 1 — Baseline (`docs/MASTER_PLAN.md`).** Any change to requirements, schema,
-  scope, security, architecture, process, or **any §5B visual constraint** → log it,
-  assess impact, **Wes approves**, then **version bump + a Revision History line**.
-- **Tier 2 — Design (`docs/FRONTEND_DESIGN.md`).** Visual/UX *expression* within the §5B
-  constraints (palette, fonts, dark/light, motion, component look) → **the Frontend
-  Builder (FE) changes directly** and logs it in that doc's design-decision log;
-  **no Master Plan revision**.
-- **Escalation (Tier 2 → Tier 1).** A design idea that would **breach a §5B constraint**,
-  or that needs **new functionality/endpoints**, escalates to Tier 1: log it, Wes
-  approves, the baseline is updated before it ships.
-
-### SemVer bump rules (for Tier-1 changes)
-Version format is **MAJOR.MINOR.PATCH**. Prior version 1.4 = 1.4.0.
-- **MAJOR (X.0.0):** breaking or scope-altering — add/remove a work package, schema
-  change, security/architecture shift, or anything that invalidates built work or a
-  published contract.
-- **MINOR (x.Y.0):** substantive but non-breaking — new sections, process or ownership
-  refinements, role model changes.
-- **PATCH (x.y.Z):** clarifications, wording, formatting, typos, TOC updates.
-
-Tier-2 changes (`docs/FRONTEND_DESIGN.md`) stay in that doc's decision log; they do
-not carry a Master Plan version bump.
-
-### Parking lots (two of them — captured, not scheduled)
-- **Master Plan parking lot (below)** — larger **feature / functionality** ideas
-  (Tier-1 scope), revisited after the initial site is seen.
-- **`docs/FRONTEND_DESIGN.md` parking lot** — the **visual / design** brainstorm
-  (Tier-2), the Frontend Builder's (FE) to keep.
-
-**Master Plan parking lot:**
+**Parking Lot (captured, not scheduled)** — revisit after the initial site is seen:
 - Per-member **dashboard** (FamilySearch-style "my contributions" summary).
 - **Browse-vs-edit UX** split (subtle edit icon → inline/popup edit) so editing
   controls never intrude on the reading experience.
@@ -663,10 +740,24 @@ not carry a Master Plan version bump.
     of the logged-in dashboard.
   - **Scope + sequence:** spans BE (public flag + API + gate logic + serving rules)
     and FE (curated public rendering + admin curation/layout UI + dashboard restyle).
-    Schedule as a focused WP after WP3 (core front-end CRUD UI) is complete.
-- (Add future *feature* ideas here rather than expanding MVP scope.)
+    Schedule as a focused WP after WP4 (front-end shell + core CRUD UI) is complete.
+    (Approved by Wes 2026-06-29; carried forward from the `wp3-frontend-crud` branch
+    at merge into `wp4-fe-shell`, 2026-07-03.)
 
-[↑ Back to Contents](#contents)
+**v2 / future captures (reserved seams, do NOT build now):**
+- **MFA (TOTP)** — authenticator-app second factor, **no SMS/phone dependency** (§9 Tier-3).
+- **Notification email system** — event-triggered emails with a **preference center**,
+  **digests**, and **unsubscribe/compliance**, on a **separate sending stream** from the
+  transactional email of §8.10 (deliverability + compliance hygiene).
+- **Dynamic pan/zoom tree canvas** — lazy-expand from any node; the v1 traversal endpoint's
+  "lazy subtree fetch" (§3 design rules) is the seam for it.
+- **Admin theme switcher** — pick among predetermined designs (pairs with white-label
+  branding, §8.9).
+- **Family Bunch** — a *separate*, present-tense family **social** app (not genealogy).
+  **Do NOT build it here.** FamilyHub stays the system of record: it owns accounts,
+  member profiles, and stable IDs, and merely **reserves an identity/API seam** so a
+  future Family Bunch could authenticate against it.
+- (Add future ideas here rather than expanding MVP scope.)
 
 ---
 
@@ -685,30 +776,39 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 - **Backend note:** the search endpoint is part of the WP2 API contract surface so the
   WP4 search UI has a stable target. No technical limit at family scale.
 
-[↑ Back to Contents](#contents)
-
 ---
 
 ## Revision History
-- v1.6.0 — 2026-06-29 — Parked the public-surface + PII-gate model in §11: curated
-  public view of the database (per-item "public" flag, default OFF; `living`-person
-  guardrail via §9; admin PII-gate + preview + `audit_log`; configurable section
-  layout via `site_settings`; Chronicle shared design system spanning public and
-  logged-in app). MINOR bump — parking-lot capture only; no scope committed.
-  (Approved by Wes.)
-- v1.5.0 — 2026-06-28 — Adopted SemVer (MAJOR.MINOR.PATCH; prior 1.4 = 1.4.0) with
-  defined change tiers in §11; generalized the builder model to implementer-agnostic
-  roles Frontend Builder (FE) / Backend Builder (BE) — implementer is now assigned at
-  task time, not named in this document; added a Contents/TOC. (Approved by Wes.)
-- v1.4 — 2026-06-28 — Emptied §5B durable visual constraints (moved to FRONTEND_DESIGN.md
-  design parking lot as post-stable candidates); §5B left as a placeholder to be re-populated
-  after the front end is built and tested. (Approved by Wes.)
-- v1.3 — 2026-06-18 — Separated fluid design from the baseline: trimmed §5B to durable
-  Visual Requirements & Constraints (accessibility, calm-by-design, cross-generational
-  goal with a lean toward the youngest generation, identity guardrail, imagery-as-
-  texture) and moved the living visual/UX design language to a new Cowork-owned
-  docs/FRONTEND_DESIGN.md. Added a document map + RACI (§7) and a two-tier change-control
-  model + dual parking lots (§11). (Raised by Wes.)
+- **v2.1.0 — 2026-07-03 — MINOR.** Carried forward the **public surface + PII guardrail**
+  parking-lot entry (§11) from the `wp3-frontend-crud` branch (approved by Wes
+  2026-06-29) when that branch's Chronicle front-end work was merged forward onto
+  `wp4-fe-shell`. Parking-lot capture only — no scope committed. (Raised by FE.)
+- **v2.0.0 — 2026-07-03 — MAJOR (v1 design reconciliation).** Scope/schema-altering, so
+  a major bump. (Raised by Wes; decisions captured in ADR-0001, ADR-0002, and
+  `docs/CONTEXT_LOG.md`.)
+  1. **Write-control → v1** (per **ADR-0001**, reversing the old v2 deferral): `audit_log`
+     (before→after) + **soft-delete** + **Curator revert** are core v1 scope. Reflected in
+     §3 design rules, §3.5 (audit_log table), §3.6, §8.6, §9 (audit now Tier-1).
+  2. **Fan Chart → v2.** v1 tree = **Pedigree** (vertical default; horizontal reserved as
+     a v2 toggle) **+ Family Group + Relationship View**. Renderer is
+     orientation-parameterized; traversal endpoint supports lazy subtree fetch from any
+     node; the person graph is a **graph, not a linked list** (§2, §3, §4, §5, §6).
+  3. **Associations (ASSO) → v2, confirmed.** The Person Page **"Other Relationships"**
+     (non-family) section is v2; **core family relationships remain v1** (§3.6, §4, §5, §8.3).
+  4. **RBAC rename (§10):** GUEST/USER/POWER USER/ADMIN → **Viewer/Contributor/Curator/
+     Admin**; **permissions modeled as data** + a **read-only** role→permission matrix in
+     v1 (editable UI is v2). Also §3.5, §8.8, §9.
+  5. **New v1 scope:** Account↔Person link (**ADR-0002**, `users.individual_id`;
+     oldest-ancestor fallback), self-authored living-member records, suggestions inbox +
+     role-change requests, transactional email (verification + reset), white-label
+     branding (`site_name`/`family_name`), per-user timezone, and a configurable security
+     baseline (§3.5, §5, §8.7–8.10, §9).
+  6. **New v1.x (additive, post-core-CRUD):** Member Profile + privacy-controlled contact
+     fields + **Family Address Book** (default-deny, per-field sharing); merge/duplicate
+     tools (§5).
+  7. **Parking lot (§11):** MFA (TOTP), notification-email system, dynamic pan/zoom tree
+     canvas, admin theme switcher, and the **Family Bunch** identity/API seam (reserved,
+     not built).
 - v1.2 — 2026-06-18 — Added the **branch-per-work-package** workflow to §7: each WP is
   built on its own branch off master; tests may be red on-branch (WIP); a branch merges
   to master only when green (the CI merge gate), so master is always green; cross-lane
@@ -720,6 +820,4 @@ strong version ships in v1 — easy here because the dataset is family-sized.
   depth bar (§5A), visual design brief (§5B), orchestration + build sequence + blocker
   handoff (§7), Project+ roadmap (§6), security ladder (§9), RBAC ladder (§10), change
   control + parking lot (§11), search (§12).
-
-[↑ Back to Contents](#contents)
 <!-- Add new versions above this line, newest first, when §11 change control approves a change. -->

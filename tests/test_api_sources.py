@@ -55,7 +55,7 @@ def test_citation_polymorphic_and_quality(member_client):
         "subject_id": pid}).status_code == 400
 
 
-def test_deleting_source_cascades_citations(member_client):
+def test_deleting_source_is_soft_and_preserves_citations(member_client):
     pid = _individual(member_client)
     source = member_client.post("/api/sources", json={"title": "S"}).get_json()
     citation = member_client.post("/api/citations", json={
@@ -63,4 +63,8 @@ def test_deleting_source_cascades_citations(member_client):
         "subject_id": pid}).get_json()
 
     member_client.delete(f"/api/sources/{source['id']}")
-    assert member_client.get(f"/api/citations/{citation['id']}").status_code == 404
+    # Soft delete (ADR-0001): the source reads as gone...
+    assert member_client.get(f"/api/sources/{source['id']}").status_code == 404
+    # ...but its citations are NOT cascade-removed, so restoring the source is
+    # consistent. (The old hard delete cascaded; recoverability forbids that.)
+    assert member_client.get(f"/api/citations/{citation['id']}").status_code == 200

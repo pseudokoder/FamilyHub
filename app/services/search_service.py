@@ -27,26 +27,11 @@ def _like(term):
     return f"%{safe}%"
 
 
-def _event_year(individual_id, tag):
-    event = (Event.query
-             .filter_by(subject_type="individual", subject_id=individual_id,
-                        event_tag=tag)
-             .first())
-    if event and event.date_sort and event.date_sort[:4].isdigit():
-        return int(event.date_sort[:4])
-    return None
-
-
 def _person_result(individual):
-    primary = individual.primary_name
-    return {
-        "id": individual.id,
-        "name": primary.display if primary else None,
-        "sex": individual.sex,
-        "living": individual.living,
-        "birth_year": _event_year(individual.id, "BIRT"),
-        "death_year": _event_year(individual.id, "DEAT"),
-    }
+    # Reuse the ONE list-item shape (id + name + vitals + place) so the People
+    # list, search results, and tree nodes are byte-for-byte the same contract.
+    from app.services import individual_service
+    return individual_service.serialize_list_item(individual)
 
 
 def _snippet(text, length=160):
@@ -55,7 +40,7 @@ def _snippet(text, length=160):
 
 
 def _search_people(args, q):
-    query = Individual.query
+    query = Individual.query.filter(Individual.deleted_at.is_(None))
     given, surname = args.get("given"), args.get("surname")
 
     # Name matching: q hits given/surname/nickname; given/surname hit their field.
@@ -108,7 +93,8 @@ def _search_people(args, q):
 def _search_notes(q):
     like = _like(q)
     notes = (Note.query
-             .filter(or_(Note.content.ilike(like, escape="\\"),
+             .filter(Note.deleted_at.is_(None),
+                     or_(Note.content.ilike(like, escape="\\"),
                          Note.title.ilike(like, escape="\\")))
              .order_by(Note.updated_at.desc()).all())
     return [

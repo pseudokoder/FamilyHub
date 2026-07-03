@@ -9,6 +9,7 @@ everything else — one validation path for every polymorphic write.
 from app.extensions import db
 from app.models import Citation, Source
 from app.services import genealogy_service as gs
+from app.services import write_control
 from app.services.api_errors import ApiError
 
 CITATION_SUBJECTS = {
@@ -54,7 +55,7 @@ def serialize(citation):
 
 
 def list_all(subject_type=None, subject_id=None):
-    query = Citation.query
+    query = Citation.query.filter(Citation.deleted_at.is_(None))
     if subject_type and subject_id is not None:
         query = query.filter_by(subject_type=subject_type, subject_id=subject_id)
     return [serialize(c) for c in query.order_by(Citation.id).all()]
@@ -80,6 +81,8 @@ def create(data):
         notes=data.get("notes") or None,
     )
     db.session.add(citation)
+    db.session.flush()
+    write_control.log_create("citation", citation)
     db.session.commit()
     return serialize(citation)
 
@@ -87,6 +90,7 @@ def create(data):
 def update(citation_id, data):
     from app.routes.api import get_or_404
     citation = get_or_404(Citation, citation_id, "citation")
+    before = write_control.snapshot(citation)
     if "source_id" in data:
         citation.source_id = _validate_source(data["source_id"])
     if "subject_type" in data or "subject_id" in data:
@@ -99,6 +103,7 @@ def update(citation_id, data):
             setattr(citation, field, data.get(field) or None)
     if "quality" in data:
         citation.quality = _quality(data)
+    write_control.log_update("citation", citation, before)
     db.session.commit()
     return serialize(citation)
 
@@ -106,5 +111,4 @@ def update(citation_id, data):
 def delete(citation_id):
     from app.routes.api import get_or_404
     citation = get_or_404(Citation, citation_id, "citation")
-    db.session.delete(citation)
-    db.session.commit()
+    write_control.soft_delete("citation", citation)  # soft + audit (ADR-0001)

@@ -28,6 +28,7 @@ from pillow_heif import register_heif_opener
 from app.extensions import db
 from app.models import MediaLink, MediaObject
 from app.services import genealogy_service as gs
+from app.services import write_control
 from app.services.api_errors import ApiError
 
 register_heif_opener()  # teach Pillow to read iPhone HEIC/HEIF
@@ -129,6 +130,7 @@ def serialize_link(link):
 
 
 def serialize(media, with_links=True):
+    links = [link for link in media.links if not link.is_deleted]
     data = {
         "id": media.id,
         "gedcom_xref": media.gedcom_xref,
@@ -136,29 +138,42 @@ def serialize(media, with_links=True):
         "media_type": media.media_type,
         "title": media.title,
         "description": media.description,
+        # When the photo was TAKEN (distinct from created_at = when uploaded).
+        "capture_date": media.capture_date,
+        "capture_date_sort": media.capture_date_sort,
         "uploaded_by": media.uploaded_by,
         "uploader": media.uploader.display_name if media.uploader else None,
         "created_at": _iso(media.created_at),
         # Login-walled URLs the front-end uses in <img> tags — never the raw path.
         "file_url": f"/api/media/{media.id}/file",
         "thumb_url": f"/api/media/{media.id}/thumb",
-        "links_count": len(media.links),
+        "links_count": len(links),
     }
     if with_links:
-        data["links"] = [serialize_link(link) for link in media.links]
+        data["links"] = [serialize_link(link) for link in links]
     return data
 
 
 # --- CRUD ---------------------------------------------------------------------
 
-def list_all(subject_type=None, subject_id=None):
-    if subject_type and subject_id is not None:
-        objects = (MediaObject.query.join(MediaLink)
-                   .filter(MediaLink.subject_type == subject_type,
-                           MediaLink.subject_id == subject_id)
-                   .order_by(MediaObject.created_at.desc()).all())
+def list_all(subject_type=None, subject_id=None, order_by="uploaded"):
+    """Media, newest upload first by default. Pass ``order_by="capture"`` to order
+    by when the photo was TAKEN (capture_date_sort) — the album/timeline view
+    (Master Plan §4). Soft-deleted objects and links are excluded (ADR-0001)."""
+    if order_by == "capture":
+        # NULLs (undated photos) sort last; then oldest capture first.
+        ordering = (MediaObject.capture_date_sort.is_(None),
+                    MediaObject.capture_date_sort.asc())
     else:
-        objects = MediaObject.query.order_by(MediaObject.created_at.desc()).all()
+        ordering = (MediaObject.created_at.desc(),)
+
+    query = MediaObject.query.filter(MediaObject.deleted_at.is_(None))
+    if subject_type and subject_id is not None:
+        query = (query.join(MediaLink)
+                 .filter(MediaLink.deleted_at.is_(None),
+                         MediaLink.subject_type == subject_type,
+                         MediaLink.subject_id == subject_id))
+    objects = query.order_by(*ordering).all()
     return [serialize(m, with_links=False) for m in objects]
 
 
@@ -178,6 +193,8 @@ def create_from_upload(file, form, uploader):
         media_type=mime,
         title=(form.get("title") or None),
         description=(form.get("description") or None),
+        capture_date=(form.get("capture_date") or None),
+        capture_date_sort=(form.get("capture_date_sort") or None),
         uploaded_by=uploader.id if uploader is not None else None,
         gedcom_xref=(form.get("gedcom_xref") or None),
     )
@@ -191,6 +208,7 @@ def create_from_upload(file, form, uploader):
             MEDIA_SUBJECTS,
         )
         db.session.add(MediaLink(media_id=media.id, subject_type=st, subject_id=sid))
+    write_control.log_create("media", media)
     db.session.commit()
     return serialize(media)
 
@@ -200,9 +218,12 @@ def update(media_id, data):
     (re-uploading is a new object). Keeps the strip-on-upload guarantee simple."""
     from app.routes.api import get_or_404
     media = get_or_404(MediaObject, media_id, "media object")
-    for field in ("title", "description", "gedcom_xref"):
+    before = write_control.snapshot(media)
+    for field in ("title", "description", "gedcom_xref",
+                  "capture_date", "capture_date_sort"):
         if field in data:
             setattr(media, field, data.get(field) or None)
+    write_control.log_update("media", media, before)
     db.session.commit()
     return serialize(media)
 
@@ -210,13 +231,10 @@ def update(media_id, data):
 def delete(media_id):
     from app.routes.api import get_or_404
     media = get_or_404(MediaObject, media_id, "media object")
-    # Remove the files from disk (the DB cascade handles the link ROWS, but the
-    # database can't reach the filesystem — that's on us).
-    for path in (disk_path(media), disk_path(media, thumb=True)):
-        if os.path.exists(path):
-            os.remove(path)
-    db.session.delete(media)  # ORM cascade removes its media_links
-    db.session.commit()
+    # SOFT delete + audit (ADR-0001). We deliberately DO NOT remove the files from
+    # disk — a soft delete must be recoverable, so the bytes stay put (hidden from
+    # reads) until a restore/revert, or a future hard-purge task reclaims space.
+    write_control.soft_delete("media", media)
 
 
 def add_link(media_id, data):
@@ -225,18 +243,28 @@ def add_link(media_id, data):
     st, sid = gs.require_subject(
         data.get("subject_type"), data.get("subject_id"), MEDIA_SUBJECTS
     )
-    if db.session.get(MediaLink, (media.id, st, sid)) is not None:
+    existing = db.session.get(MediaLink, (media.id, st, sid))
+    if existing is not None and not existing.is_deleted:
         raise ApiError("This photo is already attached there.", 409,
                        fields={"subject_id": "already linked"})
-    link = MediaLink(media_id=media.id, subject_type=st, subject_id=sid)
-    db.session.add(link)
+    if existing is not None:
+        existing.deleted_at = None      # restore a previously-removed attachment
+        link = existing
+    else:
+        link = MediaLink(media_id=media.id, subject_type=st, subject_id=sid)
+        db.session.add(link)
+    write_control.log_action("update", "media", media.id,
+                             detail=f"attach {st} #{sid}")
     db.session.commit()
     return serialize_link(link)
 
 
 def remove_link(media_id, subject_type, subject_id):
+    from datetime import datetime, timezone
     link = db.session.get(MediaLink, (media_id, subject_type, subject_id))
-    if link is None:
+    if link is None or link.is_deleted:
         raise ApiError("That attachment doesn't exist.", 404)
-    db.session.delete(link)
+    link.deleted_at = datetime.now(timezone.utc)  # soft delete the attachment
+    write_control.log_action("update", "media", media_id,
+                             detail=f"detach {subject_type} #{subject_id}")
     db.session.commit()

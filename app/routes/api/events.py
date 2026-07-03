@@ -23,7 +23,7 @@ def list_events():
 
 
 @api_bp.route("/events", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_event():
     return jsonify(svc.create(json_body())), 201
 
@@ -35,13 +35,13 @@ def get_event(event_id):
 
 
 @api_bp.route("/events/<int:event_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_event(event_id):
     return jsonify(svc.update(event_id, json_body()))
 
 
 @api_bp.route("/events/<int:event_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_event(event_id):
     svc.delete(event_id)
     return "", 204

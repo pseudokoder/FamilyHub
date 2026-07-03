@@ -13,12 +13,22 @@ from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 
 from app.models.role import Role
 
-# One shared rule: 8+ characters. For a small invite-only family site this beats
-# "uppercase + symbol + blood sample" rules that just push elderly users into
-# writing passwords on sticky notes. Length > complexity is modern NIST guidance.
+
+def _min_password_length(form, field):
+    """Length > complexity is modern NIST guidance, and the minimum is now
+    ADMIN-CONFIGURABLE (§9) — read live from site_settings so tightening it needs
+    no redeploy. (The service layer enforces the same floor + the breach check for
+    the API/CLI paths — this is the friendly form-side half.)"""
+    from app.services import settings_service
+    minimum = settings_service.get_int("min_password_length", 8)
+    if field.data and len(field.data) < minimum:
+        raise ValidationError(f"Passwords need at least {minimum} characters.")
+
+
+# One shared rule set, reused by every password field.
 PASSWORD_RULES = [
     DataRequired(message="Please choose a password."),
-    Length(min=8, message="Passwords need at least 8 characters."),
+    _min_password_length,
 ]
 
 
@@ -66,7 +76,7 @@ class CreateUserForm(FlaskForm):
     # The §10 role ladder as a dropdown. coerce=str because the stored value is
     # the role's string ("user", "admin", …).
     role = SelectField(
-        "Role", choices=Role.choices(), default=Role.USER.value, coerce=str,
+        "Role", choices=Role.choices(), default=Role.CONTRIBUTOR.value, coerce=str,
     )
     submit = SubmitField("Create Account")
 

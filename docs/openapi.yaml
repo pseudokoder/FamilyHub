@@ -29,7 +29,9 @@ info:
     Private, GEDCOM-7-backed family portal. All family content requires a
     session cookie (login). The /api/* surface is the WP2 JSON CRUD + search
     contract Cowork builds the WP3 front-end against; reads need any logged-in
-    member, writes need at least the USER role (§10). State-changing /api calls
+    member, writes need at least the Contributor role (§10). Deletes are SOFT
+    (ADR-0001): a deleted record reads as gone but is recoverable via
+    /api/restore or /api/audit/{id}/revert. State-changing /api calls
     must send the CSRF token in an X-CSRFToken header. The auth/admin/plumbing
     routes render HTML today; v2 can serve JSON from the same URLs.
 
@@ -56,6 +58,16 @@ tags:
     description: Markdown memories/bios (NOTE/SNOTE) with polymorphic links
   - name: Search
     description: People by name + filters, and full-text over notes (§12)
+  - name: WriteControl
+    description: Audit trail, restore, and revert — post-moderation (ADR-0001)
+  - name: Account
+    description: Account↔Person link, "my person", and the tree root (ADR-0002)
+  - name: Tree
+    description: Pedigree graph, relationship finder, dashboard stats, On This Day
+  - name: Inbox
+    description: Suggestions inbox and role-change requests (§5, §10)
+  - name: AdminApi
+    description: Admin actions — users, settings, backups, permission matrix (§9, §10)
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -112,6 +124,9 @@ paths:
     parameters: [{name: token, in: path, required: true, schema: {type: string}, description: Signed single-use token (1h)}]
     get: {tags: [Auth], summary: New-password form (token checked first), responses: {"200": {description: HTML form}, "302": {description: Invalid/expired token}}}
     post: {tags: [Auth], summary: Set the new password, responses: {"302": {description: Reset complete}}}
+  /auth/verify-email/{token}:
+    parameters: [{name: token, in: path, required: true, schema: {type: string}, description: Signed email-verification token (24h)}]
+    get: {tags: [Auth], summary: Confirm an email address from the emailed link (§9), responses: {"302": {description: Verified (or invalid) — redirected home with a flash}}}
 
   # --- Admin -------------------------------------------------------------------
   /admin/users:
@@ -142,7 +157,7 @@ paths:
 
   # ============================================================================
   # GENEALOGY JSON API (WP2) — the contract Cowork builds WP3 against.
-  # Every write (POST/PUT/DELETE) needs the USER role and an X-CSRFToken header.
+  # Every write (POST/PUT/DELETE) needs the Contributor role + an X-CSRFToken header. DELETE is soft (ADR-0001).
   # Standard responses: 200/201 ok, 204 deleted, 400 validation, 401 not logged
   # in, 403 wrong role, 404 missing, 409 duplicate link.
   # ============================================================================
@@ -151,8 +166,8 @@ paths:
   /api/individuals:
     get:
       tags: [Individuals]
-      summary: List individuals (light — primary name + counts)
-      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individuals: {type: array, items: {$ref: '#/components/schemas/Individual'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+      summary: List individuals (light rows — name + vitals + a place)
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individuals: {type: array, items: {$ref: '#/components/schemas/PersonListItem'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
     post:
       tags: [Individuals]
       summary: Create an individual (optional inline primary `name` object)
@@ -162,14 +177,14 @@ paths:
     parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Individuals], summary: One individual with all names, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Individuals], summary: Update fields (sex/living/restriction/gedcom_xref), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
-    delete: {tags: [Individuals], summary: Delete the individual + names + all polymorphic attachments, responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Individuals], summary: Soft-delete the individual (recoverable; names + attachments preserved), responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/individuals/{individual_id}/names:
     parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Individuals], summary: Add a name (needs a given or surname), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, "400": {$ref: '#/components/responses/BadRequest'}}}
   /api/names/{name_id}:
     parameters: [{name: name_id, in: path, required: true, schema: {type: integer}}]
     put: {tags: [Individuals], summary: Update a name (is_primary steals primary from the others), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, responses: {"200": {description: Updated}, "404": {$ref: '#/components/responses/NotFound'}}}
-    delete: {tags: [Individuals], summary: Delete a name, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Individuals], summary: Soft-delete a name (recoverable), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
 
   # --- Families + Children ----------------------------------------------------
   /api/families:
@@ -179,7 +194,7 @@ paths:
     parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Families], summary: One family with children, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Families], summary: Update partners / gedcom_xref, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Families], summary: Delete the family + child links + polymorphic attachments, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Families], summary: Soft-delete the family (recoverable; children + attachments preserved), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/families/{family_id}/children:
     parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Families], summary: "Add a child link (child_id required; pedigree_type: birth|adopted|foster|step)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/FamilyChild'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Child already in this family}}}
@@ -199,7 +214,7 @@ paths:
     parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Events], summary: One event, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Events], summary: Update an event, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Events], summary: Delete an event + its attachments, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Events], summary: Soft-delete an event (recoverable), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
 
   # --- Places -----------------------------------------------------------------
   /api/places:
@@ -227,7 +242,7 @@ paths:
     parameters: [{name: source_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Sources], summary: One source, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Sources], summary: Update a source, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Sources], summary: Delete a source (cascades its citations), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Sources], summary: Soft-delete a source (recoverable; citations preserved), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/citations:
     get:
       tags: [Sources]
@@ -239,14 +254,14 @@ paths:
     parameters: [{name: citation_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Sources], summary: One citation, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Sources], summary: Update a citation, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Sources], summary: Delete a citation, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Sources], summary: Soft-delete a citation (recoverable), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
 
   # --- Media ------------------------------------------------------------------
   /api/media:
     get:
       tags: [Media]
-      summary: List media (optionally for one subject)
-      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event]}}, {name: subject_id, in: query, schema: {type: integer}}]
+      summary: List media (optionally for one subject; order by upload or capture date)
+      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event]}}, {name: subject_id, in: query, schema: {type: integer}}, {name: order_by, in: query, schema: {type: string, enum: [uploaded, capture], default: uploaded}, description: "capture = when the photo was taken"}]
       responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {media: {type: array, items: {$ref: '#/components/schemas/Media'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
     post:
       tags: [Media]
@@ -257,7 +272,7 @@ paths:
     parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Media], summary: One media object (with links), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Media], summary: Update metadata (title/description/gedcom_xref; bytes are immutable), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, responses: {"200": {description: Updated}}}
-    delete: {tags: [Media], summary: Delete the media object + its files + links, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Media], summary: Soft-delete the media object (recoverable; files kept on disk), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/media/{media_id}/file:
     parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Media], summary: Full image bytes (login-walled), responses: {"200": {description: image bytes}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}}
@@ -283,7 +298,7 @@ paths:
     parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Notes], summary: One note (with links), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Notes], summary: Update a note (title/content/content_type/is_shared), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Notes], summary: Delete a note + its links, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Notes], summary: Soft-delete a note (recoverable; links preserved), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/notes/{note_id}/links:
     parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Notes], summary: Attach the note to a subject, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Link'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Already linked}}}
@@ -307,6 +322,130 @@ paths:
         - {name: place, in: query, schema: {type: string}}
       responses: {"200": {description: Grouped results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchResults'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
 
+  # --- Account ↔ Person link + tree root (ADR-0002) ---------------------------
+  /api/me/person:
+    get: {tags: [Account], summary: The current user's linked individual (null if unlinked), responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individual: {$ref: '#/components/schemas/Individual', nullable: true}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    put: {tags: [Account], summary: "Edit your OWN person record (self-authoring; requires a link)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/me/verify-email:
+    post: {tags: [Account], summary: "Email myself a verification link for my own address (§9)", responses: {"200": {description: "{status: sent|already_verified}"}, "401": {$ref: '#/components/responses/Unauthorized'}, "503": {description: Email not configured}}}
+  /api/tree/root:
+    get: {tags: [Account], summary: "Where the tree opens: the linked person, else the oldest ancestor", responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/TreeRoot'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/users/{user_id}/individual:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    put: {tags: [Account], summary: "Admin: link an account to a person (permission&#58; link_account)", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [individual_id], properties: {individual_id: {type: integer}}}}}}, responses: {"200": {description: Linked, content: {application/json: {schema: {$ref: '#/components/schemas/AccountLink'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: That person is already linked to another account}}}
+    delete: {tags: [Account], summary: "Admin: unlink an account (permission&#58; link_account)", responses: {"200": {description: Unlinked, content: {application/json: {schema: {$ref: '#/components/schemas/AccountLink'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Tree traversal + views (Master Plan §4) --------------------------------
+  /api/individuals/{individual_id}/pedigree:
+    parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
+    get:
+      tags: [Tree]
+      summary: A graph slice from any node (ancestors/descendants, depth, lazy-expand)
+      parameters:
+        - {name: direction, in: query, schema: {type: string, enum: [ancestors, descendants, both], default: both}}
+        - {name: depth, in: query, schema: {type: integer, default: 3, minimum: 1, maximum: 6}, description: generations each way}
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/PedigreeGraph'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}
+  /api/individuals/{a_id}/relationship/{b_id}:
+    parameters: [{name: a_id, in: path, required: true, schema: {type: integer}}, {name: b_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Tree], summary: Shortest blood path + plain-English label (B relative to A), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/RelationshipResult'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/stats:
+    get: {tags: [Tree], summary: Aggregate counts + storage (Home + Admin dashboard), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Stats'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/on-this-day:
+    get:
+      tags: [Tree]
+      summary: Family births/marriages/deaths sharing today's (or a given) date
+      parameters: [{name: month, in: query, schema: {type: integer, minimum: 1, maximum: 12}}, {name: day, in: query, schema: {type: integer, minimum: 1, maximum: 31}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/OnThisDay'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+  /api/historical-events:
+    get:
+      tags: [Tree]
+      summary: World/US almanac (each with a description) to blend into the timeline
+      parameters: [{name: scope, in: query, schema: {type: string, enum: [US, world]}}, {name: year_from, in: query, schema: {type: integer}}, {name: year_to, in: query, schema: {type: integer}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {historical_events: {type: array, items: {$ref: '#/components/schemas/HistoricalEvent'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+
+  # --- Admin actions (§9, §10) ------------------------------------------------
+  /api/admin/users:
+    get: {tags: [AdminApi], summary: All accounts with role + linked-person status, responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {users: {type: array, items: {$ref: '#/components/schemas/AdminUser'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/users/{user_id}/reset-password:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [AdminApi], summary: Email the user a password-reset link, responses: {"200": {description: "{status: reset_email_sent}"}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "503": {description: Email not configured}}}
+  /api/admin/users/{user_id}/change-email:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    post:
+      tags: [AdminApi]
+      summary: "Secure change-email: verify new addr, notify both, force reset, step-up re-auth"
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [new_email, current_password], properties: {new_email: {type: string}, current_password: {type: string, description: the admin's OWN password (step-up)}}}}}}
+      responses: {"200": {description: Changed, content: {application/json: {schema: {$ref: '#/components/schemas/AdminUser'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {description: Step-up re-auth failed / not admin}, "404": {$ref: '#/components/responses/NotFound'}, "503": {description: Email not configured}}
+  /api/settings:
+    get: {tags: [AdminApi], summary: Editable settings, grouped (branding/security/email/defaults), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Settings'}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+    put: {tags: [AdminApi], summary: Patch settings (coerced + validated; unknown keys ignored), requestBody: {content: {application/json: {schema: {type: object, additionalProperties: true}}}}, responses: {"200": {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/Settings'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups:
+    get: {tags: [AdminApi], summary: Backup list + sizes, storage location, disk headroom, last/next run, schedule, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/BackupOverview'}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups/run:
+    post: {tags: [AdminApi], summary: Back up now (create + verify + off-site upload), responses: {"200": {description: Verification report}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups/schedule:
+    put: {tags: [AdminApi], summary: "Set the backup schedule (off|daily|weekly + hour)", requestBody: {content: {application/json: {schema: {type: object, properties: {schedule: {type: string, enum: [off, daily, weekly]}, hour: {type: integer, minimum: 0, maximum: 23}}}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups/restore:
+    post:
+      tags: [AdminApi]
+      summary: "GUARDED restore: confirm + step-up; auto safety-backup taken first"
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [filename, current_password, confirm], properties: {filename: {type: string}, current_password: {type: string, description: step-up}, confirm: {type: boolean}}}}}}
+      responses: {"200": {description: Restored (+ safety backup name)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {description: Step-up failed}, "404": {$ref: '#/components/responses/NotFound'}}
+  /api/permissions/matrix:
+    get: {tags: [AdminApi], summary: Read-only role→permission map (permissions-as-data; §10), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/PermissionMatrix'}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+
+  # --- Suggestions inbox + role-change requests (§5, §10) ---------------------
+  /api/suggestions:
+    post: {tags: [Inbox], summary: Submit a suggestion (any member), requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    get:
+      tags: [Inbox]
+      summary: The admin inbox — filter by status/topic, or the prioritized queue
+      parameters: [{name: status, in: query, schema: {type: string, enum: [new, in_progress, done, declined]}}, {name: topic, in: query, schema: {type: string, enum: [idea, bug, photo_request, other]}}, {name: prioritized, in: query, schema: {type: boolean}, description: only items with a priority, ranked}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {suggestions: {type: array, items: {$ref: '#/components/schemas/Suggestion'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/suggestions/{suggestion_id}:
+    parameters: [{name: suggestion_id, in: path, required: true, schema: {type: integer}}]
+    put: {tags: [Inbox], summary: "Admin triage: set status and/or priority (integer rank, or null)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/role-requests:
+    post: {tags: [Inbox], summary: "Request a role change (member); one pending request at a time", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [requested_role], properties: {requested_role: {type: string, enum: [viewer, contributor, curator, admin]}}}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: A pending request already exists}}}
+    get:
+      tags: [Inbox]
+      summary: "Admin: list role requests (filter by status)"
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, approved, denied]}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {role_requests: {type: array, items: {$ref: '#/components/schemas/RoleRequest'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/role-requests/{request_id}/approve:
+    parameters: [{name: request_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Inbox], summary: "Admin: approve (applies the role change through the audit service)", responses: {"200": {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: Already decided}}}
+  /api/role-requests/{request_id}/deny:
+    parameters: [{name: request_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Inbox], summary: "Admin: deny (no role change, decision recorded)", responses: {"200": {description: Denied, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: Already decided}}}
+
+  # --- Write control: activity feed, restore, revert (ADR-0001) ---------------
+  /api/activity:
+    get:
+      tags: [WriteControl]
+      summary: The audit trail — paginated, filterable (Curator+; ADR-0001)
+      parameters:
+        - {name: action, in: query, schema: {type: string, enum: [create, update, delete, restore, revert]}}
+        - {name: actor_id, in: query, schema: {type: integer}}
+        - {name: subject_type, in: query, schema: {type: string}}
+        - {name: date_from, in: query, schema: {type: string, format: date}}
+        - {name: date_to, in: query, schema: {type: string, format: date}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: per_page, in: query, schema: {type: integer, default: 50, maximum: 200}}
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ActivityPage'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/restore:
+    post:
+      tags: [WriteControl]
+      summary: Un-delete a soft-deleted record (permission&#58; revert)
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [subject_type, subject_id], properties: {subject_type: {type: string, enum: [individual, name, family, event, source, citation, media, note]}, subject_id: {type: integer}}}}}}
+      responses: {"200": {description: Restored (returns the row snapshot)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}
+  /api/audit/{audit_id}/revert:
+    parameters: [{name: audit_id, in: path, required: true, schema: {type: integer}}]
+    post:
+      tags: [WriteControl]
+      summary: Undo the change an audit entry describes (permission&#58; revert)
+      responses: {"200": {description: Reverted (result is the new snapshot, or null if now deleted)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}
+
 components:
   responses:
     Unauthorized: {description: Not logged in, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
@@ -319,6 +458,203 @@ components:
       properties:
         error: {type: string}
         fields: {type: object, additionalProperties: {type: string}, description: per-field problems (present on validation errors)}
+    AuditEntry:
+      type: object
+      description: One row of the write-control audit trail (ADR-0001).
+      properties:
+        id: {type: integer, readOnly: true}
+        action: {type: string, description: create|update|delete|restore|revert (or a security/admin verb)}
+        actor_id: {type: integer, nullable: true}
+        actor: {type: string, nullable: true, description: the actor's display name}
+        subject_type: {type: string, example: individual}
+        subject_id: {type: integer, nullable: true}
+        detail: {type: string}
+        created_at: {type: string, format: date-time, readOnly: true}
+    ActivityPage:
+      type: object
+      description: A page of audit entries plus pagination metadata.
+      properties:
+        activity: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+        page: {type: integer}
+        per_page: {type: integer}
+        total: {type: integer}
+        pages: {type: integer}
+    AccountLink:
+      type: object
+      description: The Account↔Person link state for one user (ADR-0002).
+      properties:
+        user_id: {type: integer, readOnly: true}
+        individual_id: {type: integer, nullable: true}
+        individual: {$ref: '#/components/schemas/Individual', nullable: true}
+    TreeRoot:
+      type: object
+      description: Where the family tree should open for the current user (ADR-0002).
+      properties:
+        individual_id: {type: integer, nullable: true}
+        source: {type: string, enum: [linked, oldest_ancestor, empty], description: how the root was chosen}
+        individual: {$ref: '#/components/schemas/Individual', nullable: true}
+    PersonListItem:
+      type: object
+      description: The lightweight person row shared by the People list, search, and tree nodes.
+      properties:
+        id: {type: integer}
+        primary_name: {type: string, nullable: true}
+        sex: {type: string, nullable: true}
+        living: {type: boolean}
+        birth_year: {type: integer, nullable: true}
+        death_year: {type: integer, nullable: true}
+        birth_place: {type: string, nullable: true}
+    PedigreeGraph:
+      type: object
+      description: A bounded graph slice — nodes + edges — for lazy-expandable tree rendering.
+      properties:
+        root_id: {type: integer}
+        direction: {type: string, enum: [ancestors, descendants, both]}
+        depth: {type: integer}
+        nodes:
+          type: array
+          items:
+            allOf:
+              - {$ref: '#/components/schemas/PersonListItem'}
+              - type: object
+                properties:
+                  has_ancestors: {type: boolean, description: more parents exist beyond the slice (lazy-fetch hint)}
+                  has_descendants: {type: boolean}
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              type: {type: string, enum: [parent-child, partner]}
+              family_id: {type: integer}
+              parent_id: {type: integer, nullable: true}
+              child_id: {type: integer, nullable: true}
+              partner1_id: {type: integer, nullable: true}
+              partner2_id: {type: integer, nullable: true}
+    RelationshipResult:
+      type: object
+      description: Shortest blood path between two people + a label describing B relative to A.
+      properties:
+        a: {type: integer}
+        b: {type: integer}
+        relationship: {type: string, example: 1st cousin once removed}
+        nca_id: {type: integer, nullable: true, description: nearest common ancestor}
+        distance_a: {type: integer, nullable: true}
+        distance_b: {type: integer, nullable: true}
+        path: {type: array, items: {type: integer}, description: individual ids from A through the NCA to B}
+    Stats:
+      type: object
+      description: Aggregate counts + storage for the dashboards.
+      properties:
+        counts:
+          type: object
+          additionalProperties: {type: integer}
+          description: people, families, events, sources, citations, photos, notes, places, repositories, users
+        storage_bytes: {type: integer}
+    OnThisDay:
+      type: object
+      description: Family births/marriages/deaths sharing a calendar day.
+      properties:
+        month: {type: integer}
+        day: {type: integer}
+        births: {type: array, items: {$ref: '#/components/schemas/Anniversary'}}
+        marriages: {type: array, items: {$ref: '#/components/schemas/Anniversary'}}
+        deaths: {type: array, items: {$ref: '#/components/schemas/Anniversary'}}
+    Anniversary:
+      type: object
+      properties:
+        event_id: {type: integer}
+        subject_type: {type: string}
+        subject_id: {type: integer}
+        who: {type: string, nullable: true}
+        year: {type: integer, nullable: true}
+        date_original: {type: string, nullable: true}
+        place: {type: string, nullable: true}
+    AdminUser:
+      type: object
+      description: An account row for the admin Users tab.
+      properties:
+        id: {type: integer}
+        email: {type: string}
+        display_name: {type: string}
+        role: {type: string, enum: [viewer, contributor, curator, admin]}
+        is_active: {type: boolean}
+        email_verified: {type: boolean}
+        individual_id: {type: integer, nullable: true}
+        linked: {type: boolean, description: whether the account is linked to a person}
+        locked: {type: boolean, description: currently locked out}
+        created_at: {type: string, format: date-time}
+    Settings:
+      type: object
+      description: Editable settings grouped for the admin panel (secrets excluded).
+      properties:
+        branding: {type: object, additionalProperties: true}
+        security: {type: object, additionalProperties: true}
+        email: {type: object, additionalProperties: true}
+        defaults: {type: object, additionalProperties: true}
+    BackupOverview:
+      type: object
+      properties:
+        backups:
+          type: array
+          items:
+            type: object
+            properties:
+              filename: {type: string}
+              bytes: {type: integer}
+              created_at: {type: string, format: date-time}
+        storage_location: {type: string}
+        offsite_bucket: {type: string, nullable: true}
+        disk_free_bytes: {type: integer, nullable: true}
+        disk_total_bytes: {type: integer, nullable: true}
+        last_run: {type: string, format: date-time, nullable: true}
+        next_run: {type: string, format: date-time, nullable: true}
+        schedule: {type: string, enum: [off, daily, weekly]}
+        schedule_hour: {type: integer}
+    PermissionMatrix:
+      type: object
+      description: The permissions-as-data map (§10) — role → {permission → bool}.
+      properties:
+        permissions: {type: array, items: {type: string}}
+        matrix:
+          type: object
+          additionalProperties: {type: object, additionalProperties: {type: boolean}}
+    Suggestion:
+      type: object
+      description: A member suggestion in the admin inbox (§5).
+      properties:
+        id: {type: integer, readOnly: true}
+        author_user_id: {type: integer, nullable: true, readOnly: true}
+        author: {type: string, nullable: true, readOnly: true}
+        topic: {type: string, enum: [idea, bug, photo_request, other]}
+        body: {type: string}
+        status: {type: string, enum: [new, in_progress, done, declined]}
+        priority: {type: integer, nullable: true, description: admin rank (lower = higher); null = untriaged}
+        created_at: {type: string, format: date-time, readOnly: true}
+        updated_at: {type: string, format: date-time, readOnly: true}
+    RoleRequest:
+      type: object
+      description: A member's request for a role change (§10).
+      properties:
+        id: {type: integer, readOnly: true}
+        user_id: {type: integer, readOnly: true}
+        user: {type: string, nullable: true, readOnly: true}
+        requested_role: {type: string, enum: [viewer, contributor, curator, admin]}
+        status: {type: string, enum: [pending, approved, denied], readOnly: true}
+        decided_by_user_id: {type: integer, nullable: true, readOnly: true}
+        decided_by: {type: string, nullable: true, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+        decided_at: {type: string, format: date-time, nullable: true, readOnly: true}
+    HistoricalEvent:
+      type: object
+      description: One world/US almanac entry (reference data) for timeline context.
+      properties:
+        id: {type: integer}
+        year: {type: integer}
+        date_sort: {type: string, nullable: true}
+        title: {type: string}
+        description: {type: string}
+        scope: {type: string, enum: [US, world]}
     Name:
       type: object
       description: A name belonging to an individual (system fields are read-only).
@@ -446,9 +782,11 @@ components:
         media_type: {type: string, readOnly: true, example: image/jpeg}
         title: {type: string, nullable: true}
         description: {type: string, nullable: true}
+        capture_date: {type: string, nullable: true, description: when the photo was taken (raw, e.g. "Summer 1952")}
+        capture_date_sort: {type: string, nullable: true, description: normalized sortable capture date}
         uploaded_by: {type: integer, nullable: true, readOnly: true}
         uploader: {type: string, nullable: true, readOnly: true}
-        created_at: {type: string, format: date-time, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true, description: when uploaded (distinct from capture_date)}
         file_url: {type: string, readOnly: true}
         thumb_url: {type: string, readOnly: true}
         links_count: {type: integer, readOnly: true}
@@ -477,15 +815,7 @@ components:
         counts: {type: object, properties: {people: {type: integer}, notes: {type: integer}}}
         people:
           type: array
-          items:
-            type: object
-            properties:
-              id: {type: integer}
-              name: {type: string, nullable: true}
-              sex: {type: string, nullable: true}
-              living: {type: boolean}
-              birth_year: {type: integer, nullable: true}
-              death_year: {type: integer, nullable: true}
+          items: {$ref: '#/components/schemas/PersonListItem'}
         notes:
           type: array
           items:
