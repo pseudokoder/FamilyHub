@@ -64,6 +64,8 @@ tags:
     description: Account↔Person link, "my person", and the tree root (ADR-0002)
   - name: Tree
     description: Pedigree graph, relationship finder, dashboard stats, On This Day
+  - name: Inbox
+    description: Suggestions inbox and role-change requests (§5, §10)
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -359,6 +361,31 @@ paths:
       parameters: [{name: scope, in: query, schema: {type: string, enum: [US, world]}}, {name: year_from, in: query, schema: {type: integer}}, {name: year_to, in: query, schema: {type: integer}}]
       responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {historical_events: {type: array, items: {$ref: '#/components/schemas/HistoricalEvent'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
 
+  # --- Suggestions inbox + role-change requests (§5, §10) ---------------------
+  /api/suggestions:
+    post: {tags: [Inbox], summary: Submit a suggestion (any member), requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    get:
+      tags: [Inbox]
+      summary: The admin inbox — filter by status/topic, or the prioritized queue
+      parameters: [{name: status, in: query, schema: {type: string, enum: [new, in_progress, done, declined]}}, {name: topic, in: query, schema: {type: string, enum: [idea, bug, photo_request, other]}}, {name: prioritized, in: query, schema: {type: boolean}, description: only items with a priority, ranked}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {suggestions: {type: array, items: {$ref: '#/components/schemas/Suggestion'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/suggestions/{suggestion_id}:
+    parameters: [{name: suggestion_id, in: path, required: true, schema: {type: integer}}]
+    put: {tags: [Inbox], summary: "Admin triage: set status and/or priority (integer rank, or null)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/role-requests:
+    post: {tags: [Inbox], summary: "Request a role change (member); one pending request at a time", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [requested_role], properties: {requested_role: {type: string, enum: [viewer, contributor, curator, admin]}}}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: A pending request already exists}}}
+    get:
+      tags: [Inbox]
+      summary: "Admin: list role requests (filter by status)"
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, approved, denied]}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {role_requests: {type: array, items: {$ref: '#/components/schemas/RoleRequest'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/role-requests/{request_id}/approve:
+    parameters: [{name: request_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Inbox], summary: "Admin: approve (applies the role change through the audit service)", responses: {"200": {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: Already decided}}}
+  /api/role-requests/{request_id}/deny:
+    parameters: [{name: request_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Inbox], summary: "Admin: deny (no role change, decision recorded)", responses: {"200": {description: Denied, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: Already decided}}}
+
   # --- Write control: activity feed, restore, revert (ADR-0001) ---------------
   /api/activity:
     get:
@@ -510,6 +537,32 @@ components:
         year: {type: integer, nullable: true}
         date_original: {type: string, nullable: true}
         place: {type: string, nullable: true}
+    Suggestion:
+      type: object
+      description: A member suggestion in the admin inbox (§5).
+      properties:
+        id: {type: integer, readOnly: true}
+        author_user_id: {type: integer, nullable: true, readOnly: true}
+        author: {type: string, nullable: true, readOnly: true}
+        topic: {type: string, enum: [idea, bug, photo_request, other]}
+        body: {type: string}
+        status: {type: string, enum: [new, in_progress, done, declined]}
+        priority: {type: integer, nullable: true, description: admin rank (lower = higher); null = untriaged}
+        created_at: {type: string, format: date-time, readOnly: true}
+        updated_at: {type: string, format: date-time, readOnly: true}
+    RoleRequest:
+      type: object
+      description: A member's request for a role change (§10).
+      properties:
+        id: {type: integer, readOnly: true}
+        user_id: {type: integer, readOnly: true}
+        user: {type: string, nullable: true, readOnly: true}
+        requested_role: {type: string, enum: [viewer, contributor, curator, admin]}
+        status: {type: string, enum: [pending, approved, denied], readOnly: true}
+        decided_by_user_id: {type: integer, nullable: true, readOnly: true}
+        decided_by: {type: string, nullable: true, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+        decided_at: {type: string, format: date-time, nullable: true, readOnly: true}
     HistoricalEvent:
       type: object
       description: One world/US almanac entry (reference data) for timeline context.

@@ -104,6 +104,6 @@ def get_or_404(model, obj_id, what="record"):
 # (Defining api_bp first, importing after, is the standard Flask way to avoid a
 # circular import between this package and its route modules.)
 from app.routes.api import (  # noqa: E402,F401
-    account, activity, citations, events, families, individuals, media, notes,
-    places, search, sources, stats, tree,
+    account, activity, citations, events, families, inbox, individuals, media,
+    notes, places, search, sources, stats, tree,
 )
