@@ -37,9 +37,20 @@ Entry format:
 
 ## Open items
 
-_None._ WP1 is a backend-only work package (database foundation); **Cowork is
-idle until the WP2 API contract is published** (Master Plan §7 build sequence),
-so there are no cross-builder blockers right now.
+### [OPEN] Provided files for the docs reconciliation are missing from the tree
+- Date: 2026-07-03
+- Raised by: Code
+- Blocks: **Task A** of the docs-reconciliation run — committing the two
+  Wes-authored files **as-is** (the brief says *do not rewrite* them, so Code will
+  not author them).
+- Needs (Wes must): drop these two files into the working tree, then tell Code to
+  commit them:
+  1. `docs/adr/0002-account-person-link.md` (ADR-0002, Accepted)
+  2. `docs/CONTEXT_LOG.md` (cross-thread operational log)
+- Not blocking the rest: the ADR index (`docs/adr/README.md`) and every Master-Plan
+  reference already point at ADR-0002 by its agreed title, so adding the file later
+  needs **no rework** — Code just commits it onto this branch before merge.
+- Status: **OPEN** — awaiting the two files from Wes.
 
 ---
 

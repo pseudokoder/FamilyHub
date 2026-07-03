@@ -362,3 +362,75 @@ USER → writes; `X-CSRFToken` on writes). Cowork's WP3 builds the elderly-acces
 cross-generational UI (§5A/§5B) against it — server-rendering via the services or
 fetching the JSON, their choice. No cross-builder blockers are open; the one
 former blocker (`users` §3.5) is RESOLVED in `BLOCKERS.md`.
+
+---
+
+## Docs — v1 Design Reconciliation (2026-07-03)
+
+**Docs-only run** (no application code, migrations, or endpoints — those are BE
+Prompt 2). Goal: fold a batch of approved design decisions into the Master Plan,
+bump it, and stand up the ADR index. Branch `docs/reconcile-v1-design` off master.
+
+**Why a MAJOR bump (→ 2.0.0).** SemVer for a *plan* tracks the scope contract, not
+code. One decision — **promoting write-control (audit + soft-delete + revert) into
+v1** — changes the schema and the definition of "delete," so it's a breaking change
+to the contract downstream builders rely on. That forces MAJOR; everything else
+(role rename, new additive scope) rides along under it.
+
+**What landed in `docs/MASTER_PLAN.md`:**
+1. **Write-control → v1** (ADR-0001). Added a **soft-delete design rule** (§3), an
+   **`audit_log` table** to §3.5, flipped §3.6 / §8 / §9 from "deferred" to
+   "v1-active." Audit logging moved from §9 Tier-2 to **Tier-1** because it's now
+   a data-fidelity guarantee, not a nice-to-have.
+2. **Fan Chart → v2.** v1 tree is now Pedigree + Family Group + Relationship View.
+   The teaching point I wrote into §3: **the person graph is a graph, not a linked
+   list** — traversal must not assume one linear ancestor chain (this is the exact
+   bug a beginner writes first). The renderer is orientation-parameterized and the
+   endpoint does lazy subtree fetch — those are *seams*, deliberately cheap now so
+   the v2 horizontal-toggle and pan/zoom canvas aren't rewrites.
+3. **Associations → v2 confirmed**, but I drew the line explicitly: **core family
+   relationships (via FAM links) stay v1**; only the non-family "Other
+   Relationships" (ASSO) section defers.
+4. **RBAC rename** GUEST/USER/POWER USER/ADMIN → **Viewer/Contributor/Curator/
+   Admin**, plus **permissions-as-data** (a role = a bundle of flags) with a
+   read-only matrix in v1. The "as data" framing is the anti-lock-in move: custom
+   roles become a row, not a code change.
+5. **New v1 scope** wired into §3.5/§5/§8/§9: Account↔Person link (ADR-0002,
+   `users.individual_id`, oldest-ancestor fallback), self-authored living-member
+   records, suggestions inbox + role-change requests (two new tables sketched),
+   transactional email (verification), white-label branding, per-user timezone,
+   and a config-driven security baseline.
+6. **v1.x + parking lot** captured (Family Address Book; MFA/TOTP, notification
+   email, pan/zoom canvas, theme switcher, the reserved **Family Bunch** seam).
+
+**ADR index.** Created `docs/adr/README.md` — a one-row-per-decision table so future
+threads orient in one glance instead of re-reading every ADR.
+
+### Decisions Made Without Wes (docs reconciliation)
+1. **Schema sketched in the plan, not just prose.** I added real `CREATE TABLE`
+   stubs for `audit_log`, `suggestions`, and `role_requests` (and new columns on
+   `users`) rather than describing them in words. The Master Plan §3 is written *as*
+   schema, so keeping new v1 scope in that form keeps the doc coherent and gives BE
+   Prompt 2 an unambiguous target. No migration was written — that's BE Prompt 2.
+2. **README role labels left as-is** (`GUEST/USER/POWER_USER/ADMIN`). The rename is
+   a *plan* decision; the shipped **code enums still use the old names**, and the
+   README documents what's actually built. I'll rename README (and the enums) in
+   **BE Prompt 2** when the code changes, so the portfolio face never describes
+   something that isn't there yet.
+3. **`site_settings` stays key/value** for branding + the security baseline rather
+   than growing typed columns — matches the existing §3.5 shape and keeps new config
+   additive.
+
+### Blocked this run
+**Task A is half-blocked.** The two files Wes was to drop in —
+`docs/adr/0002-account-person-link.md` and `docs/CONTEXT_LOG.md` — **were not in the
+working tree** (confirmed by `find` + a clean `git status`). Per the blocker
+protocol I did **not** author them (the brief says "commit as-is, do not rewrite").
+The ADR index and every Master-Plan reference already point at ADR-0002 by its
+agreed title, so dropping the file in later closes the loop with no rework. Logged
+in `BLOCKERS.md`; see the session summary for the one next action.
+
+### Manual Testing Checklist (docs reconciliation)
+Nothing browser-only. Verify the Master Plan renders on GitHub (tables in §3.5/§4/
+§10, the Revision History list) and that the ADR index links resolve **once
+ADR-0002 is committed**.
