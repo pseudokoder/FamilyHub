@@ -27,7 +27,7 @@ def _normalize_email(email):
     return (email or "").strip().lower()
 
 
-def create_user(email, display_name, password, role=Role.USER, actor=None):
+def create_user(email, display_name, password, role=Role.CONTRIBUTOR, actor=None):
     """Create a new account with a securely hashed password.
 
     Raises ValueError if the email is already in use — the route layer turns

@@ -16,7 +16,7 @@ def list_families():
 
 
 @api_bp.route("/families", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_family():
     return jsonify(svc.create(json_body())), 201
 
@@ -28,26 +28,26 @@ def get_family(family_id):
 
 
 @api_bp.route("/families/<int:family_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_family(family_id):
     return jsonify(svc.update(family_id, json_body()))
 
 
 @api_bp.route("/families/<int:family_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_family(family_id):
     svc.delete(family_id)
     return "", 204
 
 
 @api_bp.route("/families/<int:family_id>/children", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def add_child(family_id):
     return jsonify(svc.add_child(family_id, json_body())), 201
 
 
 @api_bp.route("/families/<int:family_id>/children/<int:child_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def remove_child(family_id, child_id):
     svc.remove_child(family_id, child_id)
     return "", 204

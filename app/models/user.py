@@ -61,7 +61,7 @@ class User(UserMixin, db.Model):
     # to an existing table in a migration.
     role = db.Column(
         db.String(20), nullable=False,
-        default=Role.USER.value, server_default=Role.USER.value,
+        default=Role.CONTRIBUTOR.value, server_default=Role.CONTRIBUTOR.value,
     )
 
     # Soft on/off switch for an account. Flask-Login reads this on login, so a
@@ -71,9 +71,33 @@ class User(UserMixin, db.Model):
         db.Boolean, nullable=False, default=True, server_default=db.text("1")
     )
 
+    # ACCOUNT ↔ PERSON LINK (ADR-0002). A living family member is usually BOTH a
+    # login (this row) AND a person in the tree (an Individual). This nullable FK
+    # ties the two together — one user links to at most one individual. Nullable
+    # on purpose: a brand-new member, or a view-only relative, may have no linked
+    # person yet, in which case the tree falls back to the oldest-ancestor root
+    # (see genealogy_service). SET NULL so deleting a person never deletes the
+    # account. We deliberately do NOT merge users into individuals — they are
+    # different concepts (auth vs. genealogy), kept separate per §3.5.
+    individual_id = db.Column(
+        db.Integer,
+        db.ForeignKey("individuals.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # PER-USER TIMEZONE (Master Plan §5). NULL means "use the site default"
+    # (a site_settings value); an account can override it. Stored as an IANA
+    # zone name ("America/Chicago"), the portable standard — not a bare UTC
+    # offset, which breaks across daylight-saving changes.
+    timezone = db.Column(db.String(50), nullable=True)
+
     created_at = db.Column(
         db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
+
+    # The linked person (ADR-0002), or None. A plain many-to-one: each account
+    # points at zero or one individual.
+    individual = db.relationship("Individual", foreign_keys=[individual_id])
 
     # --- Role helpers (the model's slice of the §10 authorization layer) ------
 

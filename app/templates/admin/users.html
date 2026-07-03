@@ -31,12 +31,12 @@
                 <td>
                     {% if user.is_admin %}
                         <span class="badge text-bg-primary">Admin</span>
-                    {% elif user.role == "power_user" %}
-                        <span class="badge text-bg-info">Power user</span>
-                    {% elif user.role == "guest" %}
-                        <span class="badge text-bg-light border">Guest</span>
+                    {% elif user.role == "curator" %}
+                        <span class="badge text-bg-info">Curator</span>
+                    {% elif user.role == "viewer" %}
+                        <span class="badge text-bg-light border">Viewer</span>
                     {% else %}
-                        <span class="badge text-bg-secondary">Member</span>
+                        <span class="badge text-bg-secondary">Contributor</span>
                     {% endif %}
                 </td>
                 {# strftime formats the timestamp for humans —

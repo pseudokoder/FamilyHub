@@ -31,9 +31,9 @@ from app.services.genealogy_service import (
 # server (real accounts are made with `flask create-admin` + the admin panel).
 DEMO_PASSWORD = "FamilyHub123"
 DEMO_USERS = [
-    ("jo@example.com", "Grandma Jo", Role.USER),
-    ("robert@example.com", "Robert Hartwell", Role.POWER_USER),
-    ("pat@example.com", "Cousin Pat (by marriage)", Role.GUEST),
+    ("jo@example.com", "Grandma Jo", Role.CONTRIBUTOR),
+    ("robert@example.com", "Robert Hartwell", Role.CURATOR),
+    ("pat@example.com", "Cousin Pat (by marriage)", Role.VIEWER),
 ]
 
 

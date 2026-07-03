@@ -29,7 +29,7 @@ def list_media():
 
 
 @api_bp.route("/media", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def upload_media():
     # Multipart: the image is in request.files, the metadata in request.form.
     return jsonify(svc.create_from_upload(
@@ -43,13 +43,13 @@ def get_media(media_id):
 
 
 @api_bp.route("/media/<int:media_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_media(media_id):
     return jsonify(svc.update(media_id, json_body()))
 
 
 @api_bp.route("/media/<int:media_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_media(media_id):
     svc.delete(media_id)
     return "", 204
@@ -76,14 +76,14 @@ def media_thumb(media_id):
 
 
 @api_bp.route("/media/<int:media_id>/links", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def add_media_link(media_id):
     return jsonify(svc.add_link(media_id, json_body())), 201
 
 
 @api_bp.route("/media/<int:media_id>/links/<subject_type>/<int:subject_id>",
               methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def remove_media_link(media_id, subject_type, subject_id):
     svc.remove_link(media_id, subject_type, subject_id)
     return "", 204

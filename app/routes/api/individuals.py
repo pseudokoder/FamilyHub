@@ -24,7 +24,7 @@ def list_individuals():
 
 
 @api_bp.route("/individuals", methods=["POST"])
-@role_required(Role.USER)  # writing requires at least a normal member (§10)
+@role_required(Role.CONTRIBUTOR)  # writing requires at least a normal member (§10)
 def create_individual():
     return jsonify(svc.create(json_body())), 201  # 201 Created
 
@@ -36,13 +36,13 @@ def get_individual(individual_id):
 
 
 @api_bp.route("/individuals/<int:individual_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_individual(individual_id):
     return jsonify(svc.update(individual_id, json_body()))
 
 
 @api_bp.route("/individuals/<int:individual_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_individual(individual_id):
     svc.delete(individual_id)
     return "", 204  # 204 No Content — deleted, nothing to return
@@ -51,19 +51,19 @@ def delete_individual(individual_id):
 # --- Names (a sub-resource of an individual) ----------------------------------
 
 @api_bp.route("/individuals/<int:individual_id>/names", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def add_name(individual_id):
     return jsonify(svc.add_name(individual_id, json_body())), 201
 
 
 @api_bp.route("/names/<int:name_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_name(name_id):
     return jsonify(svc.update_name(name_id, json_body()))
 
 
 @api_bp.route("/names/<int:name_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_name(name_id):
     svc.delete_name(name_id)
     return "", 204

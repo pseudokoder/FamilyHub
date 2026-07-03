@@ -33,8 +33,8 @@ ADMIN_EMAIL = "admin@test.invalid"
 ADMIN_PASSWORD = "AdminPass123"
 MEMBER_EMAIL = "member@test.invalid"
 MEMBER_PASSWORD = "MemberPass123"
-GUEST_EMAIL = "guest@test.invalid"
-GUEST_PASSWORD = "GuestPass123"
+VIEWER_EMAIL = "viewer@test.invalid"
+VIEWER_PASSWORD = "ViewerPass123"
 
 
 @pytest.fixture
@@ -134,18 +134,18 @@ def member_client(app, member):
 
 
 @pytest.fixture
-def guest(app):
+def viewer(app):
     """The lowest rung of the role ladder (§10) — can read, but not write."""
     return user_service.create_user(
-        GUEST_EMAIL, "Guest", GUEST_PASSWORD, role=Role.GUEST
+        VIEWER_EMAIL, "Viewer", VIEWER_PASSWORD, role=Role.VIEWER
     )
 
 
 @pytest.fixture
-def guest_client(app, guest):
+def viewer_client(app, viewer):
     other = app.test_client()
     other.post(
-        "/auth/login", data={"email": GUEST_EMAIL, "password": GUEST_PASSWORD}
+        "/auth/login", data={"email": VIEWER_EMAIL, "password": VIEWER_PASSWORD}
     )
     return other
 

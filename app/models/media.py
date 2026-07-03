@@ -18,10 +18,11 @@ stripping) returns in WP2; this table is the data shape it will write to.
 """
 
 from app.extensions import db
+from app.models.mixins import SoftDeleteMixin
 from app.models.individual import _utcnow
 
 
-class MediaObject(db.Model):
+class MediaObject(SoftDeleteMixin, db.Model):
     """One uploaded file — GEDCOM OBJE. Photos in v1; video deferred to v2."""
 
     __tablename__ = "media_objects"
@@ -35,6 +36,15 @@ class MediaObject(db.Model):
     media_type = db.Column(db.String(50))   # MIME: image/jpeg, image/png
     title = db.Column(db.String(255))
     description = db.Column(db.Text)
+
+    # WHEN THE PHOTO WAS TAKEN — distinct from created_at (when it was uploaded).
+    # A 1952 wedding photo is uploaded in 2026; the timeline cares about 1952.
+    # Same dual-date pattern as events (Master Plan §3): keep the faithful
+    # original string ("Summer 1952", "ABT 1890") AND a normalized sortable value
+    # ("1952-00-00") so the album/timeline can ORDER BY it. Both nullable — plenty
+    # of photos have no known date.
+    capture_date = db.Column(db.String(100))       # raw, as entered
+    capture_date_sort = db.Column(db.String(20))   # normalized, sortable
 
     # SET NULL: if an uploader's account is deleted, keep the family photo but
     # forget who uploaded it. The picture matters more than the attribution.
@@ -52,7 +62,7 @@ class MediaObject(db.Model):
         return f"<MediaObject #{self.id} {self.title!r}>"
 
 
-class MediaLink(db.Model):
+class MediaLink(SoftDeleteMixin, db.Model):
     """Attaches one media object to one record — individual, family, or event.
 
     Polymorphic, with a COMPOSITE primary key: the triple (media, subject_type,

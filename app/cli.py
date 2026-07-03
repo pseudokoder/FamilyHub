@@ -169,9 +169,30 @@ def register_cli(app):
         a firm v2 deliverable — this command is mock data, not a GEDCOM importer.
         """
         from seed import seed_all, seed_users
+        from app.services import historical_event_service
 
         users = seed_users()
         counts = seed_all()
+        # The timeline's almanac backdrop is reference data, not Hartwell data —
+        # idempotent, so re-running seed never double-loads it.
+        counts["historical_events"] = historical_event_service.seed_defaults()
         click.echo(f"Seeded {len(users)} demo user(s) + mock data:")
         for name, count in counts.items():
             click.echo(f"  {name}: {count} row(s)")
+
+    @app.cli.command("seed-historical")
+    def seed_historical_command():
+        """Load the bundled world/US almanac into the timeline (idempotent).
+
+        Unlike `flask seed` (dev mock data), this is safe and INTENDED for
+        production: the historical-events backdrop (Master Plan §4) is the same
+        for every family, so run it once after `flask db upgrade` on a real
+        server. It does nothing if the table is already populated.
+        """
+        from app.services import historical_event_service
+
+        inserted = historical_event_service.seed_defaults()
+        if inserted:
+            click.echo(f"Loaded {inserted} historical event(s).")
+        else:
+            click.echo("Historical events already present — nothing to do.")

@@ -16,7 +16,7 @@ def list_places():
 
 
 @api_bp.route("/places", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_place():
     return jsonify(svc.create(json_body())), 201
 
@@ -28,13 +28,13 @@ def get_place(place_id):
 
 
 @api_bp.route("/places/<int:place_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_place(place_id):
     return jsonify(svc.update(place_id, json_body()))
 
 
 @api_bp.route("/places/<int:place_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_place(place_id):
     svc.delete(place_id)
     return "", 204

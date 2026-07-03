@@ -1,7 +1,7 @@
 """API tests: /api/individuals (+ names), and the API's auth/role wall.
 
 This file also doubles as the proof that the JSON API's authorization works,
-since individuals is the first resource: anonymous → 401, GUEST → 403 on writes,
+since individuals is the first resource: anonymous → 401, Viewer → 403 on writes,
 a normal member → full CRUD.
 """
 
@@ -11,10 +11,10 @@ def test_reads_require_login(client):
     assert client.get("/api/individuals/1").status_code == 401
 
 
-def test_guest_can_read_but_not_write(guest_client):
-    assert guest_client.get("/api/individuals").status_code == 200
-    # A GUEST is below USER on the ladder → 403 on any write (§10).
-    assert guest_client.post("/api/individuals", json={"sex": "M"}).status_code == 403
+def test_viewer_can_read_but_not_write(viewer_client):
+    assert viewer_client.get("/api/individuals").status_code == 200
+    # A Viewer is below Contributor on the ladder → 403 on any write (§10).
+    assert viewer_client.post("/api/individuals", json={"sex": "M"}).status_code == 403
 
 
 def test_create_get_and_list(member_client):

@@ -18,7 +18,7 @@ def list_repositories():
 
 
 @api_bp.route("/repositories", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_repository():
     return jsonify(svc.create_repository(json_body())), 201
 
@@ -30,13 +30,13 @@ def get_repository(repo_id):
 
 
 @api_bp.route("/repositories/<int:repo_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_repository(repo_id):
     return jsonify(svc.update_repository(repo_id, json_body()))
 
 
 @api_bp.route("/repositories/<int:repo_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_repository(repo_id):
     svc.delete_repository(repo_id)
     return "", 204
@@ -51,7 +51,7 @@ def list_sources():
 
 
 @api_bp.route("/sources", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_source():
     return jsonify(svc.create_source(json_body())), 201
 
@@ -63,13 +63,13 @@ def get_source(source_id):
 
 
 @api_bp.route("/sources/<int:source_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_source(source_id):
     return jsonify(svc.update_source(source_id, json_body()))
 
 
 @api_bp.route("/sources/<int:source_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_source(source_id):
     svc.delete_source(source_id)
     return "", 204
