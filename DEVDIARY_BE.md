@@ -562,3 +562,106 @@ has its almanac backdrop (dev `flask seed` already does this).
 The contract in `docs/openapi.yaml` now covers write-control, the account link,
 and every view endpoint the FE needs (pedigree, relationships, stats, On This Day,
 historical events). No cross-builder blockers are open.
+
+---
+
+## WP3 — Admin, Email & Security (2026-07-03)
+
+**Goal:** the backend for the admin console the FE (WP3, Cowork) will build —
+suggestions inbox, role requests, transactional email + email verification, the
+settings-driven security baseline, and the sensitive admin actions (change-email,
+backups). The rule this run lived by: **extend the preserved MVP security tier,
+never rebuild it.** Five phase-gated steps, each green.
+
+### 1. Config as DATA, and two small tables (Phase 1)
+
+`site_settings` was already key/value, so the entire admin/security/branding config
+is just NEW ROWS — no columns, no migration. `settings_service` grew a `DEFAULTS`
+map, typed accessors (`get_int`/`get_bool`), grouped `editable_settings()`, and a
+validating `update_settings()`. The **SMTP password stays in `.env`** (the existing
+secrets mechanism); only non-secret SMTP config lives in settings. Two additive
+tables — `suggestions` and `role_requests` (migration `d4a2c8e1f7b3`).
+
+### 2. Email + security hardening — extend, don't duplicate (Phase 2)
+
+- **mail_service** kept Flask-Mail as the transport (so the suite's
+  `record_messages()` capture still works) but became **settings-driven**: SMTP host/
+  port/user/from come from settings, falling back to env, and it's DB-tolerant so a
+  fresh install (no settings table yet) still sends via env. Added generic `send()`,
+  email verification, a change-notice, and a send-test.
+- **One password gate.** `security_service.validate_password` is called by *every*
+  set-password path (create, admin reset, self change, token reset), so the length
+  minimum + the **HIBP breach check** can't be bypassed by picking a different door.
+  The breach check is textbook **k-anonymity**: SHA-1 the password, send only the
+  5-char prefix, scan suffixes locally — the password never leaves the process — and
+  it **fails open** on a network outage (availability beats a nice-to-have).
+- **Lockout + session timeout.** Migration `e7b5c9d3a1f2` added `email_verified_at`,
+  `failed_login_count`, `locked_until`. `authenticate` now counts failures and locks
+  the account at the settings threshold (complementing the per-IP limiter); the
+  factory reads `session_timeout_days` per request to expire idle sessions. All live
+  values, tunable without a redeploy.
+
+### 3. Inbox + role requests (Phase 3)
+
+`suggestion_service` / `role_request_service` + `/api/suggestions` and
+`/api/role-requests`. The "prioritized queue" is not a second table — it's this
+table filtered to items with a priority, ranked (one table, many views again).
+**Approving a role request applies the change through the audited
+`user_service.set_role`** — the elevation is as traceable as any edit (ADR-0001).
+
+### 4. The sensitive admin actions (Phase 4)
+
+`admin_service` + `/api/admin/*`, all extending the existing audited services:
+- **Secure change-email** — the careful dance: **step-up re-auth** (the admin
+  re-enters their OWN password, defeating the walk-away-from-the-laptop attack),
+  notify BOTH addresses, apply (un-verifies), verification link to the new address,
+  then **force a password reset** by scrambling the old credential + emailing a reset
+  link. One audit line for the whole thing.
+- **Guarded restore** — the scariest button in the app, so: explicit `confirm`,
+  step-up re-auth, our-list-only filename (no path tricks), and an **automatic
+  safety backup taken FIRST**, so even a bad restore is itself recoverable.
+- Settings CRUD, backup detail (sizes, disk headroom, schedule, last/next run) +
+  back-up-now, and the read-only **permission matrix** (permissions-as-data, §10;
+  editable roles stay v2).
+
+### v1 → v2 mapping (added this WP)
+
+| v1 (Flask) | v2 (Spring Boot) |
+|---|---|
+| `settings_service` key/value config | `@ConfigurationProperties` + a settings table |
+| HIBP k-anonymity via `urllib` | a `PwnedClient` bean, same range query |
+| per-account lockout columns | Spring Security `AccountStatusUserDetailsChecker` |
+| step-up re-auth before sensitive ops | Spring Security re-authentication / `AuthorizationManager` |
+| `mail_service` (Flask-Mail) | `JavaMailSender` + a `MailService` |
+
+### Decisions Made Without Wes (WP3 admin)
+
+1. **New admin capabilities are JSON `/api/*`, not HTML.** The FE builds against the
+   contract (the established WP3 pattern); the preserved HTML admin panel keeps
+   working untouched. So there are now two surfaces to the same audited services.
+2. **SMTP transport stayed Flask-Mail** (settings drive its config) rather than a
+   hand-rolled `smtplib` sender — keeps the test-capture mechanism and avoids
+   duplicating a working feature. A best-effort `_apply_settings()` pushes admin
+   config onto the live mail state; env remains the reliable fallback.
+3. **"Force a password reset" = scramble + reset link.** After an admin email
+   change, the old credential is set to an unguessable random value so it's truly
+   dead until the user completes the emailed reset — the strongest reading of
+   "force."
+4. **The cron RUNNER is out of scope.** The backup *schedule* is stored + surfaced
+   (with a computed next-run) for the admin UI; the actual nightly trigger remains an
+   OS-cron/deploy concern (Master Plan §9), not an in-app scheduler.
+5. **suggestions/role_requests are not in the JSON data export** — operational data,
+   low migration value; noted so it's a conscious choice, not an oversight.
+
+### Manual Testing Checklist (WP3 admin)
+
+Nothing browser-only for Code — all JSON, fully covered by pytest (207 tests, ~92%
+coverage, floor 90%). For the integrator, on a real environment after `flask db
+upgrade`: run `flask seed-settings` (config defaults) and configure SMTP (settings +
+`MAIL_PASSWORD` in `.env`) to light up email; the breach check and lockout are on
+once their settings are enabled.
+
+### WP3 admin → front-end readiness
+
+`docs/openapi.yaml` now documents the inbox, role requests, email verification, all
+admin actions, and the permission matrix. No cross-builder blockers are open.
