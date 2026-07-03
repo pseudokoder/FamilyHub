@@ -56,6 +56,8 @@ tags:
     description: Markdown memories/bios (NOTE/SNOTE) with polymorphic links
   - name: Search
     description: People by name + filters, and full-text over notes (§12)
+  - name: WriteControl
+    description: Audit trail, restore, and revert — post-moderation (ADR-0001)
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -307,6 +309,33 @@ paths:
         - {name: place, in: query, schema: {type: string}}
       responses: {"200": {description: Grouped results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchResults'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
 
+  # --- Write control: activity feed, restore, revert (ADR-0001) ---------------
+  /api/activity:
+    get:
+      tags: [WriteControl]
+      summary: The audit trail — paginated, filterable (Curator+; ADR-0001)
+      parameters:
+        - {name: action, in: query, schema: {type: string, enum: [create, update, delete, restore, revert]}}
+        - {name: actor_id, in: query, schema: {type: integer}}
+        - {name: subject_type, in: query, schema: {type: string}}
+        - {name: date_from, in: query, schema: {type: string, format: date}}
+        - {name: date_to, in: query, schema: {type: string, format: date}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: per_page, in: query, schema: {type: integer, default: 50, maximum: 200}}
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ActivityPage'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/restore:
+    post:
+      tags: [WriteControl]
+      summary: Un-delete a soft-deleted record (permission&#58; revert)
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [subject_type, subject_id], properties: {subject_type: {type: string, enum: [individual, name, family, event, source, citation, media, note]}, subject_id: {type: integer}}}}}}
+      responses: {"200": {description: Restored (returns the row snapshot)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}
+  /api/audit/{audit_id}/revert:
+    parameters: [{name: audit_id, in: path, required: true, schema: {type: integer}}]
+    post:
+      tags: [WriteControl]
+      summary: Undo the change an audit entry describes (permission&#58; revert)
+      responses: {"200": {description: Reverted (result is the new snapshot, or null if now deleted)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}
+
 components:
   responses:
     Unauthorized: {description: Not logged in, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
@@ -319,6 +348,27 @@ components:
       properties:
         error: {type: string}
         fields: {type: object, additionalProperties: {type: string}, description: per-field problems (present on validation errors)}
+    AuditEntry:
+      type: object
+      description: One row of the write-control audit trail (ADR-0001).
+      properties:
+        id: {type: integer, readOnly: true}
+        action: {type: string, description: create|update|delete|restore|revert (or a security/admin verb)}
+        actor_id: {type: integer, nullable: true}
+        actor: {type: string, nullable: true, description: the actor's display name}
+        subject_type: {type: string, example: individual}
+        subject_id: {type: integer, nullable: true}
+        detail: {type: string}
+        created_at: {type: string, format: date-time, readOnly: true}
+    ActivityPage:
+      type: object
+      description: A page of audit entries plus pagination metadata.
+      properties:
+        activity: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+        page: {type: integer}
+        per_page: {type: integer}
+        total: {type: integer}
+        pages: {type: integer}
     Name:
       type: object
       description: A name belonging to an individual (system fields are read-only).

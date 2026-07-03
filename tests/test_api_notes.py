@@ -48,11 +48,14 @@ def test_note_links_management_and_filter(member_client):
     ).status_code == 204
 
 
-def test_note_delete_cascades_links(member_client):
+def test_note_delete_is_soft_and_preserves_links(member_client):
     from app.models import NoteLink
     pid = _individual(member_client)
     note = member_client.post("/api/notes", json={
         "content": "x", "subject_type": "individual", "subject_id": pid}).get_json()
     assert NoteLink.query.count() == 1
     member_client.delete(f"/api/notes/{note['id']}")
-    assert NoteLink.query.count() == 0  # ORM cascade removed the link
+    # Soft delete (ADR-0001): the note reads as gone...
+    assert member_client.get(f"/api/notes/{note['id']}").status_code == 404
+    # ...but the physical link row is kept so a restore brings the note back whole.
+    assert NoteLink.query.count() == 1

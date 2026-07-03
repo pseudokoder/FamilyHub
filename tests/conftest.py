@@ -133,12 +133,33 @@ def member_client(app, member):
     return other
 
 
+CURATOR_EMAIL = "curator@test.invalid"
+CURATOR_PASSWORD = "CuratorPass123"
+
+
 @pytest.fixture
 def viewer(app):
     """The lowest rung of the role ladder (§10) — can read, but not write."""
     return user_service.create_user(
         VIEWER_EMAIL, "Viewer", VIEWER_PASSWORD, role=Role.VIEWER
     )
+
+
+@pytest.fixture
+def curator(app):
+    """A Curator — elevated member who can revert/restore (ADR-0001, §10)."""
+    return user_service.create_user(
+        CURATOR_EMAIL, "Curator", CURATOR_PASSWORD, role=Role.CURATOR
+    )
+
+
+@pytest.fixture
+def curator_client(app, curator):
+    other = app.test_client()
+    other.post(
+        "/auth/login", data={"email": CURATOR_EMAIL, "password": CURATOR_PASSWORD}
+    )
+    return other
 
 
 @pytest.fixture
