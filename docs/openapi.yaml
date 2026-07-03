@@ -58,6 +58,8 @@ tags:
     description: People by name + filters, and full-text over notes (§12)
   - name: WriteControl
     description: Audit trail, restore, and revert — post-moderation (ADR-0001)
+  - name: Account
+    description: Account↔Person link, "my person", and the tree root (ADR-0002)
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -309,6 +311,17 @@ paths:
         - {name: place, in: query, schema: {type: string}}
       responses: {"200": {description: Grouped results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchResults'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
 
+  # --- Account ↔ Person link + tree root (ADR-0002) ---------------------------
+  /api/me/person:
+    get: {tags: [Account], summary: The current user's linked individual (null if unlinked), responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individual: {$ref: '#/components/schemas/Individual', nullable: true}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    put: {tags: [Account], summary: "Edit your OWN person record (self-authoring; requires a link)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/tree/root:
+    get: {tags: [Account], summary: "Where the tree opens: the linked person, else the oldest ancestor", responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/TreeRoot'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/users/{user_id}/individual:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    put: {tags: [Account], summary: "Admin: link an account to a person (permission&#58; link_account)", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [individual_id], properties: {individual_id: {type: integer}}}}}}, responses: {"200": {description: Linked, content: {application/json: {schema: {$ref: '#/components/schemas/AccountLink'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: That person is already linked to another account}}}
+    delete: {tags: [Account], summary: "Admin: unlink an account (permission&#58; link_account)", responses: {"200": {description: Unlinked, content: {application/json: {schema: {$ref: '#/components/schemas/AccountLink'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+
   # --- Write control: activity feed, restore, revert (ADR-0001) ---------------
   /api/activity:
     get:
@@ -369,6 +382,20 @@ components:
         per_page: {type: integer}
         total: {type: integer}
         pages: {type: integer}
+    AccountLink:
+      type: object
+      description: The Account↔Person link state for one user (ADR-0002).
+      properties:
+        user_id: {type: integer, readOnly: true}
+        individual_id: {type: integer, nullable: true}
+        individual: {$ref: '#/components/schemas/Individual', nullable: true}
+    TreeRoot:
+      type: object
+      description: Where the family tree should open for the current user (ADR-0002).
+      properties:
+        individual_id: {type: integer, nullable: true}
+        source: {type: string, enum: [linked, oldest_ancestor, empty], description: how the root was chosen}
+        individual: {$ref: '#/components/schemas/Individual', nullable: true}
     Name:
       type: object
       description: A name belonging to an individual (system fields are read-only).
