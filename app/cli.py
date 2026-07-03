@@ -169,13 +169,15 @@ def register_cli(app):
         a firm v2 deliverable — this command is mock data, not a GEDCOM importer.
         """
         from seed import seed_all, seed_users
-        from app.services import historical_event_service
+        from app.services import historical_event_service, settings_service
 
         users = seed_users()
         counts = seed_all()
         # The timeline's almanac backdrop is reference data, not Hartwell data —
         # idempotent, so re-running seed never double-loads it.
         counts["historical_events"] = historical_event_service.seed_defaults()
+        # Seed the admin/security/branding config defaults (idempotent).
+        counts["site_settings"] = settings_service.ensure_defaults()
         click.echo(f"Seeded {len(users)} demo user(s) + mock data:")
         for name, count in counts.items():
             click.echo(f"  {name}: {count} row(s)")
@@ -196,3 +198,17 @@ def register_cli(app):
             click.echo(f"Loaded {inserted} historical event(s).")
         else:
             click.echo("Historical events already present — nothing to do.")
+
+    @app.cli.command("seed-settings")
+    def seed_settings_command():
+        """Seed the admin/security/branding config defaults (idempotent).
+
+        Prod-safe: run once after `flask db upgrade` so the Settings panel and the
+        security baseline (min password length, lockout, session timeout…) have
+        their default rows. Existing values are never overwritten.
+        """
+        from app.services import settings_service
+
+        inserted = settings_service.ensure_defaults()
+        click.echo(f"Seeded {inserted} setting default(s)."
+                   if inserted else "Settings already seeded — nothing to do.")
