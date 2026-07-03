@@ -135,6 +135,18 @@ def change_password():
     return render_template("auth/change_password.html", form=form)
 
 
+@auth_bp.route("/verify-email/<token>")
+def verify_email(token):
+    """Arrive from a verification email and confirm the address (§9). A browser
+    GET (it's an emailed link), so this is a web route, not JSON."""
+    user = user_service.confirm_email_token(token)
+    if user is None:
+        flash("That verification link is invalid or has expired.", "danger")
+    else:
+        flash("Thanks — your email address is confirmed!", "success")
+    return redirect(url_for("main.home"))
+
+
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():

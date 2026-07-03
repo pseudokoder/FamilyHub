@@ -91,6 +91,18 @@ class User(UserMixin, db.Model):
     # offset, which breaks across daylight-saving changes.
     timezone = db.Column(db.String(50), nullable=True)
 
+    # EMAIL VERIFICATION (§9). When the CURRENT email address was verified via a
+    # signed link; NULL until then, and cleared whenever the address changes.
+    email_verified_at = db.Column(db.DateTime, nullable=True)
+
+    # LOGIN LOCKOUT (§9). Consecutive failed sign-ins (reset to 0 on success); once
+    # the settings-driven threshold is hit, locked_until parks a timestamp the
+    # login check honors. Complements the IP-based rate limiter with per-account
+    # protection.
+    failed_login_count = db.Column(
+        db.Integer, nullable=False, default=0, server_default="0")
+    locked_until = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(
         db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
@@ -107,6 +119,23 @@ class User(UserMixin, db.Model):
         bar, the admin decorator) keeps working without edits, now answered by
         the role instead of a dropped boolean column."""
         return self.role == Role.ADMIN.value
+
+    @property
+    def email_verified(self):
+        """True once the current email address has been verified (§9)."""
+        return self.email_verified_at is not None
+
+    def is_locked(self, now=None):
+        """True if the account is currently locked out (§9)."""
+        if self.locked_until is None:
+            return False
+        from datetime import datetime, timezone as _tz
+        now = now or datetime.now(_tz.utc)
+        # Stored datetimes may be naive (SQLite); compare on the same basis.
+        locked = self.locked_until
+        if locked.tzinfo is None:
+            now = now.replace(tzinfo=None)
+        return locked > now
 
     def has_role(self, minimum):
         """True if this account is at least ``minimum`` on the role ladder.

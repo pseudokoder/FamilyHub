@@ -64,6 +64,10 @@ tags:
     description: Account↔Person link, "my person", and the tree root (ADR-0002)
   - name: Tree
     description: Pedigree graph, relationship finder, dashboard stats, On This Day
+  - name: Inbox
+    description: Suggestions inbox and role-change requests (§5, §10)
+  - name: AdminApi
+    description: Admin actions — users, settings, backups, permission matrix (§9, §10)
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -120,6 +124,9 @@ paths:
     parameters: [{name: token, in: path, required: true, schema: {type: string}, description: Signed single-use token (1h)}]
     get: {tags: [Auth], summary: New-password form (token checked first), responses: {"200": {description: HTML form}, "302": {description: Invalid/expired token}}}
     post: {tags: [Auth], summary: Set the new password, responses: {"302": {description: Reset complete}}}
+  /auth/verify-email/{token}:
+    parameters: [{name: token, in: path, required: true, schema: {type: string}, description: Signed email-verification token (24h)}]
+    get: {tags: [Auth], summary: Confirm an email address from the emailed link (§9), responses: {"302": {description: Verified (or invalid) — redirected home with a flash}}}
 
   # --- Admin -------------------------------------------------------------------
   /admin/users:
@@ -319,6 +326,8 @@ paths:
   /api/me/person:
     get: {tags: [Account], summary: The current user's linked individual (null if unlinked), responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individual: {$ref: '#/components/schemas/Individual', nullable: true}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
     put: {tags: [Account], summary: "Edit your OWN person record (self-authoring; requires a link)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/me/verify-email:
+    post: {tags: [Account], summary: "Email myself a verification link for my own address (§9)", responses: {"200": {description: "{status: sent|already_verified}"}, "401": {$ref: '#/components/responses/Unauthorized'}, "503": {description: Email not configured}}}
   /api/tree/root:
     get: {tags: [Account], summary: "Where the tree opens: the linked person, else the oldest ancestor", responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/TreeRoot'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
   /api/users/{user_id}/individual:
@@ -353,6 +362,62 @@ paths:
       summary: World/US almanac (each with a description) to blend into the timeline
       parameters: [{name: scope, in: query, schema: {type: string, enum: [US, world]}}, {name: year_from, in: query, schema: {type: integer}}, {name: year_to, in: query, schema: {type: integer}}]
       responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {historical_events: {type: array, items: {$ref: '#/components/schemas/HistoricalEvent'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+
+  # --- Admin actions (§9, §10) ------------------------------------------------
+  /api/admin/users:
+    get: {tags: [AdminApi], summary: All accounts with role + linked-person status, responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {users: {type: array, items: {$ref: '#/components/schemas/AdminUser'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/users/{user_id}/reset-password:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [AdminApi], summary: Email the user a password-reset link, responses: {"200": {description: "{status: reset_email_sent}"}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "503": {description: Email not configured}}}
+  /api/admin/users/{user_id}/change-email:
+    parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
+    post:
+      tags: [AdminApi]
+      summary: "Secure change-email: verify new addr, notify both, force reset, step-up re-auth"
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [new_email, current_password], properties: {new_email: {type: string}, current_password: {type: string, description: the admin's OWN password (step-up)}}}}}}
+      responses: {"200": {description: Changed, content: {application/json: {schema: {$ref: '#/components/schemas/AdminUser'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {description: Step-up re-auth failed / not admin}, "404": {$ref: '#/components/responses/NotFound'}, "503": {description: Email not configured}}
+  /api/settings:
+    get: {tags: [AdminApi], summary: Editable settings, grouped (branding/security/email/defaults), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Settings'}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+    put: {tags: [AdminApi], summary: Patch settings (coerced + validated; unknown keys ignored), requestBody: {content: {application/json: {schema: {type: object, additionalProperties: true}}}}, responses: {"200": {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/Settings'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups:
+    get: {tags: [AdminApi], summary: Backup list + sizes, storage location, disk headroom, last/next run, schedule, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/BackupOverview'}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups/run:
+    post: {tags: [AdminApi], summary: Back up now (create + verify + off-site upload), responses: {"200": {description: Verification report}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups/schedule:
+    put: {tags: [AdminApi], summary: "Set the backup schedule (off|daily|weekly + hour)", requestBody: {content: {application/json: {schema: {type: object, properties: {schedule: {type: string, enum: [off, daily, weekly]}, hour: {type: integer, minimum: 0, maximum: 23}}}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
+  /api/admin/backups/restore:
+    post:
+      tags: [AdminApi]
+      summary: "GUARDED restore: confirm + step-up; auto safety-backup taken first"
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [filename, current_password, confirm], properties: {filename: {type: string}, current_password: {type: string, description: step-up}, confirm: {type: boolean}}}}}}
+      responses: {"200": {description: Restored (+ safety backup name)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {description: Step-up failed}, "404": {$ref: '#/components/responses/NotFound'}}
+  /api/permissions/matrix:
+    get: {tags: [AdminApi], summary: Read-only role→permission map (permissions-as-data; §10), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/PermissionMatrix'}}}}, "403": {$ref: '#/components/responses/Forbidden'}}}
+
+  # --- Suggestions inbox + role-change requests (§5, §10) ---------------------
+  /api/suggestions:
+    post: {tags: [Inbox], summary: Submit a suggestion (any member), requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    get:
+      tags: [Inbox]
+      summary: The admin inbox — filter by status/topic, or the prioritized queue
+      parameters: [{name: status, in: query, schema: {type: string, enum: [new, in_progress, done, declined]}}, {name: topic, in: query, schema: {type: string, enum: [idea, bug, photo_request, other]}}, {name: prioritized, in: query, schema: {type: boolean}, description: only items with a priority, ranked}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {suggestions: {type: array, items: {$ref: '#/components/schemas/Suggestion'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/suggestions/{suggestion_id}:
+    parameters: [{name: suggestion_id, in: path, required: true, schema: {type: integer}}]
+    put: {tags: [Inbox], summary: "Admin triage: set status and/or priority (integer rank, or null)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Suggestion'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/role-requests:
+    post: {tags: [Inbox], summary: "Request a role change (member); one pending request at a time", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [requested_role], properties: {requested_role: {type: string, enum: [viewer, contributor, curator, admin]}}}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: A pending request already exists}}}
+    get:
+      tags: [Inbox]
+      summary: "Admin: list role requests (filter by status)"
+      parameters: [{name: status, in: query, schema: {type: string, enum: [pending, approved, denied]}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {role_requests: {type: array, items: {$ref: '#/components/schemas/RoleRequest'}}}}}}}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/role-requests/{request_id}/approve:
+    parameters: [{name: request_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Inbox], summary: "Admin: approve (applies the role change through the audit service)", responses: {"200": {description: Approved, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: Already decided}}}
+  /api/role-requests/{request_id}/deny:
+    parameters: [{name: request_id, in: path, required: true, schema: {type: integer}}]
+    post: {tags: [Inbox], summary: "Admin: deny (no role change, decision recorded)", responses: {"200": {description: Denied, content: {application/json: {schema: {$ref: '#/components/schemas/RoleRequest'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: Already decided}}}
 
   # --- Write control: activity feed, restore, revert (ADR-0001) ---------------
   /api/activity:
@@ -505,6 +570,81 @@ components:
         year: {type: integer, nullable: true}
         date_original: {type: string, nullable: true}
         place: {type: string, nullable: true}
+    AdminUser:
+      type: object
+      description: An account row for the admin Users tab.
+      properties:
+        id: {type: integer}
+        email: {type: string}
+        display_name: {type: string}
+        role: {type: string, enum: [viewer, contributor, curator, admin]}
+        is_active: {type: boolean}
+        email_verified: {type: boolean}
+        individual_id: {type: integer, nullable: true}
+        linked: {type: boolean, description: whether the account is linked to a person}
+        locked: {type: boolean, description: currently locked out}
+        created_at: {type: string, format: date-time}
+    Settings:
+      type: object
+      description: Editable settings grouped for the admin panel (secrets excluded).
+      properties:
+        branding: {type: object, additionalProperties: true}
+        security: {type: object, additionalProperties: true}
+        email: {type: object, additionalProperties: true}
+        defaults: {type: object, additionalProperties: true}
+    BackupOverview:
+      type: object
+      properties:
+        backups:
+          type: array
+          items:
+            type: object
+            properties:
+              filename: {type: string}
+              bytes: {type: integer}
+              created_at: {type: string, format: date-time}
+        storage_location: {type: string}
+        offsite_bucket: {type: string, nullable: true}
+        disk_free_bytes: {type: integer, nullable: true}
+        disk_total_bytes: {type: integer, nullable: true}
+        last_run: {type: string, format: date-time, nullable: true}
+        next_run: {type: string, format: date-time, nullable: true}
+        schedule: {type: string, enum: [off, daily, weekly]}
+        schedule_hour: {type: integer}
+    PermissionMatrix:
+      type: object
+      description: The permissions-as-data map (§10) — role → {permission → bool}.
+      properties:
+        permissions: {type: array, items: {type: string}}
+        matrix:
+          type: object
+          additionalProperties: {type: object, additionalProperties: {type: boolean}}
+    Suggestion:
+      type: object
+      description: A member suggestion in the admin inbox (§5).
+      properties:
+        id: {type: integer, readOnly: true}
+        author_user_id: {type: integer, nullable: true, readOnly: true}
+        author: {type: string, nullable: true, readOnly: true}
+        topic: {type: string, enum: [idea, bug, photo_request, other]}
+        body: {type: string}
+        status: {type: string, enum: [new, in_progress, done, declined]}
+        priority: {type: integer, nullable: true, description: admin rank (lower = higher); null = untriaged}
+        created_at: {type: string, format: date-time, readOnly: true}
+        updated_at: {type: string, format: date-time, readOnly: true}
+    RoleRequest:
+      type: object
+      description: A member's request for a role change (§10).
+      properties:
+        id: {type: integer, readOnly: true}
+        user_id: {type: integer, readOnly: true}
+        user: {type: string, nullable: true, readOnly: true}
+        requested_role: {type: string, enum: [viewer, contributor, curator, admin]}
+        status: {type: string, enum: [pending, approved, denied], readOnly: true}
+        decided_by_user_id: {type: integer, nullable: true, readOnly: true}
+        decided_by: {type: string, nullable: true, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true}
+        decided_at: {type: string, format: date-time, nullable: true, readOnly: true}
     HistoricalEvent:
       type: object
       description: One world/US almanac entry (reference data) for timeline context.
