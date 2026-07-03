@@ -29,7 +29,7 @@
                 <td class="text-nowrap">{{ event.created_at.strftime("%b %d, %H:%M") }}</td>
                 <td>{{ event.user.display_name if event.user else "CLI / system" }}</td>
                 <td><span class="badge text-bg-secondary">{{ event.action }}</span></td>
-                <td>{{ event.target_type }}{% if event.target_id %} #{{ event.target_id }}{% endif %}</td>
+                <td>{{ event.subject_type }}{% if event.subject_id %} #{{ event.subject_id }}{% endif %}</td>
                 <td class="text-muted">{{ event.detail }}</td>
             </tr>
             {% endfor %}

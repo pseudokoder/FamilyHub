@@ -17,10 +17,11 @@ layer (WP2/WP3) — never store pre-rendered HTML, or you can't re-style it late
 """
 
 from app.extensions import db
+from app.models.mixins import SoftDeleteMixin
 from app.models.individual import _utcnow
 
 
-class Note(db.Model):
+class Note(SoftDeleteMixin, db.Model):
     """A narrative — a memory, a bio, a life story. GEDCOM NOTE/SNOTE."""
 
     __tablename__ = "notes"
@@ -53,7 +54,7 @@ class Note(db.Model):
         return f"<Note #{self.id} {self.title!r}>"
 
 
-class NoteLink(db.Model):
+class NoteLink(SoftDeleteMixin, db.Model):
     """Attaches one note to one record — individual, family, or event.
 
     Same polymorphic, composite-key pattern as MediaLink: it's the mechanism

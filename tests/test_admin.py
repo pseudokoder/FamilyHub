@@ -26,7 +26,7 @@ def test_admin_creates_account_and_it_works(admin_client, app):
     response = admin_client.post(
         "/admin/users/new",
         data={"email": "GrandmaJo@example.com", "display_name": "Grandma Jo",
-              "password": "Tomatoes1969", "role": "user"},
+              "password": "Tomatoes1969", "role": "contributor"},
         follow_redirects=True,
     )
     assert b"Account for Grandma Jo created" in response.data
@@ -42,15 +42,15 @@ def test_admin_creates_account_and_it_works(admin_client, app):
     assert b"Welcome back, Grandma Jo!" in response.data
 
 
-def test_admin_can_create_a_power_user(admin_client):
+def test_admin_can_create_a_curator(admin_client):
     """The role dropdown actually sets the role on the new account (§10)."""
     admin_client.post(
         "/admin/users/new",
         data={"email": "tech@example.com", "display_name": "Tech Cousin",
-              "password": "Gadgets123", "role": "power_user"},
+              "password": "Gadgets123", "role": "curator"},
         follow_redirects=True,
     )
-    assert User.query.filter_by(email="tech@example.com").one().role == "power_user"
+    assert User.query.filter_by(email="tech@example.com").one().role == "curator"
 
 
 def test_admin_can_change_a_members_role(admin_client, member):
@@ -59,17 +59,17 @@ def test_admin_can_change_a_members_role(admin_client, member):
     admin_client.post(
         f"/admin/users/{member.id}/edit",
         data={"display_name": "Member", "email": MEMBER_EMAIL,
-              "role": "power_user"},
+              "role": "curator"},
         follow_redirects=True,
     )
-    assert db.session.get(User, member.id).role == "power_user"
+    assert db.session.get(User, member.id).role == "curator"
 
 
 def test_duplicate_email_friendly_error(admin_client, member):
     response = admin_client.post(
         "/admin/users/new",
         data={"email": MEMBER_EMAIL, "display_name": "Clone",
-              "password": "Whatever123", "role": "user"},
+              "password": "Whatever123", "role": "contributor"},
         follow_redirects=True,
     )
     assert b"already in use" in response.data
@@ -79,7 +79,7 @@ def test_short_password_rejected(admin_client):
     response = admin_client.post(
         "/admin/users/new",
         data={"email": "shorty@example.com", "display_name": "S",
-              "password": "abc", "role": "user"},
+              "password": "abc", "role": "contributor"},
         follow_redirects=True,
     )
     assert b"at least 8 characters" in response.data

@@ -86,9 +86,16 @@ def one_of(data, field, allowed, required=False):
 
 
 def get_or_404(model, obj_id, what="record"):
-    """Fetch a row by id or raise a JSON 404 — the API's get-or-404."""
+    """Fetch a row by id or raise a JSON 404 — the API's get-or-404.
+
+    SOFT-DELETE AWARE (ADR-0001): a soft-deleted row (``deleted_at`` set) reads as
+    "gone" everywhere the normal API looks — GET, PUT, DELETE, and every
+    sub-resource lookup route through here, so this ONE guard hides deleted rows
+    from all of them. Restore/revert deliberately bypass this (they use
+    write_control's own getter) because they must see the deleted row to bring it
+    back."""
     obj = db.session.get(model, obj_id)
-    if obj is None:
+    if obj is None or getattr(obj, "deleted_at", None) is not None:
         raise ApiError(f"No {what} found with id {obj_id}.", 404)
     return obj
 
@@ -97,6 +104,6 @@ def get_or_404(model, obj_id, what="record"):
 # (Defining api_bp first, importing after, is the standard Flask way to avoid a
 # circular import between this package and its route modules.)
 from app.routes.api import (  # noqa: E402,F401
-    citations, events, families, individuals, media, notes, places, search,
-    sources,
+    account, activity, citations, events, families, individuals, media, notes,
+    places, search, sources, stats, tree,
 )

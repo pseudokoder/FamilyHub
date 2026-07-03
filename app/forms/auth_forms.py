@@ -66,7 +66,7 @@ class CreateUserForm(FlaskForm):
     # The §10 role ladder as a dropdown. coerce=str because the stored value is
     # the role's string ("user", "admin", …).
     role = SelectField(
-        "Role", choices=Role.choices(), default=Role.USER.value, coerce=str,
+        "Role", choices=Role.choices(), default=Role.CONTRIBUTOR.value, coerce=str,
     )
     submit = SubmitField("Create Account")
 

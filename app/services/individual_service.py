@@ -10,7 +10,7 @@ shape here and the OpenAPI doc + every consumer changes with it, in one place.
 
 from app.extensions import db
 from app.models import Individual, Name
-from app.services import genealogy_service
+from app.services import write_control
 from app.services.api_errors import ApiError
 
 # The GEDCOM SEX enum — a closed set the schema can hold (individual.py).
@@ -52,8 +52,58 @@ def serialize_name(name):
     }
 
 
+def _live_names(individual):
+    """The individual's names, excluding any soft-deleted ones (ADR-0001)."""
+    return [n for n in individual.names if not n.is_deleted]
+
+
+def _year(date_sort):
+    """Pull the year out of a sortable date ("1850-00-00" → 1850), or None. The
+    sortable string always leads with the year, so this is just the first chunk."""
+    if not date_sort:
+        return None
+    head = str(date_sort)[:4]
+    return int(head) if head.isdigit() else None
+
+
+def _vital(individual_id, tag):
+    """The (year, place_name) of an individual's BIRT/DEAT event — the vitals a
+    list row shows. One small query per person; fine at family scale."""
+    from app.models import Event
+    event = (Event.query
+             .filter(Event.deleted_at.is_(None),
+                     Event.subject_type == "individual",
+                     Event.subject_id == individual_id,
+                     Event.event_tag == tag)
+             .order_by(Event.date_sort).first())
+    if event is None:
+        return None, None
+    place = event.place.full_name if event.place else None
+    return _year(event.date_sort), place
+
+
+def serialize_list_item(individual):
+    """The LIGHTWEIGHT row shape shared by the People list, search results, and
+    tree nodes: identity + vitals (birth/death year, a primary place) — enough to
+    render a card without a second request, but not the full record."""
+    names = _live_names(individual)
+    primary = next((n for n in names if n.is_primary), names[0] if names else None)
+    birth_year, birth_place = _vital(individual.id, "BIRT")
+    death_year, _ = _vital(individual.id, "DEAT")
+    return {
+        "id": individual.id,
+        "primary_name": primary.display if primary else None,
+        "sex": individual.sex,
+        "living": individual.living,
+        "birth_year": birth_year,
+        "death_year": death_year,
+        "birth_place": birth_place,
+    }
+
+
 def serialize(individual, with_names=True):
-    primary = individual.primary_name
+    names = _live_names(individual)
+    primary = next((n for n in names if n.is_primary), names[0] if names else None)
     data = {
         "id": individual.id,
         "gedcom_xref": individual.gedcom_xref,
@@ -63,18 +113,23 @@ def serialize(individual, with_names=True):
         "created_at": _iso(individual.created_at),
         "updated_at": _iso(individual.updated_at),
         "primary_name": primary.display if primary else None,
-        "names_count": len(individual.names),
+        "names_count": len(names),
     }
     if with_names:
-        data["names"] = [serialize_name(n) for n in individual.names]
+        data["names"] = [serialize_name(n) for n in names]
     return data
 
 
 # --- Individual CRUD ----------------------------------------------------------
 
 def list_all():
-    return [serialize(i, with_names=False)
-            for i in Individual.query.order_by(Individual.id).all()]
+    # Soft-delete aware (ADR-0001): live rows only. Rows are the lightweight
+    # list-item shape (with birth/death year + a place), which the People list and
+    # search results share.
+    return [serialize_list_item(i)
+            for i in Individual.query
+            .filter(Individual.deleted_at.is_(None))
+            .order_by(Individual.id).all()]
 
 
 def get(individual_id):
@@ -105,6 +160,7 @@ def create(data):
     if isinstance(data.get("name"), dict):
         _build_name(individual, data["name"], force_primary=True)
 
+    write_control.log_create("individual", individual)  # audit (ADR-0001)
     db.session.commit()
     return serialize(individual)
 
@@ -112,6 +168,7 @@ def create(data):
 def update(individual_id, data):
     from app.routes.api import get_or_404
     individual = get_or_404(Individual, individual_id, "individual")
+    before = write_control.snapshot(individual)  # capture pre-image for the audit
     if "sex" in data:
         individual.sex = _validate_sex(data)
     if "living" in data:
@@ -120,6 +177,7 @@ def update(individual_id, data):
         individual.restriction = data.get("restriction") or None
     if "gedcom_xref" in data:
         individual.gedcom_xref = data.get("gedcom_xref") or None
+    write_control.log_update("individual", individual, before)
     db.session.commit()
     return serialize(individual)
 
@@ -127,9 +185,11 @@ def update(individual_id, data):
 def delete(individual_id):
     from app.routes.api import get_or_404
     individual = get_or_404(Individual, individual_id, "individual")
-    # The WP1 helper also sweeps up the polymorphic attachments the database
-    # can't cascade (events, citations, media/note links) and commits.
-    genealogy_service.delete_individual(individual)
+    # SOFT delete (ADR-0001): recoverable + audited. We deliberately do NOT purge
+    # the individual's polymorphic attachments (events, citations, media/note
+    # links) the way a hard delete had to — keeping them intact is what lets a
+    # Curator restore/revert the person whole. Reads hide the person meanwhile.
+    write_control.soft_delete("individual", individual)
 
 
 # --- Names sub-resource -------------------------------------------------------
@@ -164,6 +224,8 @@ def add_name(individual_id, data):
         raise ApiError("A name needs at least a given name or a surname.",
                        400, fields={"given": "required", "surname": "required"})
     name = _build_name(individual, data)
+    db.session.flush()
+    write_control.log_create("name", name)
     db.session.commit()
     return serialize_name(name)
 
@@ -171,6 +233,7 @@ def add_name(individual_id, data):
 def update_name(name_id, data):
     from app.routes.api import get_or_404
     name = get_or_404(Name, name_id, "name")
+    before = write_control.snapshot(name)
     for field in ("name_type", "name_prefix", "given", "nickname",
                   "surname_prefix", "surname", "name_suffix"):
         if field in data:
@@ -181,6 +244,7 @@ def update_name(name_id, data):
         for other in name.individual.names:
             other.is_primary = (other.id == name.id)
         name.is_primary = True
+    write_control.log_update("name", name, before)
     db.session.commit()
     return serialize_name(name)
 
@@ -188,5 +252,4 @@ def update_name(name_id, data):
 def delete_name(name_id):
     from app.routes.api import get_or_404
     name = get_or_404(Name, name_id, "name")
-    db.session.delete(name)
-    db.session.commit()
+    write_control.soft_delete("name", name)  # soft delete + audit (ADR-0001)

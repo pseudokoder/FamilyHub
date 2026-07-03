@@ -20,7 +20,7 @@ def list_notes():
 
 
 @api_bp.route("/notes", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_note():
     # The author is the logged-in member — set by the SERVER, never trusted from
     # the request body (you can't write a memory and sign someone else's name).
@@ -34,27 +34,27 @@ def get_note(note_id):
 
 
 @api_bp.route("/notes/<int:note_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_note(note_id):
     return jsonify(svc.update(note_id, json_body()))
 
 
 @api_bp.route("/notes/<int:note_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_note(note_id):
     svc.delete(note_id)
     return "", 204
 
 
 @api_bp.route("/notes/<int:note_id>/links", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def add_note_link(note_id):
     return jsonify(svc.add_link(note_id, json_body())), 201
 
 
 @api_bp.route("/notes/<int:note_id>/links/<subject_type>/<int:subject_id>",
               methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def remove_note_link(note_id, subject_type, subject_id):
     svc.remove_link(note_id, subject_type, subject_id)
     return "", 204

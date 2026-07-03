@@ -10,6 +10,7 @@ promises (the §5A depth bar: every meaningful field is capturable).
 from app.extensions import db
 from app.models import Event, Place
 from app.services import genealogy_service as gs
+from app.services import write_control
 from app.services.api_errors import ApiError
 
 # Which records an event can belong to (NOT names/events — only people & families).
@@ -50,7 +51,7 @@ def serialize(event):
 def list_all(subject_type=None, subject_id=None):
     """All events, or just one subject's, ordered by the sortable date so the
     result is already timeline-ready (Master Plan §4)."""
-    query = Event.query
+    query = Event.query.filter(Event.deleted_at.is_(None))
     if subject_type and subject_id is not None:
         query = query.filter_by(subject_type=subject_type, subject_id=subject_id)
     return [serialize(e) for e in query.order_by(Event.date_sort).all()]
@@ -78,6 +79,8 @@ def create(data):
         cause=data.get("cause") or None,
     )
     db.session.add(event)
+    db.session.flush()
+    write_control.log_create("event", event)
     db.session.commit()
     return serialize(event)
 
@@ -85,6 +88,7 @@ def create(data):
 def update(event_id, data):
     from app.routes.api import get_or_404
     event = get_or_404(Event, event_id, "event")
+    before = write_control.snapshot(event)
     if "subject_type" in data or "subject_id" in data:
         event.subject_type, event.subject_id = gs.require_subject(
             data.get("subject_type", event.subject_type),
@@ -99,10 +103,12 @@ def update(event_id, data):
                        fields={"event_tag": "required"})
     if "place_id" in data:
         event.place_id = _validate_place(data.get("place_id"))
+    write_control.log_update("event", event, before)
     db.session.commit()
     return serialize(event)
 
 
 def delete(event_id):
     from app.routes.api import get_or_404
-    gs.delete_event(get_or_404(Event, event_id, "event"))
+    # SOFT delete + audit (ADR-0001) — recoverable, unlike the old hard purge.
+    write_control.soft_delete("event", get_or_404(Event, event_id, "event"))

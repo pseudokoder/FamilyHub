@@ -20,7 +20,7 @@ def list_citations():
 
 
 @api_bp.route("/citations", methods=["POST"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def create_citation():
     return jsonify(svc.create(json_body())), 201
 
@@ -32,13 +32,13 @@ def get_citation(citation_id):
 
 
 @api_bp.route("/citations/<int:citation_id>", methods=["PUT"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def update_citation(citation_id):
     return jsonify(svc.update(citation_id, json_body()))
 
 
 @api_bp.route("/citations/<int:citation_id>", methods=["DELETE"])
-@role_required(Role.USER)
+@role_required(Role.CONTRIBUTOR)
 def delete_citation(citation_id):
     svc.delete(citation_id)
     return "", 204

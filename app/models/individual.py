@@ -20,6 +20,7 @@ relationship below becomes a `@OneToMany List<Name>`.
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.mixins import SoftDeleteMixin
 
 
 def _utcnow():
@@ -28,7 +29,7 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
-class Individual(db.Model):
+class Individual(SoftDeleteMixin, db.Model):
     """A single person in the family — GEDCOM's INDI record."""
 
     __tablename__ = "individuals"
@@ -95,7 +96,7 @@ class Individual(db.Model):
         return f"<Individual #{self.id} {name.display if name else '(unnamed)'}>"
 
 
-class Name(db.Model):
+class Name(SoftDeleteMixin, db.Model):
     """One name belonging to one individual — GEDCOM's INDI.NAME structure.
 
     GEDCOM breaks a name into PIECES (prefix, given, surname, suffix…) instead

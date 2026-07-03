@@ -2,12 +2,13 @@
 
 A repository (an archive) holds many sources (documents); a source is cited by
 many facts (see source.py). Deleting a repository nulls its sources' pointer (the
-SET NULL the app does for SQLite); deleting a source cascades its citations via
-the ORM relationship — a footnote to a deleted document is meaningless.
+SET NULL the app does for SQLite); deleting a source is a SOFT delete (ADR-0001)
+that keeps its citations intact so a restore brings the evidence back.
 """
 
 from app.extensions import db
 from app.models import Repository, Source
+from app.services import write_control
 
 
 # --- Repositories -------------------------------------------------------------
@@ -87,12 +88,14 @@ def serialize_source(source):
         "publication": source.publication,
         "repository_id": source.repository_id,
         "repository": source.repository.name if source.repository else None,
-        "citations_count": len(source.citations),
+        "citations_count": sum(1 for c in source.citations if not c.is_deleted),
     }
 
 
 def list_sources():
-    return [serialize_source(s) for s in Source.query.order_by(Source.title).all()]
+    return [serialize_source(s) for s in Source.query
+            .filter(Source.deleted_at.is_(None))
+            .order_by(Source.title).all()]
 
 
 def get_source(source_id):
@@ -111,6 +114,8 @@ def create_source(data):
         gedcom_xref=data.get("gedcom_xref") or None,
     )
     db.session.add(source)
+    db.session.flush()
+    write_control.log_create("source", source)
     db.session.commit()
     return serialize_source(source)
 
@@ -118,17 +123,20 @@ def create_source(data):
 def update_source(source_id, data):
     from app.routes.api import get_or_404
     source = get_or_404(Source, source_id, "source")
+    before = write_control.snapshot(source)
     for field in ("title", "author", "publication", "gedcom_xref"):
         if field in data:
             setattr(source, field, data.get(field) or None)
     if "repository_id" in data:
         source.repository_id = _validate_repository(data.get("repository_id"))
+    write_control.log_update("source", source, before)
     db.session.commit()
     return serialize_source(source)
 
 
 def delete_source(source_id):
     from app.routes.api import get_or_404
+    # SOFT delete + audit (ADR-0001). Its citations stay intact (not cascade-
+    # removed) so restoring the source brings its evidence back with it.
     source = get_or_404(Source, source_id, "source")
-    db.session.delete(source)  # ORM cascade removes its citations
-    db.session.commit()
+    write_control.soft_delete("source", source)

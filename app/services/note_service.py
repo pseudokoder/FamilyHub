@@ -10,6 +10,7 @@ the event it's about.
 from app.extensions import db
 from app.models import Note, NoteLink
 from app.services import genealogy_service as gs
+from app.services import write_control
 from app.services.api_errors import ApiError
 
 # A note can be attached to a person, a family, or an event.
@@ -31,6 +32,7 @@ def serialize_link(link):
 
 
 def serialize(note, with_links=True):
+    links = [link for link in note.links if not link.is_deleted]
     data = {
         "id": note.id,
         "gedcom_xref": note.gedcom_xref,
@@ -42,10 +44,10 @@ def serialize(note, with_links=True):
         "author": note.author.display_name if note.author else None,
         "created_at": _iso(note.created_at),
         "updated_at": _iso(note.updated_at),
-        "links_count": len(note.links),
+        "links_count": len(links),
     }
     if with_links:
-        data["links"] = [serialize_link(link) for link in note.links]
+        data["links"] = [serialize_link(link) for link in links]
     return data
 
 
@@ -71,11 +73,14 @@ def list_all(subject_type=None, subject_id=None):
     """All notes (newest first), or just those linked to one subject."""
     if subject_type and subject_id is not None:
         notes = (Note.query.join(NoteLink)
-                 .filter(NoteLink.subject_type == subject_type,
+                 .filter(Note.deleted_at.is_(None),
+                         NoteLink.deleted_at.is_(None),
+                         NoteLink.subject_type == subject_type,
                          NoteLink.subject_id == subject_id)
                  .order_by(Note.updated_at.desc()).all())
     else:
-        notes = Note.query.order_by(Note.updated_at.desc()).all()
+        notes = (Note.query.filter(Note.deleted_at.is_(None))
+                 .order_by(Note.updated_at.desc()).all())
     return [serialize(n, with_links=False) for n in notes]
 
 
@@ -103,6 +108,7 @@ def create(data, author=None):
             data.get("subject_type"), data.get("subject_id"), NOTE_SUBJECTS
         )
         db.session.add(NoteLink(note_id=note.id, subject_type=st, subject_id=sid))
+    write_control.log_create("note", note)
     db.session.commit()
     return serialize(note)
 
@@ -110,6 +116,7 @@ def create(data, author=None):
 def update(note_id, data):
     from app.routes.api import get_or_404
     note = get_or_404(Note, note_id, "note")
+    before = write_control.snapshot(note)
     if "title" in data:
         note.title = data.get("title") or None
     if "content" in data:
@@ -121,6 +128,7 @@ def update(note_id, data):
         note.content_type = _content_type(data)
     if "is_shared" in data:
         note.is_shared = _bool(data.get("is_shared"), default=note.is_shared)
+    write_control.log_update("note", note, before)
     db.session.commit()
     return serialize(note)
 
@@ -128,8 +136,8 @@ def update(note_id, data):
 def delete(note_id):
     from app.routes.api import get_or_404
     note = get_or_404(Note, note_id, "note")
-    db.session.delete(note)  # ORM cascade removes its note_links
-    db.session.commit()
+    # SOFT delete + audit (ADR-0001): its note_links stay so a restore is whole.
+    write_control.soft_delete("note", note)
 
 
 def add_link(note_id, data):
@@ -138,18 +146,28 @@ def add_link(note_id, data):
     st, sid = gs.require_subject(
         data.get("subject_type"), data.get("subject_id"), NOTE_SUBJECTS
     )
-    if db.session.get(NoteLink, (note.id, st, sid)) is not None:
+    existing = db.session.get(NoteLink, (note.id, st, sid))
+    if existing is not None and not existing.is_deleted:
         raise ApiError("This note is already attached there.", 409,
                        fields={"subject_id": "already linked"})
-    link = NoteLink(note_id=note.id, subject_type=st, subject_id=sid)
-    db.session.add(link)
+    if existing is not None:
+        existing.deleted_at = None      # restore a previously-removed attachment
+        link = existing
+    else:
+        link = NoteLink(note_id=note.id, subject_type=st, subject_id=sid)
+        db.session.add(link)
+    write_control.log_action("update", "note", note.id,
+                             detail=f"attach {st} #{sid}")
     db.session.commit()
     return serialize_link(link)
 
 
 def remove_link(note_id, subject_type, subject_id):
+    from datetime import datetime, timezone
     link = db.session.get(NoteLink, (note_id, subject_type, subject_id))
-    if link is None:
+    if link is None or link.is_deleted:
         raise ApiError("That attachment doesn't exist.", 404)
-    db.session.delete(link)
+    link.deleted_at = datetime.now(timezone.utc)  # soft delete the attachment
+    write_control.log_action("update", "note", note_id,
+                             detail=f"detach {subject_type} #{subject_id}")
     db.session.commit()

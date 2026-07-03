@@ -24,10 +24,11 @@ TWO DESIGN IDEAS WORTH STUDYING:
 """
 
 from app.extensions import db
+from app.models.mixins import SoftDeleteMixin
 from app.models.individual import _utcnow
 
 
-class Event(db.Model):
+class Event(SoftDeleteMixin, db.Model):
     """One dated, placed happening attached to an individual or a family."""
 
     __tablename__ = "events"
