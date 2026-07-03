@@ -4,9 +4,15 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 1.2** · Last updated 2026-06-18 · Status: WP2 complete; WP3 next.
+**Version 2.0.0** · Last updated 2026-07-03 · Status: WP2 complete; WP3 next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
-a change is approved, bump this version and add a line to the Revision History (bottom).*
+a change is approved, bump this version (SemVer) and add a line to the Revision History
+(bottom).*
+
+> **Design decisions live in ADRs.** Point-in-time architecture decisions are recorded
+> under [`docs/adr/`](adr/README.md): **ADR-0001** (write-control model — post-moderation:
+> RBAC + audit + soft-delete + revert) and **ADR-0002** (Account↔Person link). The Master
+> Plan cites them where they bite; the ADRs hold the full rationale.
 ---
 
 ## 1. The Corrected Vision
@@ -51,7 +57,7 @@ a patch, per this map:
               │          │         │         │          │
           Family      Person    Time-      Photo      Memory
           Tree /       Page      line      Album      Blog
-          Fan Chart   (Wiki)
+          Pedigree    (Wiki)
               │          │         │         │          │
          INDI+FAM    one INDI   events    OBJE media   NOTE/SNOTE
          links       + facts    by DATE   (images)     narratives
@@ -79,6 +85,17 @@ in v2. Notes on engine differences are inline.
 - **Dates** keep BOTH the original GEDCOM string (`date_original`, e.g. `"ABT 1850"`)
   and a sortable normalized value (`date_sort`) so fuzzy dates display faithfully but
   still sort on a timeline.
+- **Soft-delete, never hard-delete** (per **ADR-0001**). Every user-editable record
+  carries a nullable `deleted_at` timestamp; "delete" sets it, queries filter it out,
+  and any state is recoverable. Paired with `audit_log` (§3.5) this gives full
+  provenance + one-click **Curator revert**. This is a v1 design rule, not a v2
+  deferral (see §3.6, §8, §9).
+- **The person graph is a graph, not a linked list.** Parent/child and partner links
+  (`families` + `family_children`) form a directed graph an individual can have many
+  ancestors, descendants, and spouses. Traversal code (pedigree, relationship view)
+  must treat it as such: no assumption of a single linear chain, and the traversal
+  endpoint supports **lazy subtree fetch from any node** (the seam for the v2 dynamic
+  pan/zoom canvas — §11).
 - **Standard SQL only** — no engine-specific tricks — so the schema is portable.
 
 ### 3.1 Genealogy core
@@ -253,15 +270,61 @@ CREATE TABLE users (
     email         VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,        -- bcrypt/argon2
     display_name  VARCHAR(120),
-    role          VARCHAR(20) DEFAULT 'member', -- 'admin' | 'member'
+    role          VARCHAR(20) DEFAULT 'contributor', -- viewer|contributor|curator|admin (§10)
     is_active     BOOLEAN DEFAULT 1,
+    email_verified_at TIMESTAMP,                 -- transactional-email verification (§9)
+    individual_id INTEGER REFERENCES individuals(id) ON DELETE SET NULL,  -- Account↔Person (ADR-0002)
+    timezone      VARCHAR(50),                   -- per-user override of the site default (§5)
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+-- Account↔Person (ADR-0002): individual_id is NULLABLE. A linked user is the same
+-- person as an INDI record (enables self-authored living-member records, §5). Unlinked
+-- users have no anchor, so the tree defaults to the OLDEST-ANCESTOR root.
 
--- SITE_SETTINGS  (admin-editable text: hero, about, contact — simple key/value)
+-- SITE_SETTINGS  (admin-editable config: branding, page text, security baseline — key/value)
 CREATE TABLE site_settings (
-    setting_key   VARCHAR(80) PRIMARY KEY,      -- 'hero_tagline', 'about_text'
+    setting_key   VARCHAR(80) PRIMARY KEY,      -- see the config groups below
     setting_value TEXT
+);
+-- White-label / config-driven branding (§5): 'site_name' and 'family_name' feed the app
+-- header, page <title>s, and the Chronicle masthead, so the app is forkable/rebrandable.
+-- Also holds the site default 'timezone' and the security baseline (§9): min password
+-- length, breach-list check on/off, login rate-limit/lockout thresholds, session timeout.
+
+-- AUDIT_LOG  (provenance — every mutating write, before -> after; ADR-0001, §9 Tier-1)
+-- Present since WP2 as preserved security infra; ADR-0001 promotes it to core v1 scope.
+CREATE TABLE audit_log (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- who
+    action        VARCHAR(20),                  -- create | update | delete | revert
+    subject_type  VARCHAR(20),                  -- table/entity acted on
+    subject_id    INTEGER,
+    before_json   TEXT,                          -- prior values (NULL on create)
+    after_json    TEXT,                          -- new values (NULL on delete)
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- when
+);
+
+-- SUGGESTIONS  (Suggest-an-idea -> admin inbox; §5)
+CREATE TABLE suggestions (
+    id            INTEGER PRIMARY KEY,
+    author_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    topic         VARCHAR(120),
+    body          TEXT,
+    status        VARCHAR(20) DEFAULT 'new',    -- new | triaged | planned | done | declined
+    priority      INTEGER DEFAULT 0,            -- admin's priority-queue ordering
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ROLE_REQUESTS  (a member asks for elevated access -> admin approval; §5, §10)
+CREATE TABLE role_requests (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    requested_role VARCHAR(20),                 -- the role ladder rung being requested
+    reason        TEXT,
+    status        VARCHAR(20) DEFAULT 'pending',-- pending | approved | denied
+    decided_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -269,12 +332,21 @@ CREATE TABLE site_settings (
 These are **additive** — each is a new table or feature that Flask-Migrate can add
 later without disturbing existing data, so deferring them now does NOT lock anything
 in. Recommended home: **v2** (could land in a later v1 revision if ever needed).
-- **ASSO** (associations: godparent, witness, >2-partner families)
+- **ASSO** (associations — non-family relationships: apprenticeship, employment,
+  godparent, enslavement, household, neighbor, "relative"). This is the data behind the
+  Person Page **"Other Relationships"** section, which is **v2**. **Core family
+  relationships (parents / spouses / children / siblings via FAM links) remain v1** —
+  only the non-family associations defer.
 - **SUBM** (submitter / researcher records)
+- **Fan Chart** — the radial tree view. v1 ships **Pedigree + Family Group +
+  Relationship View** (§5); the fan chart is a v2 renderer.
 - **Video / audio** media (photos are in v1)
-- **Merge** duplicate individuals
-- **Change history / restore** (v1 uses created/updated timestamps instead)
+- **Merge** duplicate individuals (tools may land in **v1.x** — §5; firm by v2)
 - **Full GEDCOM-7 import/export** — see WP6 in §6 (tentative for v1, firm for v2)
+
+> **No longer deferred:** change-history / restore has been **promoted to v1** per
+> **ADR-0001** — `audit_log` (before→after) + soft-delete + Curator revert are core v1
+> scope (§3.5, §8, §9), not the old "timestamps only" fallback.
 
 ---
 
@@ -282,28 +354,67 @@ in. Recommended home: **v2** (could land in a later v1 revision if ever needed).
 
 | User-facing "feature" | What it really is | Tables it reads |
 |---|---|---|
-| Family tree / fan chart | Graph of INDI via FAM links | individuals, families, family_children |
+| Family tree (pedigree) | Graph of INDI via FAM links, traversed from a root | individuals, families, family_children |
 | Person page (wiki) | One individual + all their facts | individuals, names, events, citations, media_links, note_links |
 | Timeline | A person's (or family's) events by date | events (ordered by `date_sort`), places |
 | Photo album | Image media filtered & grouped | media_objects, media_links |
 | Memory blog | Markdown narratives | notes, note_links |
 | Sources view | Evidence behind each fact | sources, citations, repositories |
+| Change history / revert | Provenance + one-click undo (ADR-0001) | audit_log |
+| Suggestions inbox | Suggest-an-idea → admin triage queue | suggestions |
+| Admin: role requests | Elevation requests → admin approval | role_requests, users |
+
+> **v2 views (reserved, not built in v1):** **Fan Chart** (radial tree), the Person Page
+> **"Other Relationships"** section (non-family ASSO), and the **dynamic pan/zoom tree
+> canvas** (§11). The v1 pedigree renderer and traversal endpoint are built with the
+> seams for these (§3 design rules, §5).
 
 ---
 
 ## 5. FamilySearch-Modeled Functionality (v1 scope)
 
 Logged-in members can:
-- **Add / edit / delete** individuals, names, families, parent/child links (core CRUD)
+- **Add / edit / delete** individuals, names, families, parent/child links (core CRUD).
+  "Delete" is a **soft-delete** — recoverable, audited, revertible (ADR-0001, §3.5).
 - **Add events & attributes** (birth, death, marriage, residence, occupation…) with
   fuzzy dates and reusable places
-- **Person page** showing vitals, all names, life events, relationships, attached
-  sources, photos, and stories
-- **Pedigree + fan chart** views (start simple: a few generations, ancestor traversal)
+- **Person page** showing vitals, all names, life events, **core family relationships**
+  (parents / spouses / children / siblings), attached sources, photos, and stories.
+  *(Non-family "Other Relationships" — apprenticeship, employment, godparent, etc. — is
+  v2; see §3.6.)*
+- **Tree views:** **Pedigree** (ancestor traversal — vertical layout is the v1 default;
+  a horizontal orientation is reserved as a **v2 toggle**), a **Family Group** view, and
+  a **Relationship View**. *(Fan Chart is v2 — §3.6.)* The renderer is
+  **orientation-parameterized** and the traversal endpoint supports **lazy subtree fetch
+  from any node**, so the v2 horizontal toggle and pan/zoom canvas (§11) are seams, not
+  rewrites.
 - **Attach sources / citations** to facts; view the evidence behind a person
 - **Upload photos** and attach them to people, families, or events
 - **Write memories** (Markdown) attached to people or events
-- **Admin panel** (admin role): manage users, edit site text, verify backups
+- **Edit their own person record** — a member **linked** to an INDI (ADR-0002) may
+  self-author their living record (profession, achievements, life sketch): high-value
+  original data, not just transcription.
+- **See a tree even when unlinked** — a user with no `individual_id` gets the
+  **oldest-ancestor** as the default tree root (ADR-0002).
+- **Change their timezone** — the site has a default; each account can override it.
+- **Suggest an idea** (→ admin **Suggestions inbox**: topic + status lifecycle +
+  priority) and **request a role change** (→ admin approval).
+- **Self-serve account email** — password reset and **email verification** via
+  configurable **transactional email** (Option A: SMTP/provider — §9 Tier-1).
+- **Admin panel** (admin role): manage users + role requests, triage the suggestions
+  inbox, edit **branding** (`site_name` / `family_name`) and site text, tune the
+  **security baseline** (min password length, breach-list check, rate-limit/lockout,
+  session timeout — §9), verify backups, and **revert** any audited change.
+
+### v1.x — additive scope (lands *after* core CRUD, no schema lock-in)
+These are approved for v1 but sequenced after the core CRUD UI so they never block the
+parents-first launch. Each is additive (a new table/view), so deferring the *timing*
+costs nothing:
+- **Member Profile + privacy-controlled contact fields** and a **Family Address Book**
+  view — **default-deny, per-field sharing**, kept *inside* FamilyHub (not a separate
+  app). Feeds off the Account↔Person link (ADR-0002).
+- **Merge / duplicate** tools for individuals (also listed v2-adjacent in §3.6; may land
+  in v1.x).
 
 ---
 
@@ -398,8 +509,9 @@ Build ONE work package at a time; phase-gate review before the next.
   contract** (endpoints + JSON shapes) — the interface the frontend builds against.
 - **WP3 – Frontend.** Cowork builds the UI per the §5B design brief against the WP2
   API contract. Elderly-accessible + cross-generational polish.
-- **WP4 – The Views & Search.** Tree/fan chart, timeline, album, memory blog, and a
-  rich **Search** interface — all queries against the existing schema. (See §12.)
+- **WP4 – The Views & Search.** Tree (pedigree + family-group + relationship view),
+  timeline, album, memory blog, and a rich **Search** interface — all queries against
+  the existing schema. (See §12; fan chart is v2 per §3.6.)
 - **WP5 – Deploy.** AWS Lightsail, gunicorn + nginx, SSL, DNS, nightly backups.
 - **WP6 (TENTATIVE) – GEDCOM Import/Export Engine.** Full GEDCOM-7 round-trip,
   validated against the gedcom.io registry. Technically possible in v1, but it's the
@@ -510,11 +622,28 @@ wrong endpoint; Code finds the front-end needs a different data shape). Protocol
    rather than a partners junction table — simpler for v1.
 3. **v1 scope = the essential subset** (per §5): individual & family vital records,
    biographical narratives (= "memories"), photo uploads, events, sources, citations.
-   **Deferred to v2** (additive, no lock-in — see §3.6): ASSO, SUBM, video/audio, merge,
-   change-history/restore. **Full GEDCOM import/export:** tentative v1 WP6, firm v2.
+   **Deferred to v2** (additive, no lock-in — see §3.6): ASSO (non-family "Other
+   Relationships"), SUBM, video/audio, **Fan Chart**. **Full GEDCOM import/export:**
+   tentative v1 WP6, firm v2. **Merge** is v2-adjacent (may land v1.x — §5).
 4. **Markdown** for all narrative content (bios, memories).
 5. **`living` flag + `restriction`** drive PII hiding rather than a separate privacy
    subsystem.
+6. **Post-moderation write-control is v1** (**ADR-0001**, reversing the earlier v2
+   deferral): direct writes gated by RBAC (§10), a full `audit_log` (before→after),
+   **soft-delete only**, and **Curator revert**. A pre-moderation approval queue stays
+   v2 (additive `change_request` table). This is the scope/schema change that makes this
+   revision a **MAJOR** bump.
+7. **Account↔Person link is v1** (**ADR-0002**): a nullable `users.individual_id` FK ties
+   an account to its INDI record (enables self-authored living-member records);
+   **unlinked users default the tree root to the oldest ancestor**.
+8. **RBAC roles renamed** to **Viewer / Contributor / Curator / Admin** (was GUEST / USER
+   / POWER USER / ADMIN — §10). Same ladder; **permissions modeled as data** (a role = a
+   bundle of permission flags) so custom roles are a later data change, not a rewrite.
+9. **App is white-labelable** — `site_name` / `family_name` in `site_settings` drive
+   header, page titles, and the Chronicle masthead, so the codebase is forkable.
+10. **Transactional email (Option A)** — configurable SMTP/provider powers self-serve
+    password reset + email verification (§9). A separate *notification* email stream is
+    v2 (§11).
 
 ---
 
@@ -527,22 +656,33 @@ deliberately. The first build already cleared the MVP tier — build upward from
   protection, strict CSP, login rate limiting, security headers, login-walled photo
   serving, secure session cookies, password reset, HTTPS, PII hidden for `living`
   individuals, upload validation, files stored outside the web root.
-- **Tier 2 — Hardening (mid-project WPs):** role-based access control (§10), audit
-  logging, encryption at rest for backups, secrets management, dependency/vulnerability
-  scanning in CI, granular per-record privacy.
-- **Tier 3 — Mature (v2 / ongoing):** MFA, penetration testing, PII minimization,
-  data export/delete (subject-rights) tooling, monitoring / intrusion detection.
+  **Now also v1-active (per ADR-0001):** **RBAC** (§10, shipped in WP2), **audit logging**
+  (before→after on every mutation), and **soft-delete + Curator revert**. **Email
+  verification** joins password reset on the configurable transactional-email stream
+  (§8.10). The **security baseline is admin-configurable** via `site_settings` (§3.5):
+  min password length, **breach-list check** (HaveIBeenPwned k-anonymity), login
+  rate-limit / lockout thresholds, and session timeout.
+- **Tier 2 — Hardening (mid-project WPs):** encryption at rest for backups, secrets
+  management, dependency/vulnerability scanning in CI, granular **per-record** privacy,
+  and the **permission-as-data** role→permission matrix (read-only view in v1; editable
+  toggle UI is v2 — §10).
+- **Tier 3 — Mature (v2 / ongoing):** **MFA (TOTP** — no SMS/phone dependency; §11),
+  penetration testing, PII minimization, data export/delete (subject-rights) tooling,
+  monitoring / intrusion detection.
 - Ties directly to Wes's **ISC2 CC** and the **WGU Security** coursework.
 
 ---
 
 ## 10. Access Control — Roles & Admin Panel (progressive)
 
-Target model is standard **RBAC** with four roles:
-- **GUEST** — trusted outsider (e.g., relative by marriage): minimal, e.g. comment only.
-- **USER** — standard family member: normal CRUD on family content.
-- **POWER USER** — technically savvy member: elevated permissions just below admin.
-- **ADMIN** — full control.
+Target model is standard **RBAC** with four roles (renamed 2026-07-03 — same ladder,
+warmer/clearer labels):
+- **Viewer** — trusted outsider (e.g., relative by marriage): minimal, e.g. comment only.
+  *(was GUEST)*
+- **Contributor** — standard family member: normal CRUD on family content. *(was USER)*
+- **Curator** — technically savvy member: elevated permissions just below admin,
+  including the audit-driven **revert** (ADR-0001). *(was POWER USER)*
+- **Admin** — full control.
 
 **Anti-lock-in design (do this early):** put the `role` enum on `users` from the start
 and route every permission check through a **single authorization layer** (one
@@ -550,10 +690,18 @@ decorator/service), so adding roles or granular permissions later is a centraliz
 change, not a scattered rewrite. No technical limit in Flask/SQLite — the only
 constraint is build time.
 
+**Permissions modeled as data (do this in v1):** a role is a **bundle of permission
+flags**, not a hard-coded `if role == 'admin'` scattered through the code. Storing the
+role→permission mapping as data means a new or custom role is a **data change**, not a
+rewrite. v1 exposes a **read-only role→permission matrix** in the admin panel (so the
+model is legible); the **editable toggle UI** that lets an admin re-bundle permissions
+or mint custom roles is reserved for **v2**.
+
 **Progressive ladder (a little more each WP):**
-- **WP2:** role scaffolding (enum + auth layer) + basic USER/ADMIN.
-- **WP3–WP4:** rich admin-panel UX (Cowork) + POWER USER and GUEST tiers.
-- **Dedicated later WP:** granular per-feature permissions + full admin dashboard.
+- **WP2:** role scaffolding (enum + single auth layer) + basic Contributor/Admin. *(done)*
+- **WP3–WP4:** rich admin-panel UX (Cowork) + Curator and Viewer tiers + the read-only
+  permission matrix; role-change requests routed to admin approval (§5).
+- **v2:** editable permission-matrix UI + custom roles (the data model already allows it).
 
 ---
 
@@ -571,6 +719,20 @@ derailing an in-flight work package:
 - Per-member **dashboard** (FamilySearch-style "my contributions" summary).
 - **Browse-vs-edit UX** split (subtle edit icon → inline/popup edit) so editing
   controls never intrude on the reading experience.
+
+**v2 / future captures (reserved seams, do NOT build now):**
+- **MFA (TOTP)** — authenticator-app second factor, **no SMS/phone dependency** (§9 Tier-3).
+- **Notification email system** — event-triggered emails with a **preference center**,
+  **digests**, and **unsubscribe/compliance**, on a **separate sending stream** from the
+  transactional email of §8.10 (deliverability + compliance hygiene).
+- **Dynamic pan/zoom tree canvas** — lazy-expand from any node; the v1 traversal endpoint's
+  "lazy subtree fetch" (§3 design rules) is the seam for it.
+- **Admin theme switcher** — pick among predetermined designs (pairs with white-label
+  branding, §8.9).
+- **Family Bunch** — a *separate*, present-tense family **social** app (not genealogy).
+  **Do NOT build it here.** FamilyHub stays the system of record: it owns accounts,
+  member profiles, and stable IDs, and merely **reserves an identity/API seam** so a
+  future Family Bunch could authenticate against it.
 - (Add future ideas here rather than expanding MVP scope.)
 
 ---
@@ -593,6 +755,32 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- **v2.0.0 — 2026-07-03 — MAJOR (v1 design reconciliation).** Scope/schema-altering, so
+  a major bump. (Raised by Wes; decisions captured in ADR-0001, ADR-0002, and
+  `docs/CONTEXT_LOG.md`.)
+  1. **Write-control → v1** (per **ADR-0001**, reversing the old v2 deferral): `audit_log`
+     (before→after) + **soft-delete** + **Curator revert** are core v1 scope. Reflected in
+     §3 design rules, §3.5 (audit_log table), §3.6, §8.6, §9 (audit now Tier-1).
+  2. **Fan Chart → v2.** v1 tree = **Pedigree** (vertical default; horizontal reserved as
+     a v2 toggle) **+ Family Group + Relationship View**. Renderer is
+     orientation-parameterized; traversal endpoint supports lazy subtree fetch from any
+     node; the person graph is a **graph, not a linked list** (§2, §3, §4, §5, §6).
+  3. **Associations (ASSO) → v2, confirmed.** The Person Page **"Other Relationships"**
+     (non-family) section is v2; **core family relationships remain v1** (§3.6, §4, §5, §8.3).
+  4. **RBAC rename (§10):** GUEST/USER/POWER USER/ADMIN → **Viewer/Contributor/Curator/
+     Admin**; **permissions modeled as data** + a **read-only** role→permission matrix in
+     v1 (editable UI is v2). Also §3.5, §8.8, §9.
+  5. **New v1 scope:** Account↔Person link (**ADR-0002**, `users.individual_id`;
+     oldest-ancestor fallback), self-authored living-member records, suggestions inbox +
+     role-change requests, transactional email (verification + reset), white-label
+     branding (`site_name`/`family_name`), per-user timezone, and a configurable security
+     baseline (§3.5, §5, §8.7–8.10, §9).
+  6. **New v1.x (additive, post-core-CRUD):** Member Profile + privacy-controlled contact
+     fields + **Family Address Book** (default-deny, per-field sharing); merge/duplicate
+     tools (§5).
+  7. **Parking lot (§11):** MFA (TOTP), notification-email system, dynamic pan/zoom tree
+     canvas, admin theme switcher, and the **Family Bunch** identity/API seam (reserved,
+     not built).
 - v1.2 — 2026-06-18 — Added the **branch-per-work-package** workflow to §7: each WP is
   built on its own branch off master; tests may be red on-branch (WIP); a branch merges
   to master only when green (the CI merge gate), so master is always green; cross-lane
