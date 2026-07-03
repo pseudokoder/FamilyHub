@@ -60,6 +60,8 @@ tags:
     description: Audit trail, restore, and revert — post-moderation (ADR-0001)
   - name: Account
     description: Account↔Person link, "my person", and the tree root (ADR-0002)
+  - name: Tree
+    description: Pedigree graph, relationship finder, dashboard stats, On This Day
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -155,8 +157,8 @@ paths:
   /api/individuals:
     get:
       tags: [Individuals]
-      summary: List individuals (light — primary name + counts)
-      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individuals: {type: array, items: {$ref: '#/components/schemas/Individual'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+      summary: List individuals (light rows — name + vitals + a place)
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individuals: {type: array, items: {$ref: '#/components/schemas/PersonListItem'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
     post:
       tags: [Individuals]
       summary: Create an individual (optional inline primary `name` object)
@@ -249,8 +251,8 @@ paths:
   /api/media:
     get:
       tags: [Media]
-      summary: List media (optionally for one subject)
-      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event]}}, {name: subject_id, in: query, schema: {type: integer}}]
+      summary: List media (optionally for one subject; order by upload or capture date)
+      parameters: [{name: subject_type, in: query, schema: {type: string, enum: [individual, family, event]}}, {name: subject_id, in: query, schema: {type: integer}}, {name: order_by, in: query, schema: {type: string, enum: [uploaded, capture], default: uploaded}, description: "capture = when the photo was taken"}]
       responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {media: {type: array, items: {$ref: '#/components/schemas/Media'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
     post:
       tags: [Media]
@@ -321,6 +323,34 @@ paths:
     parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
     put: {tags: [Account], summary: "Admin: link an account to a person (permission&#58; link_account)", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [individual_id], properties: {individual_id: {type: integer}}}}}}, responses: {"200": {description: Linked, content: {application/json: {schema: {$ref: '#/components/schemas/AccountLink'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}, "409": {description: That person is already linked to another account}}}
     delete: {tags: [Account], summary: "Admin: unlink an account (permission&#58; link_account)", responses: {"200": {description: Unlinked, content: {application/json: {schema: {$ref: '#/components/schemas/AccountLink'}}}}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+
+  # --- Tree traversal + views (Master Plan §4) --------------------------------
+  /api/individuals/{individual_id}/pedigree:
+    parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
+    get:
+      tags: [Tree]
+      summary: A graph slice from any node (ancestors/descendants, depth, lazy-expand)
+      parameters:
+        - {name: direction, in: query, schema: {type: string, enum: [ancestors, descendants, both], default: both}}
+        - {name: depth, in: query, schema: {type: integer, default: 3, minimum: 1, maximum: 6}, description: generations each way}
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/PedigreeGraph'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}
+  /api/individuals/{a_id}/relationship/{b_id}:
+    parameters: [{name: a_id, in: path, required: true, schema: {type: integer}}, {name: b_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Tree], summary: Shortest blood path + plain-English label (B relative to A), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/RelationshipResult'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}}
+  /api/stats:
+    get: {tags: [Tree], summary: Aggregate counts + storage (Home + Admin dashboard), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Stats'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/on-this-day:
+    get:
+      tags: [Tree]
+      summary: Family births/marriages/deaths sharing today's (or a given) date
+      parameters: [{name: month, in: query, schema: {type: integer, minimum: 1, maximum: 12}}, {name: day, in: query, schema: {type: integer, minimum: 1, maximum: 31}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/OnThisDay'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+  /api/historical-events:
+    get:
+      tags: [Tree]
+      summary: World/US almanac (each with a description) to blend into the timeline
+      parameters: [{name: scope, in: query, schema: {type: string, enum: [US, world]}}, {name: year_from, in: query, schema: {type: integer}}, {name: year_to, in: query, schema: {type: integer}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {historical_events: {type: array, items: {$ref: '#/components/schemas/HistoricalEvent'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
 
   # --- Write control: activity feed, restore, revert (ADR-0001) ---------------
   /api/activity:
@@ -396,6 +426,93 @@ components:
         individual_id: {type: integer, nullable: true}
         source: {type: string, enum: [linked, oldest_ancestor, empty], description: how the root was chosen}
         individual: {$ref: '#/components/schemas/Individual', nullable: true}
+    PersonListItem:
+      type: object
+      description: The lightweight person row shared by the People list, search, and tree nodes.
+      properties:
+        id: {type: integer}
+        primary_name: {type: string, nullable: true}
+        sex: {type: string, nullable: true}
+        living: {type: boolean}
+        birth_year: {type: integer, nullable: true}
+        death_year: {type: integer, nullable: true}
+        birth_place: {type: string, nullable: true}
+    PedigreeGraph:
+      type: object
+      description: A bounded graph slice — nodes + edges — for lazy-expandable tree rendering.
+      properties:
+        root_id: {type: integer}
+        direction: {type: string, enum: [ancestors, descendants, both]}
+        depth: {type: integer}
+        nodes:
+          type: array
+          items:
+            allOf:
+              - {$ref: '#/components/schemas/PersonListItem'}
+              - type: object
+                properties:
+                  has_ancestors: {type: boolean, description: more parents exist beyond the slice (lazy-fetch hint)}
+                  has_descendants: {type: boolean}
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              type: {type: string, enum: [parent-child, partner]}
+              family_id: {type: integer}
+              parent_id: {type: integer, nullable: true}
+              child_id: {type: integer, nullable: true}
+              partner1_id: {type: integer, nullable: true}
+              partner2_id: {type: integer, nullable: true}
+    RelationshipResult:
+      type: object
+      description: Shortest blood path between two people + a label describing B relative to A.
+      properties:
+        a: {type: integer}
+        b: {type: integer}
+        relationship: {type: string, example: 1st cousin once removed}
+        nca_id: {type: integer, nullable: true, description: nearest common ancestor}
+        distance_a: {type: integer, nullable: true}
+        distance_b: {type: integer, nullable: true}
+        path: {type: array, items: {type: integer}, description: individual ids from A through the NCA to B}
+    Stats:
+      type: object
+      description: Aggregate counts + storage for the dashboards.
+      properties:
+        counts:
+          type: object
+          additionalProperties: {type: integer}
+          description: people, families, events, sources, citations, photos, notes, places, repositories, users
+        storage_bytes: {type: integer}
+    OnThisDay:
+      type: object
+      description: Family births/marriages/deaths sharing a calendar day.
+      properties:
+        month: {type: integer}
+        day: {type: integer}
+        births: {type: array, items: {$ref: '#/components/schemas/Anniversary'}}
+        marriages: {type: array, items: {$ref: '#/components/schemas/Anniversary'}}
+        deaths: {type: array, items: {$ref: '#/components/schemas/Anniversary'}}
+    Anniversary:
+      type: object
+      properties:
+        event_id: {type: integer}
+        subject_type: {type: string}
+        subject_id: {type: integer}
+        who: {type: string, nullable: true}
+        year: {type: integer, nullable: true}
+        date_original: {type: string, nullable: true}
+        place: {type: string, nullable: true}
+    HistoricalEvent:
+      type: object
+      description: One world/US almanac entry (reference data) for timeline context.
+      properties:
+        id: {type: integer}
+        year: {type: integer}
+        date_sort: {type: string, nullable: true}
+        title: {type: string}
+        description: {type: string}
+        scope: {type: string, enum: [US, world]}
     Name:
       type: object
       description: A name belonging to an individual (system fields are read-only).
@@ -523,9 +640,11 @@ components:
         media_type: {type: string, readOnly: true, example: image/jpeg}
         title: {type: string, nullable: true}
         description: {type: string, nullable: true}
+        capture_date: {type: string, nullable: true, description: when the photo was taken (raw, e.g. "Summer 1952")}
+        capture_date_sort: {type: string, nullable: true, description: normalized sortable capture date}
         uploaded_by: {type: integer, nullable: true, readOnly: true}
         uploader: {type: string, nullable: true, readOnly: true}
-        created_at: {type: string, format: date-time, readOnly: true}
+        created_at: {type: string, format: date-time, readOnly: true, description: when uploaded (distinct from capture_date)}
         file_url: {type: string, readOnly: true}
         thumb_url: {type: string, readOnly: true}
         links_count: {type: integer, readOnly: true}
@@ -554,15 +673,7 @@ components:
         counts: {type: object, properties: {people: {type: integer}, notes: {type: integer}}}
         people:
           type: array
-          items:
-            type: object
-            properties:
-              id: {type: integer}
-              name: {type: string, nullable: true}
-              sex: {type: string, nullable: true}
-              living: {type: boolean}
-              birth_year: {type: integer, nullable: true}
-              death_year: {type: integer, nullable: true}
+          items: {$ref: '#/components/schemas/PersonListItem'}
         notes:
           type: array
           items:

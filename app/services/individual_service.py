@@ -57,6 +57,50 @@ def _live_names(individual):
     return [n for n in individual.names if not n.is_deleted]
 
 
+def _year(date_sort):
+    """Pull the year out of a sortable date ("1850-00-00" → 1850), or None. The
+    sortable string always leads with the year, so this is just the first chunk."""
+    if not date_sort:
+        return None
+    head = str(date_sort)[:4]
+    return int(head) if head.isdigit() else None
+
+
+def _vital(individual_id, tag):
+    """The (year, place_name) of an individual's BIRT/DEAT event — the vitals a
+    list row shows. One small query per person; fine at family scale."""
+    from app.models import Event
+    event = (Event.query
+             .filter(Event.deleted_at.is_(None),
+                     Event.subject_type == "individual",
+                     Event.subject_id == individual_id,
+                     Event.event_tag == tag)
+             .order_by(Event.date_sort).first())
+    if event is None:
+        return None, None
+    place = event.place.full_name if event.place else None
+    return _year(event.date_sort), place
+
+
+def serialize_list_item(individual):
+    """The LIGHTWEIGHT row shape shared by the People list, search results, and
+    tree nodes: identity + vitals (birth/death year, a primary place) — enough to
+    render a card without a second request, but not the full record."""
+    names = _live_names(individual)
+    primary = next((n for n in names if n.is_primary), names[0] if names else None)
+    birth_year, birth_place = _vital(individual.id, "BIRT")
+    death_year, _ = _vital(individual.id, "DEAT")
+    return {
+        "id": individual.id,
+        "primary_name": primary.display if primary else None,
+        "sex": individual.sex,
+        "living": individual.living,
+        "birth_year": birth_year,
+        "death_year": death_year,
+        "birth_place": birth_place,
+    }
+
+
 def serialize(individual, with_names=True):
     names = _live_names(individual)
     primary = next((n for n in names if n.is_primary), names[0] if names else None)
@@ -79,8 +123,10 @@ def serialize(individual, with_names=True):
 # --- Individual CRUD ----------------------------------------------------------
 
 def list_all():
-    # Soft-delete aware (ADR-0001): live rows only.
-    return [serialize(i, with_names=False)
+    # Soft-delete aware (ADR-0001): live rows only. Rows are the lightweight
+    # list-item shape (with birth/death year + a place), which the People list and
+    # search results share.
+    return [serialize_list_item(i)
             for i in Individual.query
             .filter(Individual.deleted_at.is_(None))
             .order_by(Individual.id).all()]

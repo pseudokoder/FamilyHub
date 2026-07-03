@@ -105,5 +105,5 @@ def get_or_404(model, obj_id, what="record"):
 # circular import between this package and its route modules.)
 from app.routes.api import (  # noqa: E402,F401
     account, activity, citations, events, families, individuals, media, notes,
-    places, search, sources,
+    places, search, sources, stats, tree,
 )

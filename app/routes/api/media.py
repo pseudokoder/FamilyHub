@@ -22,9 +22,12 @@ from app.services.authz import role_required
 @api_bp.route("/media", methods=["GET"])
 @login_required
 def list_media():
+    # order_by=capture sorts by when the photo was TAKEN (album/timeline);
+    # the default is newest upload first.
     return jsonify(media=svc.list_all(
         request.args.get("subject_type"),
         request.args.get("subject_id", type=int),
+        order_by=request.args.get("order_by", "uploaded"),
     ))
 
 
