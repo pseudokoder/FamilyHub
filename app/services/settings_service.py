@@ -44,11 +44,15 @@ DEFAULTS = {
     "date_format": "original",          # original | iso
     "place_format": "full",             # full | short
     "new_record_privacy": "living",     # living | public
+    # Backup schedule (the actual runner is OS cron/deploy; these drive it + the
+    # admin "next run" display).
+    "backup_schedule": "daily",         # off | daily | weekly
+    "backup_hour": "3",                 # 0-23, server local hour
 }
 
 # Type per key, so the CRUD endpoint coerces + validates instead of storing junk.
 _INT_KEYS = {"min_password_length", "login_lockout_threshold",
-             "session_timeout_days", "smtp_port"}
+             "session_timeout_days", "smtp_port", "backup_hour"}
 _BOOL_KEYS = {"breach_check_enabled"}
 
 # Grouping for the admin Settings UI (the FE renders one card per group).
