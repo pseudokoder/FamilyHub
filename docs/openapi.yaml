@@ -29,7 +29,9 @@ info:
     Private, GEDCOM-7-backed family portal. All family content requires a
     session cookie (login). The /api/* surface is the WP2 JSON CRUD + search
     contract Cowork builds the WP3 front-end against; reads need any logged-in
-    member, writes need at least the USER role (§10). State-changing /api calls
+    member, writes need at least the Contributor role (§10). Deletes are SOFT
+    (ADR-0001): a deleted record reads as gone but is recoverable via
+    /api/restore or /api/audit/{id}/revert. State-changing /api calls
     must send the CSRF token in an X-CSRFToken header. The auth/admin/plumbing
     routes render HTML today; v2 can serve JSON from the same URLs.
 
@@ -148,7 +150,7 @@ paths:
 
   # ============================================================================
   # GENEALOGY JSON API (WP2) — the contract Cowork builds WP3 against.
-  # Every write (POST/PUT/DELETE) needs the USER role and an X-CSRFToken header.
+  # Every write (POST/PUT/DELETE) needs the Contributor role + an X-CSRFToken header. DELETE is soft (ADR-0001).
   # Standard responses: 200/201 ok, 204 deleted, 400 validation, 401 not logged
   # in, 403 wrong role, 404 missing, 409 duplicate link.
   # ============================================================================
@@ -168,14 +170,14 @@ paths:
     parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Individuals], summary: One individual with all names, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Individuals], summary: Update fields (sex/living/restriction/gedcom_xref), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Individual'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}}}
-    delete: {tags: [Individuals], summary: Delete the individual + names + all polymorphic attachments, responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Individuals], summary: Soft-delete the individual (recoverable; names + attachments preserved), responses: {"204": {description: Deleted}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/individuals/{individual_id}/names:
     parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Individuals], summary: Add a name (needs a given or surname), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, responses: {"201": {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, "400": {$ref: '#/components/responses/BadRequest'}}}
   /api/names/{name_id}:
     parameters: [{name: name_id, in: path, required: true, schema: {type: integer}}]
     put: {tags: [Individuals], summary: Update a name (is_primary steals primary from the others), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Name'}}}}, responses: {"200": {description: Updated}, "404": {$ref: '#/components/responses/NotFound'}}}
-    delete: {tags: [Individuals], summary: Delete a name, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Individuals], summary: Soft-delete a name (recoverable), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
 
   # --- Families + Children ----------------------------------------------------
   /api/families:
@@ -185,7 +187,7 @@ paths:
     parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Families], summary: One family with children, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Families], summary: Update partners / gedcom_xref, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Family'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Families], summary: Delete the family + child links + polymorphic attachments, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Families], summary: Soft-delete the family (recoverable; children + attachments preserved), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/families/{family_id}/children:
     parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Families], summary: "Add a child link (child_id required; pedigree_type: birth|adopted|foster|step)", requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/FamilyChild'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Child already in this family}}}
@@ -205,7 +207,7 @@ paths:
     parameters: [{name: event_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Events], summary: One event, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Events], summary: Update an event, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Events], summary: Delete an event + its attachments, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Events], summary: Soft-delete an event (recoverable), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
 
   # --- Places -----------------------------------------------------------------
   /api/places:
@@ -233,7 +235,7 @@ paths:
     parameters: [{name: source_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Sources], summary: One source, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Sources], summary: Update a source, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Source'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Sources], summary: Delete a source (cascades its citations), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Sources], summary: Soft-delete a source (recoverable; citations preserved), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/citations:
     get:
       tags: [Sources]
@@ -245,7 +247,7 @@ paths:
     parameters: [{name: citation_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Sources], summary: One citation, responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Sources], summary: Update a citation, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Citation'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Sources], summary: Delete a citation, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Sources], summary: Soft-delete a citation (recoverable), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
 
   # --- Media ------------------------------------------------------------------
   /api/media:
@@ -263,7 +265,7 @@ paths:
     parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Media], summary: One media object (with links), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Media], summary: Update metadata (title/description/gedcom_xref; bytes are immutable), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Media'}}}}, responses: {"200": {description: Updated}}}
-    delete: {tags: [Media], summary: Delete the media object + its files + links, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Media], summary: Soft-delete the media object (recoverable; files kept on disk), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/media/{media_id}/file:
     parameters: [{name: media_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Media], summary: Full image bytes (login-walled), responses: {"200": {description: image bytes}, "401": {$ref: '#/components/responses/Unauthorized'}, "404": {$ref: '#/components/responses/NotFound'}}}
@@ -289,7 +291,7 @@ paths:
     parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Notes], summary: One note (with links), responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, "404": {$ref: '#/components/responses/NotFound'}}}
     put: {tags: [Notes], summary: Update a note (title/content/content_type/is_shared), requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Note'}}}}, responses: {"200": {description: Updated}, "400": {$ref: '#/components/responses/BadRequest'}}}
-    delete: {tags: [Notes], summary: Delete a note + its links, responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Notes], summary: Soft-delete a note (recoverable; links preserved), responses: {"204": {description: Deleted}, "404": {$ref: '#/components/responses/NotFound'}}}
   /api/notes/{note_id}/links:
     parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
     post: {tags: [Notes], summary: Attach the note to a subject, requestBody: {content: {application/json: {schema: {$ref: '#/components/schemas/Link'}}}}, responses: {"201": {description: Linked}, "400": {$ref: '#/components/responses/BadRequest'}, "409": {description: Already linked}}}

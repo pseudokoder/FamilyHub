@@ -434,3 +434,131 @@ in `BLOCKERS.md`; see the session summary for the one next action.
 Nothing browser-only. Verify the Master Plan renders on GitHub (tables in §3.5/§4/
 §10, the Revision History list) and that the ADR index links resolve **once
 ADR-0002 is committed**.
+
+---
+
+## WP3 — Backend Gaps: write-control, account link, tree endpoints (2026-07-03)
+
+**Goal:** build the backend pieces the WP3 front-end needs but WP2 didn't have —
+the ADR-0001 write-control model, the ADR-0002 account↔person link, and the "view"
+endpoints (pedigree, relationships, stats, timeline). Docs-only reconciliation
+(v2.0.0) approved the scope; this is the code. Built in five phase-gated steps,
+each ending green.
+
+### 1. Schema, migration, and the RBAC rename (Phase 1)
+
+One additive migration (`c2f1a7b9d4e0`) carries the whole schema delta:
+- **Soft-delete** (`deleted_at`) on the 11 user-editable tables, via a reusable
+  `SoftDeleteMixin`. *Why a mixin:* the column is identical everywhere — define it
+  once (DRY), and a new soft-deletable table inherits one class. (D426/D480.)
+- **`users.individual_id`** (nullable FK, ADR-0002) + **`timezone`**.
+- **`audit_log`** renamed `target_*` → `subject_*` (matching the schema-wide
+  polymorphic convention) + `before_json`/`after_json` for revert.
+- **`media_objects.capture_date`** (+ sortable) — *when a photo was taken*, which
+  is not when it was uploaded (`created_at`). Same dual-date trick as events.
+- **`historical_events`** almanac table (timeline backdrop, seeded from a bundled
+  list; `flask seed-historical` is prod-safe + idempotent).
+- **RBAC rename** GUEST/USER/POWER_USER/ADMIN → **Viewer/Contributor/Curator/
+  Admin**, with a data migration for existing rows. `Role.coerce` still accepts
+  the old strings, so a pre-rename database keeps resolving (belt *and* suspenders
+  alongside the migration).
+- **Permissions as data** (`permissions.py`): a role → a frozenset of permission
+  flags, checked via `authz.permission_required`. This is the §10 anti-lock-in
+  seam — v2 moves the map into an editable table and *no check changes*.
+
+*Teaching note (batch_alter_table):* SQLite can't rename/drop a column in place, so
+every change goes through Alembic's table-rebuild. Verified the migration
+upgrades, downgrades, and re-upgrades cleanly against a temp DB.
+
+### 2. Write-control: the recoverability guarantee (Phase 2)
+
+`write_control.py` is the ONE place mutations are audited and reversed (ADR-0001):
+- Every create/update/(soft-)delete on the genealogy entities writes an audit row
+  with a **generic column snapshot** — one `snapshot()`/`_apply()` pair serves
+  every table, so there's no per-entity audit serializer to keep in sync.
+- **Delete = soft delete** everywhere. Reads hide deleted rows through a SINGLE
+  guard in `get_or_404` (every GET/PUT/DELETE/sub-resource lookup routes through
+  it) plus per-`list_all` filters. Media keeps its files on disk; source/note
+  deletes no longer cascade — recoverability forbids destroying the children.
+- **Revert is uniform** because `before_json` is a full row image: replay it to
+  undo an update/delete/restore; soft-delete the row to undo a create.
+- Endpoints: `GET /api/activity` (Curator+), `POST /api/restore`,
+  `POST /api/audit/<id>/revert` (both need the `revert` permission).
+
+*Decision:* three old tests asserted hard-delete/cascade behaviour (files removed,
+citations/links cascaded). ADR-0001 deliberately reverses that, so those tests now
+assert soft-delete semantics — the requirement changed, not the test's honesty.
+
+### 3. Account ↔ Person + self-authoring (Phase 3)
+
+`account_service.py`: admin link/unlink (one person ↔ one account, enforced +
+audited), "my person", **self-edit** (a linked member may edit their OWN record
+regardless of role — the ADR-0002 self-authoring case), and the **fallback tree
+root** (linked person, else the earliest-born ancestor who is nobody's child).
+
+### 4. The view endpoints (Phase 4)
+
+- **Pedigree** (`tree_service.graph`): a bounded **graph slice** (nodes + edges)
+  from any node, ancestors/descendants, `depth`-limited, with per-node
+  `has_ancestors`/`has_descendants` flags for **lazy subtree fetch**. Written as a
+  BFS because *the tree is a graph, not a linked list* — branches rejoin, people
+  have many spouses; assuming a linear chain is the first bug a beginner writes.
+- **Relationship finder** (`tree_service.relationship`): BFS to each person's
+  ancestor set, pick the nearest common ancestor by least combined distance, then
+  translate the two distances into English — direct line, sibling, Nth cousin M
+  times removed, aunt/uncle, with spouse/in-law as best-effort fallbacks. Verified
+  against an explicit clan fixture (the label matrix is a test, not a hope).
+- **List item** now carries birth/death year + a place; the People list, search,
+  and tree nodes share one `PersonListItem` shape.
+- **Stats + On This Day + almanac** (`stats_service`, `historical_event_service`)
+  feed Home and the Admin dashboard.
+
+### 5. Contract + docs (Phase 5)
+
+`docs/openapi.yaml` documents every new path and schema (the sync test enforces
+it), and its delete summaries now say "soft-delete (recoverable)". README and this
+diary updated. `openapi.yaml`'s Contributor/soft-delete notes replace the old
+USER/hard-delete language.
+
+### v1 → v2 mapping (added this WP)
+
+| v1 (Flask) | v2 (Spring Boot) |
+|---|---|
+| `SoftDeleteMixin` + `deleted_at` filters | `@SQLDelete` + `@Where("deleted_at is null")` |
+| `write_control` snapshot/revert | Hibernate Envers audit history |
+| `permissions.py` role→flags dict | a `role_permissions` table + `hasAuthority` |
+| `authz.permission_required` | `@PreAuthorize("hasAuthority('revert')")` |
+| `tree_service` BFS graph slice | a `TreeService` over JPA, same BFS |
+| `users.individual_id` FK (ADR-0002) | the same nullable FK on the JPA `User` |
+
+### Decisions Made Without Wes (WP3 backend gaps)
+
+1. **audit_log kept `user_id` (not `actor_user_id`)** — the committed Master Plan
+   §3.5 sketch and the existing column both use `user_id`; matching them avoided a
+   needless rename that would break the preserved admin/backup logging. (The
+   Phase-1 prompt's `actor_user_id` was a naming variance; the spec wins.)
+2. **Soft-delete does NOT cascade to owned children.** Deleting an individual
+   soft-deletes just that row; its names/events stay (hidden with the parent) so a
+   restore/revert brings the person back whole. Simpler and fully recoverable; a
+   future WP can add cascade-soft-delete if the FE wants a "trash" view of children.
+3. **Places/repositories stay hard-delete** (reference data, `SET NULL`), so
+   they're not in the write-control/soft-delete set. Noted here rather than
+   forcing them into a model they don't fit.
+4. **Restore/revert are generic endpoints** (`/api/restore`, `/api/audit/<id>/
+   revert`) rather than per-resource — one contract surface, driven by the audit
+   trail, instead of eight near-identical routes.
+5. **`historical_events` is not in the data export** — it's regenerable reference
+   data (re-seeded from the bundled list), like not backing up a package cache.
+
+### Manual Testing Checklist (WP3 backend gaps)
+
+Nothing browser-only for Code — the whole surface is JSON, fully covered by pytest
+(176 tests, ~93% coverage, floor 90%). For the integrator: after `flask db
+upgrade`, run `flask seed-historical` once on any real environment so the timeline
+has its almanac backdrop (dev `flask seed` already does this).
+
+### WP3 backend → front-end readiness
+
+The contract in `docs/openapi.yaml` now covers write-control, the account link,
+and every view endpoint the FE needs (pedigree, relationships, stats, On This Day,
+historical events). No cross-builder blockers are open.
