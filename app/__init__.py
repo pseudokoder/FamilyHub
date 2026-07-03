@@ -153,6 +153,29 @@ def create_app(config_class=Config):
             )
         return response
 
+    # --- Settings-driven session timeout (§9) -------------------------------
+    # An idle session expires after `session_timeout_days` (a live site_settings
+    # value, so an admin can tighten it without a redeploy). Reading it per
+    # authenticated request is cheap at family scale; guarded so a fresh install
+    # with no DB yet still boots.
+    from datetime import timedelta
+
+    from flask import session
+    from flask_login import current_user
+
+    @app.before_request
+    def _apply_session_timeout():
+        if not current_user.is_authenticated:
+            return
+        try:
+            from app.services import settings_service
+            days = settings_service.get_int("session_timeout_days", 30)
+        except Exception:  # noqa: BLE001 — DB not ready / first boot
+            days = 30
+        if days > 0:
+            session.permanent = True
+            app.permanent_session_lifetime = timedelta(days=days)
+
     # Register blueprints — each one is a self-contained feature area.
     # v2 mapping: one Blueprint ≈ one Spring Boot @Controller class.
     #

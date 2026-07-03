@@ -11,11 +11,12 @@ Thin controllers over account_service; the link operations are gated by the
 own data).
 """
 
-from flask import jsonify
+from flask import jsonify, url_for
 from flask_login import current_user, login_required
 
 from app.routes.api import api_bp, json_body
-from app.services import account_service, permissions
+from app.services import account_service, mail_service, permissions, user_service
+from app.services.api_errors import ApiError
 from app.services.authz import permission_required
 
 
@@ -31,6 +32,20 @@ def my_person():
 @login_required  # any linked member may edit their OWN record (ADR-0002)
 def update_my_person():
     return jsonify(account_service.self_update(current_user, json_body()))
+
+
+@api_bp.route("/me/verify-email", methods=["POST"])
+@login_required
+def send_my_verification():
+    """Email the current user a link to verify their own address (§9)."""
+    if not mail_service.is_configured():
+        raise ApiError("Email isn't set up on this server yet.", 503)
+    if current_user.email_verified:
+        return jsonify(status="already_verified")
+    token = user_service.generate_email_verify_token(current_user)
+    verify_url = url_for("auth.verify_email", token=token, _external=True)
+    mail_service.send_email_verification(current_user, verify_url)
+    return jsonify(status="sent")
 
 
 @api_bp.route("/tree/root", methods=["GET"])
