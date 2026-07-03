@@ -54,6 +54,27 @@ doc quality regress on smaller models.
 
 ---
 
+## 2026-07-03 · PROCESS conventions (co-manager ↔ builder workflow)
+- **Embed verbatim doc content in prompts.** When a prompt must land a doc committed as-is
+  (ADR, Context Log, etc.), the co-manager embeds the full content in the prompt so the
+  builder writes it. Never ask Wes to hand-place files — slow on the MacBook Air; it caused
+  a blocker on BE Prompt 1.
+- **Prompts are 100% copy-paste-ready.** The prompt contains ONLY text meant for the
+  Builder. All Wes-facing meta (model/effort recommendation, coaching, run notes) goes in
+  the Cowork chat, never in the prompt.
+- **Builders do NOT read the whole Master_Plan.** The co-manager distills what a task needs
+  into the prompt and points to specific sections/ADRs. Cover-to-cover reading of
+  MASTER_PLAN.md is a Co-Manager-thread startup step ONLY.
+- **Division of labor / cost.** All thinking + doc authoring (README, Master_Plan text,
+  ADRs, Context Log, contributor docs) happens in the Co-Manager thread (Opus 4.8). Builders
+  execute at low token cost on a fast model: commit doc content verbatim and write code. Aim
+  for low cost at the maximum reasonable performance.
+- **One model per prompt.** Model/effort is set once before a run and cannot change
+  mid-execution. The co-manager recommends a single model/effort per prompt so Wes can start
+  it and walk away.
+
+---
+
 ## 2026-07-03 · Design-session decisions (Person Page + Tree + Home/People + Memories/Search + User area + Admin)
 
 Wireframes approved with Wes this session. **Targets** = where each must be committed.
