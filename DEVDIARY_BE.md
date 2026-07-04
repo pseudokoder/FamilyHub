@@ -665,3 +665,91 @@ once their settings are enabled.
 
 `docs/openapi.yaml` now documents the inbox, role requests, email verification, all
 admin actions, and the permission matrix. No cross-builder blockers are open.
+
+---
+
+## WP5 — Docs Reconciliation + Cross-Builder Blockers (2026-07-03)
+
+**Goal:** a docs-and-fixes run bridging WP3 (backend admin) and WP4 (frontend
+shell) — commit ADR-0003, reconcile the Master Plan, and resolve the two blockers
+FE raised while building the WP4 nav and Home page.
+
+### 1. ADR-0003 — and finding its own motivating bug still live
+
+Committed `docs/adr/0003-white-label-neutral-language.md` verbatim (the rule: no
+personal names/contact in the app's own UI copy, config defaults, or build-detail
+docs; author credit and origin narrative stay fine elsewhere). The ADR's own
+motivating example — a login page reading *"Call or text Wes"* — turned out to
+still be live in the app, not hypothetical: `login.html`, `forgot_password.html`,
+the 403/429/500 error pages, and a flash message in `auth.py` all named the
+author. Worse, the login-page copy was **stale advice**: it told people to text
+someone for a password reset when self-serve email reset has existed since
+WP3-backend-admin Phase 2. Fixed all of it to neutral phrasing ("contact your
+family administrator") and updated the two tests that asserted the old copy.
+Seed data (`seed.py`'s fictional "Hartwell family") is untouched — ADR-0003
+explicitly allows fictional demo names.
+
+### 2. Master Plan MINOR bump (2.1.0 → 2.2.0)
+
+Decision-capture only: a §8 pointer + the top-of-doc ADR callout now cite
+ADR-0003. No new scope — the white-label rule was already implicit in the
+existing branding scope (§5/§8.9); this makes it explicit and citable.
+
+### 3. Blocker 1 — the admin gate, aligned to permissions-as-data
+
+Before touching anything, I verified the CLAIM in the blocker: is a non-admin
+actually getting a wrong answer today? A quick probe (viewer/contributor/curator
+clients against `GET /api/admin/users`) showed correct 403s across the board —
+so this was an **architectural gap, not a live bug**. `admin_required` was
+`role_required(Role.ADMIN)`, a bespoke ladder check, when the Master Plan's own
+§10 anti-lock-in design calls for every check to route through the
+permissions-as-data layer. The fix is one line in `authz.py`:
+`admin_required = permission_required(permissions.ADMINISTER)` — because
+`permissions.py` has no import of `authz.py`, this is safe at module level with
+no circular-import risk, and it re-points all 25 existing `@admin_required`
+usages at the permission-flag layer with **zero route edits**. Curator holds
+`revert`, not `administer` — a deliberate, correct distinction, not an oversight.
+`tests/test_wp5_authz_alignment.py` is a parametrized matrix (every role ×
+8 admin-only + 1 curator-plus endpoint) proving each rung gets the right answer.
+
+### 4. Blocker 2 — a second, narrower view over the same audit_log
+
+Home wants "Jane added a photo" for every member; the only endpoint,
+`GET /api/activity`, is Curator+ by design (ADR-0001 — it's the full audit trail,
+carrying deletes/reverts/security actions). Rather than loosen that gate (which
+would leak sensitive rows to Viewers), I built a **different, narrower view over
+the identical table** — the "one database, many views" principle applied to
+`audit_log` itself: `write_control.member_feed()` filters to `action="create"`
+on `individual`/`media`/`note` only, renders a friendly sentence, and silently
+drops rows whose subject has since been soft-deleted (a feed shouldn't point at
+content that's gone). New `GET /api/activity/feed`,
+`permission_required(permissions.VIEW)` — any logged-in member. The test suite
+proves the exclusion two ways: the friendly feed never shows a delete/account
+action, AND the full Curator+ trail still does (so it's provably a narrower view,
+not a weaker one).
+
+### Decisions Made Without Wes (WP5)
+
+1. **Fixed the ADR-0003 motivating bug in this same PR** rather than filing it
+   as a follow-up — it's a live PII/UX issue the ADR itself calls out, the ADR's
+   own "Effort/Enforcement" section asks phase-gate review to grep for exactly
+   this before merge, and the fix was five templates + a flash message, not a
+   redesign.
+2. **`admin_required` repointed via ONE line**, not a route-by-route rewrite —
+   the smallest change that satisfies "route through the permission-flags layer"
+   literally, with identical behavior today (only Admin holds `administer`) and
+   zero blast radius.
+3. **Left `base.html` / `home.js` / `dashboard.html` untouched** — those are
+   FE's Jinja/JS (Master Plan §7); BLOCKERS.md spells out exactly what FE should
+   change to consume the new endpoint (swap `/api/activity` for
+   `/api/activity/feed` on Home; loosen the Curator-only container gate).
+4. **No new `site_settings` key for "admin contact"** — the neutral copy says
+   "contact your family administrator" without a live mailto/phone value; adding
+   a configurable admin-contact field is new scope beyond adopting the ADR, left
+   for a future WP if wanted.
+
+### Manual Testing Checklist (WP5)
+
+Nothing browser-only for BE — both fixes are fully covered by pytest (232 tests,
+~92% coverage, floor 90%). Nothing pushed; branch `wp5-be-docs-blockers` is ready
+for Wes to push + open the PR.

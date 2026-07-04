@@ -1,13 +1,16 @@
 """/api — write-control surface: the activity feed, restore, and revert (ADR-0001).
 
 These are the endpoints that make post-moderation safe (Master Plan v2.0.0 §9):
-  * GET  /api/activity              — the paginated, filterable audit trail.
+  * GET  /api/activity              — the paginated, filterable audit trail (Curator+).
+  * GET  /api/activity/feed         — friendly, ALL-MEMBERS "recent activity" (Home).
   * POST /api/restore               — un-delete a soft-deleted row.
   * POST /api/audit/<id>/revert     — undo the change an audit entry describes.
 
-Reading the trail needs at least Curator; restore/revert need the ``revert``
-permission (Curator+ per the permissions map). Thin controllers, as ever — all the
-logic lives in write_control.
+Reading the full trail needs at least Curator; the Home feed needs only ``view``
+(any logged-in member) since it's filtered to safe, non-sensitive creates
+(BLOCKERS.md, 2026-07-03). restore/revert need the ``revert`` permission (Curator+
+per the permissions map). Thin controllers, as ever — all the logic lives in
+write_control.
 """
 
 from datetime import datetime
@@ -54,6 +57,15 @@ def activity_feed():
         page=_int_arg("page") or 1,
         per_page=_int_arg("per_page") or 50,
     ))
+
+
+@api_bp.route("/activity/feed", methods=["GET"])
+@permission_required(permissions.VIEW)  # any logged-in member — deliberately NOT Curator+
+def activity_member_feed():
+    """The Home page's "recent activity" — friendly sentences over safe creates
+    only (new people/photos/stories). Never deletes, reverts, or account/security
+    actions — see write_control.member_feed for the exact filter."""
+    return jsonify(activity=write_control.member_feed(limit=_int_arg("limit") or 20))
 
 
 @api_bp.route("/restore", methods=["POST"])

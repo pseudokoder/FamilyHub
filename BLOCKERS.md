@@ -37,52 +37,62 @@ Entry format:
 
 ## Open items
 
-### [OPEN] WP4 nav brief says "Admin" is Curator+; the backend admin surface is Admin-only
-- Date: 2026-07-03
+### [RESOLVED] WP4 nav brief says "Admin" is Curator+; the backend admin surface is Admin-only
+- Date: 2026-07-03 (raised) → 2026-07-03 (resolved)
 - Raised by: FE
-- Blocks: nothing critical — the app shell (`app/templates/base.html`) gates the
-  user-menu "Admin" item on `current_user.is_admin` (true Admin), NOT Curator+ as
-  the WP4 brief literally asked ("Admin (only if the current user is Curator/
-  Admin per the role)"), so the link never 403s. That's the safe default, but it
-  means Curators get no admin-menu entry at all right now, even though §10 makes
-  Curator a real, elevated rung (it holds `revert`, i.e. the audit trail +
-  restore/undo).
-- Needs (BE must, or Wes must decide): pick one —
-  1. Confirm the nav is right as built (Admin-only) and the brief's "Curator/
-     Admin" phrasing was loose — nothing to change; OR
-  2. Add a Curator-visible capability to gate a menu item on instead — most
-     naturally the audit trail (`GET /api/activity`, already `role_required
-     (Role.CURATOR)`) — so Curators get e.g. an "Activity" entry pointing at a
-     real page, distinct from the Admin-only `/admin/*` panel.
-  Every `/admin/*` HTML route and every `/api/admin/*` + `/api/suggestions`
-  (GET/PUT) + `/api/role-requests` (GET/approve/deny) JSON route is hard-coded
-  `@admin_required` (`app/services/authz.py`, `app/routes/admin.py`,
-  `app/routes/api/admin_api.py`, `app/routes/api/inbox.py`) — loosening any of
-  those to Curator+ is a §10 permissions-map change, not a template change, so
-  it's BE's call either way.
-- Status: OPEN.
+- Was blocking: nothing critical — `app/templates/base.html` gated the user-menu
+  "Admin" item on `current_user.is_admin` (true Admin), not Curator+ as the WP4
+  brief literally asked, so the link never 403'd; it just meant Curators saw no
+  admin-menu entry at all, even though §10 makes Curator a real, elevated rung
+  (it holds `revert`).
+- Decision (BE, option 1 of the two offered): **the Admin-only nav item is
+  correct as built — leave it Admin-only.** Every capability behind `/admin/*`
+  and `/api/admin/*` (user management, settings, backups, suggestion/role-request
+  triage) is genuinely `administer`-scoped per the permissions map
+  (`app/services/permissions.py`) — Curator does NOT hold `administer`, only
+  `revert`. Loosening the panel to Curator+ would be wrong, not just untidy.
+- What DID change (so the gate is no longer even loosely tied to the legacy
+  boolean): `admin_required` in `app/services/authz.py` is now
+  `permission_required(permissions.ADMINISTER)` — the same permissions-as-data
+  layer as everything else — instead of a bespoke `role_required(Role.ADMIN)`.
+  `current_user.is_admin` still exists (template display / back-compat) but no
+  route gates on it. See `tests/test_wp5_authz_alignment.py` for the full
+  allow/deny matrix.
+- Curator's distinct capability is real and already exposed: `GET /api/activity`
+  (the full audit trail), `POST /api/restore`, `POST /api/audit/<id>/revert` —
+  all `permission_required(permissions.REVERT)`, Curator+. **FE may add a
+  Curator-visible nav entry pointing at these** whenever it builds an activity/
+  audit HTML page — no backend work needed, the endpoints already exist and are
+  correctly gated. Not blocking; template-only whenever FE gets to it.
+- Status: **RESOLVED 2026-07-03.**
 
-### [OPEN] Home's "Recent Activity" needs a friendly, all-members feed; today it's Curator+ only
-- Date: 2026-07-03
+### [RESOLVED] Home's "Recent Activity" needs a friendly, all-members feed; today it's Curator+ only
+- Date: 2026-07-03 (raised) → 2026-07-03 (resolved)
 - Raised by: FE
-- Blocks: nothing critical — `app/templates/dashboard.html` only renders the
-  Recent Activity container for `current_user.has_role('curator')`; everyone
-  else sees an honest static message instead of a feed that would 403. But the
-  WP4 Home brief describes this section for every logged-in member ("Mom added
-  a photo to …"), and the only endpoint that exists, `GET /api/activity`
-  (`app/routes/api/activity.py`), is `@role_required(Role.CURATOR)` by design
-  (ADR-0001 — it's the audit/write-control trail, which also carries
-  restore/revert/security actions a Viewer or Contributor arguably shouldn't
-  see). `app/static/js/home.js` already has the friendly action→verb /
-  subject_type→noun phrasing ready (`ACTION_VERB`/`SUBJECT_NOUN`) — it just has
-  nothing to call for non-Curators.
-- Needs (BE must): add a `view`-permission-gated feed of *friendly, non-sensitive*
-  creation/update events (new people, photos, stories — not deletes/reverts/
-  security actions) that every logged-in member can call, OR confirm Curator+
-  gating is the intended v1 answer and this is a documentation-only fix (update
-  the Master Plan §4 Home description to say "Curator+" instead of "every
-  member").
-- Status: OPEN.
+- Was blocking: nothing critical — `app/templates/dashboard.html` only rendered
+  the Recent Activity container for `current_user.has_role('curator')`; everyone
+  else saw a static message instead of a feed that would 403. The only endpoint
+  that existed, `GET /api/activity`, is `@role_required(Role.CURATOR)` by design
+  (ADR-0001 — the audit/write-control trail, which also carries security actions
+  a Viewer or Contributor shouldn't see).
+- Fix (BE): new `GET /api/activity/feed` (`app/routes/api/activity.py`,
+  `permission_required(permissions.VIEW)` — any logged-in member). Backed by
+  `write_control.member_feed()`: a DIFFERENT, narrower view over the SAME
+  `audit_log` table — only `create` events on `individual`/`media`/`note`
+  (new people/photos/stories), rendered as a friendly sentence ("Jane added a
+  photo: Family reunion 1962"), with since-(soft-)deleted subjects silently
+  skipped. Deletes, reverts, updates, and every account/security action
+  (`user`/`backup` subject types) never appear — proven in
+  `tests/test_wp5_member_feed.py`, including a check that the full Curator+
+  trail still sees what the friendly feed excludes. Documented in
+  `docs/openapi.yaml` (`MemberActivityEntry` schema).
+- Needs (FE, next front-end session): point `app/static/js/home.js`'s existing
+  `ACTION_VERB`/`SUBJECT_NOUN` rendering at `GET /api/activity/feed` (it already
+  returns pre-formatted `text` per row, so the JS may not even need the noun/verb
+  maps anymore — FE's call), and loosen `dashboard.html`'s Recent Activity
+  container from `current_user.has_role('curator')` to any authenticated member.
+  Template/JS-only; no further backend work required.
+- Status: **RESOLVED 2026-07-03.**
 
 ### [RESOLVED] Found + fixed: Bootstrap was silently CDN-only, dead on arrival under the CSP
 - Date: 2026-07-03

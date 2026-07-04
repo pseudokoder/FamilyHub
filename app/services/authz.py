@@ -19,6 +19,7 @@ from flask_login import current_user
 
 from app.extensions import login_manager
 from app.models.role import Role
+from app.services import permissions
 
 
 def role_required(minimum):
@@ -49,12 +50,6 @@ def role_required(minimum):
     return decorator
 
 
-# The common rungs, named once so routes read like English:
-#   @admin_required                   → ADMIN only
-#   @role_required(Role.CONTRIBUTOR)  → any normal member or above (CRUD default)
-admin_required = role_required(Role.ADMIN)
-
-
 def permission_required(permission):
     """Decorator: the view requires a logged-in, active account that HOLDS a
     specific permission flag (see app/services/permissions.py).
@@ -67,7 +62,6 @@ def permission_required(permission):
     Same three outcomes as ``role_required``: 401 (not logged in), 403 (logged in
     but the permission isn't in your bundle), or the view runs.
     """
-    from app.services import permissions
 
     def decorator(view):
         @wraps(view)
@@ -81,6 +75,18 @@ def permission_required(permission):
         return wrapped
 
     return decorator
+
+
+# THE ADMIN GATE, aligned to the role model (BLOCKERS.md, 2026-07-03): every
+# admin-only view requires the ``administer`` permission flag — today held by
+# ONLY the Admin role (see permissions.ROLE_PERMISSIONS) — rather than the
+# legacy ``current_user.is_admin`` boolean shim on the User model. That shim
+# still exists for display/back-compat (e.g. templates showing an "Admin"
+# badge), but no ROUTE should gate on it: gating here means a future custom
+# role can hold ``administer`` by editing DATA (v2's editable permission
+# matrix), with no route ever changing. Curator sits just below — it holds
+# ``revert`` (the audit trail + restore/undo), not ``administer``.
+admin_required = permission_required(permissions.ADMINISTER)
 
 
 def _wants_json():

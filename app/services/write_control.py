@@ -255,3 +255,75 @@ def list_activity(action=None, actor_id=None, subject_type=None,
         "total": pagination.total,
         "pages": pagination.pages,
     }
+
+
+# --- Member-safe "recent activity" feed for Home (BLOCKERS.md, 2026-07-03) -----
+#
+# The full audit trail above is Curator+ ONLY by design (ADR-0001) — it carries
+# deletes, reverts, and account/security actions that a Viewer or Contributor
+# shouldn't see. But Home wants a friendly "Jane added a photo" feed for EVERY
+# logged-in member. Rather than loosen the Curator-only trail, this is a
+# DIFFERENT, narrower view over the SAME table (one database, many views): only
+# ``create`` events, only on new-content subject types, rendered as a plain
+# sentence. Deletes/updates/reverts/user/backup actions never appear here.
+
+MEMBER_SAFE_SUBJECTS = ("individual", "media", "note")
+
+# Friendly noun per subject type, for the sentence below.
+_FRIENDLY_NOUN = {
+    "individual": "a new person",
+    "media": "a photo",
+    "note": "a story",
+}
+
+
+def _member_friendly_entry(entry):
+    """One safe feed row, or None if the subject has since been (soft-)deleted —
+    a friendly feed shouldn't point at content that's no longer there."""
+    model = SUBJECT_MODELS.get(entry.subject_type)
+    obj = db.session.get(model, entry.subject_id) if model else None
+    if obj is None or getattr(obj, "is_deleted", False):
+        return None
+
+    actor = entry.user.display_name if entry.user else "Someone"
+    if entry.subject_type == "individual":
+        name = obj.primary_name.display if obj.primary_name else None
+        what = f"a new person: {name}" if name else _FRIENDLY_NOUN["individual"]
+    elif entry.subject_type == "media":
+        what = f"a photo: {obj.title}" if obj.title else _FRIENDLY_NOUN["media"]
+    else:  # note
+        what = f"a story: {obj.title}" if obj.title else _FRIENDLY_NOUN["note"]
+
+    verb = "added" if entry.subject_type != "note" else "wrote"
+    return {
+        "id": entry.id,
+        "text": f"{actor} {verb} {what}",
+        "subject_type": entry.subject_type,
+        "subject_id": entry.subject_id,
+        "created_at": _iso(entry.created_at),
+    }
+
+
+def member_feed(limit=20):
+    """Friendly, ALL-MEMBERS recent-activity feed for Home. Only ``create``
+    events on new genealogy content (people/photos/stories) — never deletes,
+    reverts, edits, or account/security actions. Over-fetches a little so
+    since-deleted subjects (silently skipped) don't shrink the visible feed."""
+    from app.models import AuditLog
+
+    limit = max(1, min(int(limit), 100))
+    entries = (AuditLog.query
+               .filter(AuditLog.action == "create",
+                       AuditLog.subject_type.in_(MEMBER_SAFE_SUBJECTS))
+               .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+               .limit(limit * 2)
+               .all())
+
+    feed = []
+    for entry in entries:
+        row = _member_friendly_entry(entry)
+        if row is not None:
+            feed.append(row)
+        if len(feed) >= limit:
+            break
+    return feed

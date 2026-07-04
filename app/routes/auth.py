@@ -71,7 +71,8 @@ def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
     if not mail_service.is_configured():
-        flash("Email isn't set up on this server yet — ask Wes and he'll reset it for you.", "warning")
+        flash("Email isn't set up on this server yet — ask your family "
+              "administrator and they'll reset it for you.", "warning")
         return redirect(url_for("auth.login"))
 
     form = ForgotPasswordForm()
@@ -115,7 +116,7 @@ def reset_password(token):
 @auth_bp.route("/change-password", methods=["GET", "POST"])
 @login_required
 def change_password():
-    """Self-service password change — Wes shouldn't be a human helpdesk
+    """Self-service password change — an admin shouldn't be a human helpdesk
     for every password the family wants to rotate."""
     form = ChangePasswordForm()
     if form.validate_on_submit():

@@ -26,7 +26,7 @@ def test_403_is_friendly(client, member):
     response = client.get("/admin/users")
     assert response.status_code == 403
     assert b"not yours to change" in response.data
-    assert b"ask wes" in response.data.lower()
+    assert b"ask your family administrator" in response.data.lower()
 
 
 def test_404_keeps_the_navbar_for_logged_in_users(admin_client):

@@ -435,6 +435,12 @@ paths:
         - {name: page, in: query, schema: {type: integer, default: 1}}
         - {name: per_page, in: query, schema: {type: integer, default: 50, maximum: 200}}
       responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/ActivityPage'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}, "403": {$ref: '#/components/responses/Forbidden'}}
+  /api/activity/feed:
+    get:
+      tags: [WriteControl]
+      summary: "Friendly, ALL-MEMBERS recent-activity feed for Home — safe creates only, never deletes/reverts/account actions"
+      parameters: [{name: limit, in: query, schema: {type: integer, default: 20, maximum: 100}}]
+      responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {activity: {type: array, items: {$ref: '#/components/schemas/MemberActivityEntry'}}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
   /api/restore:
     post:
       tags: [WriteControl]
@@ -496,6 +502,15 @@ components:
         per_page: {type: integer}
         total: {type: integer}
         pages: {type: integer}
+    MemberActivityEntry:
+      type: object
+      description: One row of the friendly, all-members Home activity feed — a safe CREATE only (never a delete/revert/account action).
+      properties:
+        id: {type: integer, readOnly: true}
+        text: {type: string, example: "Jane added a photo: Family reunion 1962"}
+        subject_type: {type: string, enum: [individual, media, note]}
+        subject_id: {type: integer}
+        created_at: {type: string, format: date-time, readOnly: true}
     AccountLink:
       type: object
       description: The Account↔Person link state for one user (ADR-0002).

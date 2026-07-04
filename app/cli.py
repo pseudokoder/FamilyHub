@@ -160,7 +160,7 @@ def register_cli(app):
     def seed_command():
         """Fill a FRESH database with realistic mock data (the Hartwell family).
 
-        For development only — it lets Cowork (WP3) and Wes see the app full of
+        For development only — it lets a builder or reviewer see the app full of
         believable three-generation data, and it doubles as a runnable proof
         that the GEDCOM-7 schema holds together (see seed.py). Run it once on an
         empty dev database, right after `flask db upgrade`.

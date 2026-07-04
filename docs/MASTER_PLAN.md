@@ -4,15 +4,16 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 2.1.0** · Last updated 2026-07-03 · Status: WP3 (backend) complete; WP4 (frontend) next.
+**Version 2.2.0** · Last updated 2026-07-03 · Status: WP3 (backend) complete; WP4 (frontend) next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version (SemVer) and add a line to the Revision History
 (bottom).*
 
 > **Design decisions live in ADRs.** Point-in-time architecture decisions are recorded
 > under [`docs/adr/`](adr/README.md): **ADR-0001** (write-control model — post-moderation:
-> RBAC + audit + soft-delete + revert) and **ADR-0002** (Account↔Person link). The Master
-> Plan cites them where they bite; the ADRs hold the full rationale.
+> RBAC + audit + soft-delete + revert), **ADR-0002** (Account↔Person link), and **ADR-0003**
+> (white-label — neutral language, no personal data in the app itself). The Master Plan
+> cites them where they bite; the ADRs hold the full rationale.
 ---
 
 ## 1. The Corrected Vision
@@ -644,6 +645,14 @@ wrong endpoint; Code finds the front-end needs a different data shape). Protocol
 10. **Transactional email (Option A)** — configurable SMTP/provider powers self-serve
     password reset + email verification (§9). A separate *notification* email stream is
     v2 (§11).
+11. **Neutral language, no personal data in the app itself** (**ADR-0003**): white-label
+    means no specific family's name/contact info appears in the app's own UI copy, config
+    defaults, or the technical/build-detail language describing the schema and
+    architecture — that's what makes the codebase genuinely forkable and keeps a public
+    repo PII-clean. Author credit and the project's origin story remain fine in docs
+    (README, this plan's own narrative) — the line is between *attribution* (allowed) and
+    *the app's operative voice* (must stay generic, e.g. "contact your family
+    administrator").
 
 ---
 
@@ -779,6 +788,13 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- **v2.2.0 — 2026-07-03 — MINOR.** Adopted **ADR-0003** (white-label — neutral language,
+  no personal data in the app itself): §8 decision #11 points at the ADR; the top-of-doc
+  ADR pointer lists it alongside ADR-0001/0002. Decision-capture only — the rule was
+  already implicit in the white-label scope (§5/§8.9); this makes it explicit and citable.
+  A same-session fix (outside this doc) removed the ADR's own motivating example — a
+  hardcoded personal name in the login/error-page copy — from the app surface. (Raised by
+  Wes.)
 - **v2.1.0 — 2026-07-03 — MINOR.** Carried forward the **public surface + PII guardrail**
   parking-lot entry (§11) from the `wp3-frontend-crud` branch (approved by Wes
   2026-06-29) when that branch's Chronicle front-end work was merged forward onto

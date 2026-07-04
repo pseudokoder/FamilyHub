@@ -88,8 +88,9 @@ def test_feature_hides_itself_without_mail_config(tmp_path, client):
     nomail_app = create_app(NoMailConfig)
     nomail_client = nomail_app.test_client()
 
-    # The login page points at Wes, not at a dead feature...
-    assert b"Forgot your password? Call or text Wes" in nomail_client.get("/auth/login").data
+    # The login page points at a generic administrator, not at a dead feature
+    # or a hardcoded personal name (ADR-0003)...
+    assert b"Contact your family administrator" in nomail_client.get("/auth/login").data
     # ...and the route itself declines politely.
     response = nomail_client.get("/auth/forgot-password", follow_redirects=True)
-    assert b"ask Wes" in response.data
+    assert b"ask your family administrator" in response.data

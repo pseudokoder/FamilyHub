@@ -20,6 +20,12 @@ real family and a learning project for a future Java/Spring Boot rewrite (v2).
 spec (architecture, schema, roadmap); [`DEVDIARY.md`](DEVDIARY.md) is the guided,
 textbook-style tour of how it was built. Contributors: [CONTRIBUTING.md](CONTRIBUTING.md).
 
+**Fork-friendly by design.** No specific family's data ships with this project — site
+branding (name, family name) is admin-configurable at runtime, and the app's own voice
+stays generic ("contact your family administrator") rather than naming an individual.
+Author credit and this project's origin story are welcome in docs like this one; the app
+itself just never assumes it's *your* family until you make it so ([ADR-0003](docs/adr/0003-white-label-neutral-language.md)).
+
 ## What's built today
 
 - **GEDCOM-7 schema** — individuals, names, families & parent/child links,
