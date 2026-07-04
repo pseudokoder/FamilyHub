@@ -52,6 +52,93 @@ keep them to the **original Opus-4.8-grade standard** — accurate at every WP b
 professionally written, never describing removed features, versioned per §11. Do not let
 doc quality regress on smaller models.
 
+## ★ CURRENT BUILD STATE (as of 2026-07-03)
+
+**Design phase: COMPLETE.** Every v1 screen was wireframed and approved with Wes (Person
+Page, Tree, Home, People, Memories, Search, User area, Admin). **Build phase: in progress.**
+
+### Prompt ledger — status of every builder run
+
+| Run | Scope | Status |
+|---|---|---|
+| BE-1 | Docs reconciliation (Master Plan → v2.0.0, ADR index) | ✅ merged |
+| BE-2 | Foundation + ◆ endpoints (schema, RBAC rename, audit/soft-delete/revert, account↔person, pedigree/relationship/stats/on-this-day/historical/list-item/capture-date) | ✅ merged + verified |
+| BE-3 | Transactional email + security hardening, Suggestions inbox, admin actions | ✅ merged + verified |
+| FE-1 | App shell + Home + People | ✅ merged (was Bootstrap + had a hardcoded name → fixed by FE-fix) |
+| BE-fix | ADR-0003 commit + Master Plan/README + Context Log clarify + 2 blockers (admin authz → role model; member-safe activity feed) | ✅ merged |
+| FE-fix | Chronicle authenticated base + reskin shell/Home/People + copy neutralization | 🔄 RUNNING (branch `wp5-fe-chronicle`) |
+
+### Remaining work packages (the plan ahead)
+
+- **FE-2** — Person Page (6 tabs), native Chronicle.
+- **FE-3** — Tree (vertical Pedigree · Family Group · Relationship View).
+- **FE-4** — Memories (album views) + Search (quick + Advanced).
+- **FE-5** — User area (My Contributions dashboard + Account & Security).
+- **FE-6** — Admin console (Dashboard · Users · Suggestions · Settings · Backups · Activity).
+- **BE WP4 view endpoints** as FE needs them (Memories album filters, any search facets) —
+  check `openapi.yaml` first; add only what's missing.
+- **Late-v1 passes:** accessibility/elderly/§5B constraints; **WP5 deploy** (AWS Lightsail);
+  **WP6 GEDCOM** decision gate (tentative v1, firm v2).
+- **v1.x (additive):** Family Address Book + member profile contact fields; merge/duplicate.
+- **v2:** Fan Chart, dynamic pan/zoom tree canvas, MFA/TOTP, notification-email system,
+  editable-roles UI, admin theme switcher, Family Bunch (separate app), GEDCOM import/export.
+
+### Immediate next steps for the incoming thread
+
+1. **Verify FE-fix + BE-fix once merged** (copy sweep truly name-free; ADR-0003 committed;
+   admin endpoints 403 correctly by role; Chronicle renders on the logged-in app; member-safe
+   activity feed live). Verification = fetch the repo, read the actual code/docs, check vs
+   plan/ADRs/contract. (raw.githubusercontent CDN caches ~5 min — re-fetch if stale.)
+2. **Draft FE-2 (Person Page)** — native Chronicle, wired to `openapi.yaml`.
+3. Continue FE-3 → FE-6, verifying each merge.
+
+## ★ DECISIONS (this session) the Person Page + later FE prompts must honor
+
+- **RBAC ladder:** Viewer / Contributor / Curator / Admin. Admin menu/endpoints = Admin only.
+- **Chronicle styling is applied NOW** during the build; only accessibility/elderly/§5B
+  *constraints* are deferred to end-of-v1. §5A depth bar always holds (no hollow stubs).
+- **Global nav:** Home · Tree · People · Memories · Search + user menu (Account & Security,
+  Suggest an idea, Admin [Admin only], Log out). Brand from `site_settings`.
+- **Person Page — 6 tabs, order:** Story · Relationships · Timeline · Photos · Details ·
+  Sources. Story = read view; Details = the CRUD workbench. Inner bio card = "Life Sketch."
+  Header: portrait + name + lifespan + ID, with View Tree / View Relationship / Follow.
+  Story right rail = **slim Timeline** (fills desktop height, internal scroll, drops below on
+  narrow); main column stacks Life Story → Photos → Family → Name Meaning → Vitals → Latest
+  Changes → Sources (full cards). Timeline (full tab) = age-spine + life chapters + migration
+  thread, color-coded Life/Family/World events, "N Sources" badges. **ASSO "Other
+  Relationships" = v2** (core family relationships stay v1).
+- **Tree v1:** vertical Pedigree (horizontal toggle = reserved v2 seam) · Family Group sheet ·
+  Relationship View (plain-English label + chain). **Fan Chart = v2.** Person is a GRAPH;
+  click-to-recenter; lazy subtree fetch is the v2-canvas seam.
+- **Home:** Quick Add, warm On This Day, member-safe Recent Activity, small growth stat strip.
+- **People:** find/filter(All/Living/Deceased/Surname)/sort/paginate; list row = name +
+  birth–death year + primary place; depth-complete Register form.
+- **Memories:** one photo store, album VIEWS (By Person · By Family · By Event · Chronological
+  by capture-date). Views are cheap filters; don't cut for cost.
+- **Search:** quick nav (people + families) + Advanced multi-field.
+- **User area:** Dashboard (My Contributions) + Account & Security — PM-friendly password
+  fields (autocomplete tokens, no paste-block), self-serve email reset + verification, MFA
+  TOTP seam (v2), Delete = anonymize contributor + keep records/audit, per-user timezone,
+  role badge + "Request role change" → admin inbox.
+- **Admin:** role-filtered Dashboard (counts/storage/queues) · Users (read-only RBAC matrix +
+  reset password + secure change-email + view profile) · Suggestions (chronological inbox →
+  prioritized queue) · Settings (config/white-label branding; NO logged-in landing selector;
+  fallback root = oldest ancestor; security knobs; email config; public-page tool = v1 build
+  LAST) · Backups (DB backup/restore v1; GEDCOM v2) · Activity (audit_log + revert).
+
+## ★ Verified endpoint names (on master — but always confirm against openapi.yaml)
+
+`/api/individuals` (+ `/{id}/names`), `/api/search`,
+`/api/individuals/{individual_id}/pedigree`, `/api/individuals/{a_id}/relationship/{b_id}`,
+`/api/stats`, `/api/on-this-day`, `/api/historical-events`, `/api/activity`, `/api/restore`,
+plus BE-3 suggestions/role-request/admin/change-email routes (see `openapi.yaml`).
+
+## ★ Model-selection guidance (recommend ONE per prompt, set before the run)
+
+- Docs / architecture / security / algorithms → **Opus high** (or Sonnet high).
+- Routine CRUD / template wiring → **Sonnet medium**.
+- Design-system foundation work (e.g., the Chronicle base) → **Sonnet high**.
+
 ---
 
 ## 2026-07-03 · CLARIFICATIONS (Chronicle styling + author-name nuance)
