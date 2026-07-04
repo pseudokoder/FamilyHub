@@ -466,3 +466,156 @@ one durable lesson: Angular's component-scoped styles would have made the
 "repaint Bootstrap's classes" mechanism unnecessary (each component brings its
 own styles) — worth remembering when v2 designs its Material/Angular theme
 instead of trying to port `chronicle-app.css` line-for-line.
+
+---
+
+## FE-2 — Person Page (Six Tabs, Native Chronicle)
+
+**Branch:** `fe2-person-page`
+**Date:** 2026-07-04
+**Status:** Implementation complete; full suite green; pending owner review + merge.
+
+### What FE-2 Delivered
+
+`people/show.html`'s FE-1 placeholder ("this person's page is on its way") is
+now the real Person Page: one route, six tabs (Story · Relationships ·
+Timeline · Photos · Details · Sources), switched by URL hash so every tab is
+deep-linkable and back/forward works. Everything is client-rendered by the new
+`app/static/js/person.js` against the WP2 JSON API — no new Flask routes, no
+`docs/openapi.yaml` changes (the `/people/{individual_id}` Views entry already
+existed).
+
+- **Story** — Life Sketch, Photos strip, Family summary, Name Meaning (only
+  when one exists), Vitals, Sources, plus a condensed right-rail timeline. No
+  "Latest Changes" card — see the BLOCKERS.md item below.
+- **Relationships** — Parents/Spouses/Children/Siblings, each with a
+  pedigree-type badge; add spouse/child, link parents, edit a child's
+  pedigree_type/order, remove a link — all Contributor+.
+- **Timeline** — age spine, life-chapter grouping, Life/Family/World
+  color-coded events, a migration-thread place-change mark, "N sources"
+  badges per event.
+- **Photos** — a photo-wall grid, a CSP-safe lightbox, upload + link/unlink an
+  existing photo (Contributor+).
+- **Details** — the full CRUD workbench: Names (all fields), Person facts
+  (sex/living/restriction, plain-language restriction help text), Events &
+  attributes (any GEDCOM tag, fuzzy dates, find-or-create place).
+- **Sources** — citations grouped by what they back (person/name/event),
+  plain-language QUAY reliability labels, attach/edit/soft-delete
+  (Contributor+).
+
+Full decision log (tab-switching architecture, the memoized fetch cache, the
+Relationships data-assembly path, Markdown rendering, the Timeline algorithm,
+and a real flexbox bug found in the browser) is in
+`docs/FRONTEND_DESIGN.md`'s 2026-07-04 entry — not duplicated here.
+
+### Depth-Bar Decisions Worth Recording
+
+- **Header portrait / relationship-card cameos** reuse `chronicle.js`'s own
+  `photo()`/`applyTones()` globals (already loaded site-wide by `base.html`)
+  for the toned-cameo placeholder, rather than inventing a new component —
+  same CSP-safe data-p1/data-p2 mechanism, just applied to freshly-injected
+  markup. Tones are picked deterministically from the person's id (decorative
+  only — no such field exists on `Individual`).
+- **"Follow" renders disabled, not faked.** The header's Follow button was
+  wireframed and approved, but no backend endpoint exists. Logged as an OPEN
+  `BLOCKERS.md` item asking whether it's in scope for v1 or cut.
+- **No "Latest Changes" card on Story.** `GET /api/activity/feed` has no
+  per-subject filter — showing it un-scoped would either leak site-wide
+  activity onto one person's page or require re-deriving Curator+-only data.
+  Omitted per §5A; OPEN `BLOCKERS.md` item asks BE for the filter.
+- **Editing a child's pedigree_type/child_order** goes through DELETE then
+  re-POST (the contract has no PUT for an active `family_children` row, but
+  `family_service.add_child` already restores-with-new-values on a
+  soft-deleted one) — a real code path, not a workaround. Logged as an OPEN
+  *forward note* (not a blocker — it works today) asking for a dedicated PUT
+  so the audit trail records one `update` instead of a delete/create pair.
+- **Markdown rendering is a small, safe, hand-written subset** (paragraphs,
+  headings, bold/italic/code, "- " lists) — no CDN markdown library is
+  allowed under the strict CSP, and adding a Python one would cross into BE's
+  lane (`app/requirements.txt` is BE's file). Escaping happens on the raw text
+  BEFORE any Markdown syntax is applied, so no amount of Markdown can smuggle
+  real HTML through (D315).
+- **Relationships' add-spouse/add-child/link-parents pickers** search only
+  existing individuals via `/api/search` (never inline "create a new person"),
+  keeping this page's scope to *linking*, not authoring — a new person is
+  still made at `/people/new`.
+
+### Files Created or Modified
+
+| File | Status | Notes |
+|---|---|---|
+| `app/templates/people/show.html` | Modified | Real content; thin shell, all rendering is client-side |
+| `app/static/js/person.js` | Created | All six tabs, ~1,700 lines, sectioned and commented |
+| `app/static/css/chronicle-app.css` | Modified | New Person Page component classes (§9 of that file) |
+| `BLOCKERS.md` | Modified | Two OPEN items (Follow endpoint, activity/feed subject filter) + one OPEN forward note (family_children PUT) |
+| `docs/FRONTEND_DESIGN.md` | Modified | 2026-07-04 decision-log entry |
+
+### Manual Testing Checklist
+
+> Clear this section once the owner has done a browser pass and confirmed green.
+
+- [x] Logged in as a seeded Contributor (`jo@example.com`) against
+      `flask seed`'s Hartwell data (`/people/3`, John Thomas Hartwell — every
+      polymorphic link kind the seed data exercises: names, events, a family as
+      both child and parent, media, a note, a citation) — all six tabs render
+      real data, nothing hollow.
+- [x] Created an event (Residence, fuzzy year, find-or-create place) and a
+      citation (existing source via search) live in the browser — both
+      persisted, re-rendered correctly, and propagated into the Story tab's
+      Vitals/Sources cards and the Timeline without a page reload.
+- [x] Logged in as the seeded Viewer (`pat@example.com`) — confirmed zero
+      Add/Edit/Delete/Remove controls render anywhere across Relationships,
+      Details, Photos, or Sources (Person facts falls back to plain read-only
+      text instead of a disabled form).
+- [x] 375px viewport: header stacks, tabs scroll horizontally, relationship
+      cards go full-width — no horizontal page overflow.
+- [x] Zero browser console errors / CSP violations across every tab and role
+      tested.
+- [x] `flask db upgrade` had nothing pending; 232/232 tests green before and
+      after (no new routes — the `test_openapi.py` route-map sync test needed
+      no changes).
+
+### A Bug Found and Fixed in the Browser
+
+The first real-browser pass on Relationships showed every card's "Remove"
+button overlapping the person's name — a flexbox sizing bug (`.rel-card__body`
+had no `flex-grow`, so a fixed-width card's default shrink behavior squeezed
+it down to ~24px while the sibling actions block, protected with
+`flex: none`, kept full size and rendered over it) that pytest's HTML-only
+test client had no way to catch. Fixed by giving the actions block its own
+row (`flex: 0 0 100%`) instead of fighting for space beside a long name.
+Full root-cause writeup in `docs/FRONTEND_DESIGN.md`.
+
+### Cross-Boundary Touches
+
+None. No Flask routes, models, services, or `docs/openapi.yaml` paths changed
+this branch — client-side templates/CSS/JS only, against the existing WP2
+contract.
+
+### WGU Connections
+
+- **D280 JavaScript Programming** — a hash-router with lazy tab loading and a
+  memoized fetch cache (`once`/`invalidate`), built from scratch in vanilla JS
+  (no framework); a small hand-rolled Markdown-to-safe-HTML renderer.
+- **D278/D279 Front-End, D281 UI Design** — six distinct information
+  densities (a read-only Story digest vs. a full CRUD workbench in Details)
+  sharing one design language; a real flexbox debugging session (automatic
+  minimum size vs. `flex-grow`/`flex-shrink` interaction).
+- **D315 Security** — every dynamically-injected string goes through
+  `escapeHtml()` before becoming `innerHTML`, including inside the Markdown
+  renderer (escape-then-decorate, never decorate-then-escape); CSP-strict
+  throughout (no inline styles/handlers anywhere in ~1,700 new lines).
+- **D426/D427 Data Management** — the Relationships tab is a hands-on graph
+  traversal exercise: discovering "families where I'm a child" has no direct
+  endpoint, so it's derived from a bounded pedigree walk, the same BFS
+  structure `tree_service.py` uses server-side.
+
+### v2 Spring Boot Migration Notes
+
+Nothing here changes the v2 route/contract mapping — this branch is
+templates/CSS/JS only. The Person Page's client-side memoized cache
+(`cache`/`once`/`invalidate`) is the same shape an Angular `PersonService`
+would want as a `shareReplay(1)`-backed observable per data key; the
+lazy-tab-load pattern maps directly to Angular's lazy-loaded feature modules
+or a `*ngIf`-gated child component that only calls its own API on first
+activation.

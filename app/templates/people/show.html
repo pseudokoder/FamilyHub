@@ -1,21 +1,53 @@
-{# people/show.html — the Person Page. A placeholder for now (Master Plan
-   says this is a LATER FE prompt, "FE-2"), but a real per-id route already,
-   so every People-list row and search result links somewhere stable that
-   FE-2 fills in without anyone having to change a link. #}
+{# people/show.html — the Person Page (FE-2, Master Plan §5A/§5B). One route,
+   six client-rendered tabs (Story/Relationships/Timeline/Photos/Details/
+   Sources) switched by URL hash so every tab is deep-linkable and back/
+   forward works — see app/static/js/person.js for all of it. This template
+   stays a thin shell on purpose: every section either shows real data from
+   docs/openapi.yaml or is omitted entirely (§5A "never a hollow shell"), and
+   that decision can only be made once the data is back, so nothing is
+   pre-rendered here.
+
+   `data-can-contribute` mirrors the WP4 pattern (people/index.html's
+   `current_user.has_role('contributor')` check): the ONE place the template
+   tells the script what the current member is allowed to do, so person.js
+   never has to guess and never renders a control the API would 403. #}
 {% extends "base.html" %}
 
 {% block title %}Person #{{ individual_id }}{% endblock %}
 
 {% block content %}
-<div class="text-center py-5">
-    <h1>This person's page is on its way</h1>
-    <p class="fs-4 mt-3 text-muted">
-        Person #{{ individual_id }} is registered — their full page (vitals,
-        names, events, relationships, sources, photos, and stories) is coming
-        in a future update.
-    </p>
-    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('people.index') }}">
-        Back to People
-    </a>
+<div class="person-page" id="personPage"
+     data-individual-id="{{ individual_id }}"
+     data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+
+    <header class="person-header panel" id="personHeader">
+        <p class="text-muted mb-0">Loading this person's page…</p>
+    </header>
+
+    <nav class="person-tabs" id="personTabs" aria-label="Person page sections">
+        <a href="#story" class="person-tabs__link" data-tab="story">Story</a>
+        <a href="#relationships" class="person-tabs__link" data-tab="relationships">Relationships</a>
+        <a href="#timeline" class="person-tabs__link" data-tab="timeline">Timeline</a>
+        <a href="#photos" class="person-tabs__link" data-tab="photos">Photos</a>
+        <a href="#details" class="person-tabs__link" data-tab="details">Details</a>
+        <a href="#sources" class="person-tabs__link" data-tab="sources">Sources</a>
+    </nav>
+
+    <section class="person-tabpanel d-none" id="tab-story" data-tab-panel="story" aria-label="Story"></section>
+    <section class="person-tabpanel d-none" id="tab-relationships" data-tab-panel="relationships" aria-label="Relationships"></section>
+    <section class="person-tabpanel d-none" id="tab-timeline" data-tab-panel="timeline" aria-label="Timeline"></section>
+    <section class="person-tabpanel d-none" id="tab-photos" data-tab-panel="photos" aria-label="Photos"></section>
+    <section class="person-tabpanel d-none" id="tab-details" data-tab-panel="details" aria-label="Details"></section>
+    <section class="person-tabpanel d-none" id="tab-sources" data-tab-panel="sources" aria-label="Sources"></section>
+
 </div>
+
+{# Reused by the Details tab's fuzzy-date + find-or-create Place fields — same
+   FE-1 partial and pattern as people/new.html (see _fuzzy_date_fields.html). #}
+<datalist id="placesDatalist"></datalist>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/person.js') }}"></script>
 {% endblock %}
