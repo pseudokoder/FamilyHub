@@ -40,6 +40,17 @@ class Config:
     # Turn off a feature we don't use; silences a startup warning.
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Bootstrap-Flask defaults to a jsdelivr CDN — but base.html's own comment
+    # (and the strict script-src/style-src 'self' CSP in app/__init__.py)
+    # promise Bootstrap is served from OUR origin, never a third party. This
+    # setting was missing (Bootstrap-Flask's default is False), so every
+    # authenticated Bootstrap page was silently unstyled/un-scripted in any
+    # browser honoring the CSP — pytest never caught it because the test
+    # client doesn't fetch <link>/<script> tags. True routes CSS/JS through
+    # the bootstrap blueprint's own static folder (see tests/test_openapi.py's
+    # NOT_API set, which already carves out that route).
+    BOOTSTRAP_SERVE_LOCAL = True
+
     # --- Session / cookie security (D315 Network and Security) -------------
     # HTTPONLY: JavaScript can't read the session cookie, so even an XSS bug
     # can't steal logins. SAMESITE=Lax: the browser won't send our cookie on

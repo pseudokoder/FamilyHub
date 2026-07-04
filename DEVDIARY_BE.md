@@ -3,8 +3,8 @@
 > The learning roadmap for the **backend + infrastructure** half of FamilyHub,
 > written like textbook chapters: what was built, **why** it's best practice,
 > every technology choice and its WGU curriculum connection, and the v2 (Java/
-> Spring Boot) mapping. **Claude Code owns this file.** Cowork keeps the
-> front-end story in [`DEVDIARY_FE.md`](DEVDIARY_FE.md); the thin
+> Spring Boot) mapping. **The Backend Builder (BE) owns this file.** The Frontend
+> Builder (FE) keeps the front-end story in [`DEVDIARY_FE.md`](DEVDIARY_FE.md); the thin
 > [`DEVDIARY.md`](DEVDIARY.md) indexes both. The architecture/scope source of
 > truth is [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
 
@@ -217,7 +217,7 @@ going"). Cross-plan deviations are also logged in `BLOCKERS.md`.
 
 WP1 is a data-foundation work package: **everything in it is verified by pytest
 plus the `flask db upgrade` / `flask seed` commands** — there is no new browser
-UI to eyeball. The UI manual checks return when Cowork builds the front-end
+UI to eyeball. The UI manual checks return when the Frontend Builder (FE) builds the front-end
 (WP3), and live in `DEVDIARY_FE.md`.
 
 Carried forward for the **deployment** boundary (WP5), unchanged and still valid:
@@ -237,7 +237,7 @@ The data foundation is in place and green. WP2 can now build the **service + RES
 route layer** for individuals/families/events/sources/media/notes against these
 models, add the §10 role scaffolding, and — the key deliverable — publish the
 **API contract** in `docs/openapi.yaml`. That contract is the handoff that lets
-Cowork start WP3. Before starting WP2, read `BLOCKERS.md` (the `users` §3.5
+the Frontend Builder (FE) start WP3. Before starting WP2, read `BLOCKERS.md` (the `users` §3.5
 alignment is the one open item, and it's a WP2 task).
 
 ---
@@ -247,7 +247,7 @@ alignment is the one open item, and it's a WP2 task).
 **Goal (Master Plan §6):** build the backend that the front-end (WP3) consumes —
 a JSON CRUD + search API over the GEDCOM-7 schema — resolve the `users`/RBAC
 blocker (§3.5/§10), and **publish the API contract**. Code writes no genealogy
-templates; that's Cowork's WP3.
+templates; that's the Frontend Builder's (FE) WP3.
 
 ### 1. The `users` migration — changing the lock without breaking the door
 
@@ -290,9 +290,9 @@ v2: this collapses into Spring Security's `@PreAuthorize("hasRole(...)")`.
 Approved consumption model: a **JSON REST API under `/api/*`**. Every route is a
 thin controller — parse, call one service, `jsonify` — and all logic + the
 serialization shape lives in per-resource services (`individual_service`,
-`family_service`, …). Because the service returns plain dicts, Cowork's WP3 can
-fetch the JSON *or* server-render Jinja by calling the same service — identical
-shape either way. Uniform errors (`ApiError` → `{"error", "fields"}` with the
+`family_service`, …). Because the service returns plain dicts, the Frontend
+Builder's (FE) WP3 can fetch the JSON *or* server-render Jinja by calling the same
+service — identical shape either way. Uniform errors (`ApiError` → `{"error", "fields"}` with the
 right status) make the contract trustworthy.
 
 **Polymorphic writes** all go through one gate, `genealogy_service.require_subject`,
@@ -337,8 +337,8 @@ hittable as JSON with no UI required.
 | `ApiError` → uniform JSON | `@ControllerAdvice` exception handlers |
 
 ### Decisions Made Without Wes (WP2)
-1. **`/api/*` prefix** for the JSON API — leaves the root URLs free for Cowork's
-   WP3 human pages; conventional; v2 Angular consumes `/api/*`.
+1. **`/api/*` prefix** for the JSON API — leaves the root URLs free for the Frontend
+   Builder's (FE) WP3 human pages; conventional; v2 Angular consumes `/api/*`.
 2. **`is_admin` kept as a computed property** (shrinks the migration blast radius).
 3. **Notes search = `LIKE` now, FTS5 in WP4** (§12; honors §3 portability).
 4. **Media metadata is immutable** after upload — re-uploading is a new object,
@@ -355,11 +355,11 @@ preserved auth/admin pages are covered too. Carry-forward deployment checks
 
 ### WP2 → WP3 Readiness
 
-**The contract is ready for Cowork.** `docs/openapi.yaml` is the stable interface:
-JSON CRUD for every genealogy resource + sub-records + polymorphic links, a search
-endpoint, uniform error shapes, and a documented auth model (login → reads;
-USER → writes; `X-CSRFToken` on writes). Cowork's WP3 builds the elderly-accessible,
-cross-generational UI (§5A/§5B) against it — server-rendering via the services or
+**The contract is ready for the Frontend Builder (FE).** `docs/openapi.yaml` is the
+stable interface: JSON CRUD for every genealogy resource + sub-records + polymorphic
+links, a search endpoint, uniform error shapes, and a documented auth model (login →
+reads; USER → writes; `X-CSRFToken` on writes). The Frontend Builder's (FE) WP3
+builds the elderly-accessible, cross-generational UI (§5A/§5B) against it — server-rendering via the services or
 fetching the JSON, their choice. No cross-builder blockers are open; the one
 former blocker (`users` §3.5) is RESOLVED in `BLOCKERS.md`.
 

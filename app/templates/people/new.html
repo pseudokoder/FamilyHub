@@ -1,0 +1,117 @@
+{# people/new.html — Register a person (Master Plan §5A depth bar, WP4
+   Piece 3): every user-meaningful field the schema holds is a real input.
+   System fields (id, timestamps, gedcom_xref) are never user input.
+
+   This form does NOT post to a Flask route — people.js intercepts submit
+   and calls the JSON API directly (POST /api/individuals, then optionally
+   /api/places + /api/events for the birth/death vitals). That's the same
+   contract a v2 Angular reactive form would call. #}
+{% extends "base.html" %}
+
+{% block title %}Register a person{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-lg-8">
+
+<h1 class="mb-4">Register a person</h1>
+
+<div id="formError" class="alert alert-danger d-none" role="alert"></div>
+<div id="formWarning" class="alert alert-warning d-none" role="alert"></div>
+
+<form id="registerPersonForm" novalidate>
+
+    <fieldset class="mb-4">
+        <legend class="h4">Name</legend>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="namePrefix" class="form-label">Prefix</label>
+                <input type="text" id="namePrefix" class="form-control" placeholder="Dr., Rev.">
+            </div>
+            <div class="col-md-5">
+                <label for="given" class="form-label">Given name(s)</label>
+                <input type="text" id="given" class="form-control" placeholder="Rosa María">
+            </div>
+            <div class="col-md-4">
+                <label for="nickname" class="form-label">Nickname</label>
+                <input type="text" id="nickname" class="form-control" placeholder="Rosie">
+            </div>
+
+            <div class="col-md-3">
+                <label for="surnamePrefix" class="form-label">Surname prefix</label>
+                <input type="text" id="surnamePrefix" class="form-control" placeholder="van, de la">
+            </div>
+            <div class="col-md-5">
+                <label for="surname" class="form-label">Surname</label>
+                <input type="text" id="surname" class="form-control" placeholder="Vega">
+            </div>
+            <div class="col-md-4">
+                <label for="nameSuffix" class="form-label">Suffix</label>
+                <input type="text" id="nameSuffix" class="form-control" placeholder="Jr., III">
+            </div>
+
+            <div class="col-md-6">
+                <label for="nameType" class="form-label">This name is their…</label>
+                <select id="nameType" class="form-select">
+                    <option value="birth" selected>Birth name</option>
+                    <option value="married">Married name</option>
+                    <option value="aka">Also known as</option>
+                    <option value="immigrant">Immigrant name</option>
+                    <option value="maiden">Maiden name</option>
+                </select>
+            </div>
+        </div>
+        <p class="form-text">Enter at least a given name or a surname.</p>
+    </fieldset>
+
+    <fieldset class="mb-4">
+        <legend class="h4">About them</legend>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label for="sex" class="form-label">Sex</label>
+                <select id="sex" class="form-select">
+                    <option value="U" selected>Unknown</option>
+                    <option value="F">Female</option>
+                    <option value="M">Male</option>
+                    <option value="X">Other</option>
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="living" checked>
+                    <label class="form-check-label" for="living">This person is living</label>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="mb-4">
+        <legend class="h4">Birth</legend>
+        {% with prefix="birth" %}
+        {% include "people/_fuzzy_date_fields.html" with context %}
+        {% endwith %}
+    </fieldset>
+
+    <fieldset class="mb-4 d-none" id="deathFieldset">
+        <legend class="h4">Death</legend>
+        {% with prefix="death" %}
+        {% include "people/_fuzzy_date_fields.html" with context %}
+        {% endwith %}
+    </fieldset>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-lg" id="registerSubmit">Register Person</button>
+        <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('people.index') }}">Cancel</a>
+    </div>
+</form>
+
+</div>
+</div>
+
+<datalist id="placesDatalist"></datalist>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/people.js') }}"></script>
+{% endblock %}

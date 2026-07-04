@@ -1,10 +1,10 @@
 # BLOCKERS — Cross-Builder Blocker Handoff Log
 
-> **Two builders, one repo.** **Claude Code** owns the backend + the whole
-> repo/infra; **Cowork** owns the front-end (Jinja templates, CSS, vanilla JS).
-> A builder will sometimes hit a wall only the *other* builder can fix (Cowork
-> finds a missing or wrong endpoint; Code finds the front-end needs a different
-> data shape). This file is how that handoff happens without anyone faking a
+> **Two builders, one repo.** The **Backend Builder (BE)** owns the backend + the
+> whole repo/infra; the **Frontend Builder (FE)** owns the front-end (Jinja templates,
+> CSS, vanilla JS). A builder will sometimes hit a wall only the *other* builder can
+> fix (the FE finds a missing or wrong endpoint; the BE finds the front-end needs a
+> different data shape). This file is how that handoff happens without anyone faking a
 > dependency. (Master Plan §7.)
 
 ## The protocol — read this, then the open items
@@ -15,7 +15,7 @@
 2. **Never fake or stub around a cross-boundary blocker.** That's what produced
    the hollow first build. Stop *that item*; continue other in-scope work if
    it's safe to.
-3. **Log it here** as an `OPEN` entry with: date · raised-by (Code/Cowork) ·
+3. **Log it here** as an `OPEN` entry with: date · raised-by (BE/FE) ·
    what's blocked · exactly what the other builder must do · status.
 4. **Surface it in your end-of-session summary** so Wes sees it and knows which
    tool to spin up next.
@@ -27,7 +27,7 @@ Entry format:
 ```
 ### [OPEN|RESOLVED] <short title>
 - Date: YYYY-MM-DD
-- Raised by: Code | Cowork
+- Raised by: BE | FE
 - Blocks: <what can't proceed>
 - Needs (the other builder must): <the exact action required>
 - Status: <OPEN / RESOLVED on YYYY-MM-DD — how>
@@ -36,6 +36,98 @@ Entry format:
 ---
 
 ## Open items
+
+### [OPEN] WP4 nav brief says "Admin" is Curator+; the backend admin surface is Admin-only
+- Date: 2026-07-03
+- Raised by: FE
+- Blocks: nothing critical — the app shell (`app/templates/base.html`) gates the
+  user-menu "Admin" item on `current_user.is_admin` (true Admin), NOT Curator+ as
+  the WP4 brief literally asked ("Admin (only if the current user is Curator/
+  Admin per the role)"), so the link never 403s. That's the safe default, but it
+  means Curators get no admin-menu entry at all right now, even though §10 makes
+  Curator a real, elevated rung (it holds `revert`, i.e. the audit trail +
+  restore/undo).
+- Needs (BE must, or Wes must decide): pick one —
+  1. Confirm the nav is right as built (Admin-only) and the brief's "Curator/
+     Admin" phrasing was loose — nothing to change; OR
+  2. Add a Curator-visible capability to gate a menu item on instead — most
+     naturally the audit trail (`GET /api/activity`, already `role_required
+     (Role.CURATOR)`) — so Curators get e.g. an "Activity" entry pointing at a
+     real page, distinct from the Admin-only `/admin/*` panel.
+  Every `/admin/*` HTML route and every `/api/admin/*` + `/api/suggestions`
+  (GET/PUT) + `/api/role-requests` (GET/approve/deny) JSON route is hard-coded
+  `@admin_required` (`app/services/authz.py`, `app/routes/admin.py`,
+  `app/routes/api/admin_api.py`, `app/routes/api/inbox.py`) — loosening any of
+  those to Curator+ is a §10 permissions-map change, not a template change, so
+  it's BE's call either way.
+- Status: OPEN.
+
+### [OPEN] Home's "Recent Activity" needs a friendly, all-members feed; today it's Curator+ only
+- Date: 2026-07-03
+- Raised by: FE
+- Blocks: nothing critical — `app/templates/dashboard.html` only renders the
+  Recent Activity container for `current_user.has_role('curator')`; everyone
+  else sees an honest static message instead of a feed that would 403. But the
+  WP4 Home brief describes this section for every logged-in member ("Mom added
+  a photo to …"), and the only endpoint that exists, `GET /api/activity`
+  (`app/routes/api/activity.py`), is `@role_required(Role.CURATOR)` by design
+  (ADR-0001 — it's the audit/write-control trail, which also carries
+  restore/revert/security actions a Viewer or Contributor arguably shouldn't
+  see). `app/static/js/home.js` already has the friendly action→verb /
+  subject_type→noun phrasing ready (`ACTION_VERB`/`SUBJECT_NOUN`) — it just has
+  nothing to call for non-Curators.
+- Needs (BE must): add a `view`-permission-gated feed of *friendly, non-sensitive*
+  creation/update events (new people, photos, stories — not deletes/reverts/
+  security actions) that every logged-in member can call, OR confirm Curator+
+  gating is the intended v1 answer and this is a documentation-only fix (update
+  the Master Plan §4 Home description to say "Curator+" instead of "every
+  member").
+- Status: OPEN.
+
+### [RESOLVED] Found + fixed: Bootstrap was silently CDN-only, dead on arrival under the CSP
+- Date: 2026-07-03
+- Raised by: FE
+- Was blocking: nothing filed an issue — this was a **pre-existing bug** WP4
+  testing surfaced, not something introduced this session. Manually loading any
+  authenticated Bootstrap page in a real browser (not pytest, which never
+  fetches `<link>`/`<script>` tags) showed Bootstrap's CSS/JS failing to load
+  from `cdn.jsdelivr.net`, blocked by the strict CSP (`style-src`/`script-src
+  'self'`, `app/__init__.py`). Every Bootstrap page — admin panel included —
+  was unstyled and had no working dropdowns/collapse for anyone testing in a
+  browser, contradicting `base.html`'s own comment ("served from the installed
+  package — no CDN").
+- Root cause: `BOOTSTRAP_SERVE_LOCAL` was never set, so Bootstrap-Flask
+  defaulted to `False` (CDN mode).
+- Fix (FE, this session): added `BOOTSTRAP_SERVE_LOCAL = True` to
+  `app/config.py`, with a comment explaining why. Verified in a real browser
+  (Bootstrap CSS/JS/Popper now load from `/bootstrap/static/...`, same-origin)
+  and the full suite stays green (207/207).
+- Also touched, same session, same transparency rule as the FE `main.py` entry
+  above — small, mechanical, needed for the WP4 nav to work at all, not a
+  design decision:
+  - `app/__init__.py` — added an `app.context_processor` injecting `brand`
+    (site_name/family_name) into every template, so the navbar brand doesn't
+    require every route to pass it in explicitly.
+  - `run.py` — reads `PORT` from the environment (default 5000 unchanged)
+    purely so local dev can pick a free port; no behavior change when unset.
+- Needs (BE should): spot-check `BOOTSTRAP_SERVE_LOCAL` at PR review — it's a
+  one-line config fix, but it changes what every existing Bootstrap page (incl.
+  admin) actually looks like in a browser for the first time.
+- Status: **RESOLVED 2026-07-03** — fixed, tested (pytest green + manual
+  browser verification via the preview tool).
+
+### [RESOLVED] FE touched `app/routes/main.py` — BE review at merge
+
+- Date: 2026-06-28
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE must): review the one-line routing change in `app/routes/main.py`
+  (`render_template("index.html", ...)` → `render_template("dashboard.html", ...)`
+  inside the `if current_user.is_authenticated:` branch). This is view-routing
+  only — no business logic, no schema, no endpoints changed. Confirm it doesn't
+  break any existing BE tests and sign off at merge time.
+- Status: RESOLVED 2026-06-29 — tests green (139/139); view-routing only, no
+  business logic/schema/endpoints changed; BE sign-off complete.
 
 ### [RESOLVED] Provided files for the docs reconciliation were missing from the tree
 - Date: 2026-07-03 (raised) → 2026-07-03 (resolved)
@@ -48,6 +140,22 @@ Entry format:
 - Status: **RESOLVED 2026-07-03** — Wes placed both files; Code committed them
   unmodified. The ADR index and Master Plan v2.0.0 references to ADR-0002 now
   resolve; the CONTEXT_LOG's drift list (#1–4) matches the applied reconciliation.
+
+### [RESOLVED] wp3-frontend-crud (Chronicle FE work) merged forward onto master
+- Date: 2026-07-03
+- Raised by: FE
+- Was blocking: starting **WP4** — the FE builder was told to branch `wp4-fe-shell`
+  off `master`, but the prior WP3 Chronicle front-end work (public `index.html`,
+  `dashboard.html`, `chronicle.js`, self-hosted fonts/images, `FRONTEND_DESIGN.md`)
+  was sitting unmerged on `wp3-frontend-crud`, branched before the WP3 backend-gaps
+  and WP3 backend-admin work landed on master.
+- Needs (BE should): spot-check the merge at PR review — `docs/MASTER_PLAN.md` and
+  this file were the only textual conflicts (both doc-only; resolved by keeping
+  master's reconciled v2.0.0 plan and carrying forward the one Wes-approved parking-lot
+  entry the FE branch had added). No app code conflicted.
+- Status: **RESOLVED 2026-07-03** — merged `origin/master` into a new `wp4-fe-shell`
+  branch created from `origin/wp3-frontend-crud`; conflicts resolved as above; full
+  suite still green post-merge (see DEVDIARY_FE.md).
 
 ---
 

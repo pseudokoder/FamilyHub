@@ -4,7 +4,7 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 2.0.0** · Last updated 2026-07-03 · Status: WP2 complete; WP3 next.
+**Version 2.1.0** · Last updated 2026-07-03 · Status: WP3 (backend) complete; WP4 (frontend) next.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version (SemVer) and add a line to the Revision History
 (bottom).*
@@ -719,6 +719,30 @@ derailing an in-flight work package:
 - Per-member **dashboard** (FamilySearch-style "my contributions" summary).
 - **Browse-vs-edit UX** split (subtle edit icon → inline/popup edit) so editing
   controls never intrude on the reading experience.
+- **Public surface + PII guardrail.** A curated public landing — not a separate
+  feature, but a filtered view of the existing database ("One Database, Many Views").
+  Key decisions to carry in:
+  - **Per-item "public" flag** (default OFF) on individuals, photos, stories, and
+    events; an admin marks specific items public; the public page renders only flagged
+    items.
+  - **Living-person guardrail** — `living = true` individuals are NEVER eligible for
+    the public flag (enforced by the existing `living` field + §9; no exceptions).
+  - **Admin PII-gate** — before any item goes public, the admin console shows a
+    preview of exactly what would appear, warns/blocks on living-person data and flags
+    likely PII (DOB, places, contact info), requires explicit confirmation, and writes
+    an `audit_log` entry.
+  - **Configurable public layout** — the public page is composed of admin-toggled /
+    editable / reorderable sections, so marketing-only sections (e.g. a "Begin your
+    family's archive" CTA) can be removed or edited without code changes; section copy
+    uses the existing `site_settings` table.
+  - **Chronicle shared design system** — the public landing and the logged-in app
+    share one design language ("Chronicle"), including a Chronicle-consistent restyle
+    of the logged-in dashboard.
+  - **Scope + sequence:** spans BE (public flag + API + gate logic + serving rules)
+    and FE (curated public rendering + admin curation/layout UI + dashboard restyle).
+    Schedule as a focused WP after WP4 (front-end shell + core CRUD UI) is complete.
+    (Approved by Wes 2026-06-29; carried forward from the `wp3-frontend-crud` branch
+    at merge into `wp4-fe-shell`, 2026-07-03.)
 
 **v2 / future captures (reserved seams, do NOT build now):**
 - **MFA (TOTP)** — authenticator-app second factor, **no SMS/phone dependency** (§9 Tier-3).
@@ -755,6 +779,10 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- **v2.1.0 — 2026-07-03 — MINOR.** Carried forward the **public surface + PII guardrail**
+  parking-lot entry (§11) from the `wp3-frontend-crud` branch (approved by Wes
+  2026-06-29) when that branch's Chronicle front-end work was merged forward onto
+  `wp4-fe-shell`. Parking-lot capture only — no scope committed. (Raised by FE.)
 - **v2.0.0 — 2026-07-03 — MAJOR (v1 design reconciliation).** Scope/schema-altering, so
   a major bump. (Raised by Wes; decisions captured in ADR-0001, ADR-0002, and
   `docs/CONTEXT_LOG.md`.)

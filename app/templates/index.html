@@ -1,98 +1,392 @@
-{# The home page — the only public URL in the app. Logged-out visitors see a
-   welcome and a Login button (zero family content, zero PII). Logged-in
-   family sees the dashboard: one giant button per activity, because the
-   least technical user should never have to hunt through menus. #}
-{% extends "base.html" %}
+{#
+  ============================================================================
+  index.html — FamilyHub public home page  ·  "CHRONICLE" — ANTIQUE/EXPEDITION
+  STANDALONE TEMPLATE: has its own <html>/<head>/nav/footer. Does NOT extend
+  base.html. Renders only for logged-out visitors (see app/routes/main.py —
+  authenticated users are routed to dashboard.html which extends base.html).
 
-{% block title %}Home{% endblock %}
+  FE decisions made without Wes (2026-06-28):
+  - All asset paths use url_for('static', filename=...) — Flask's URL builder.
+  - Google Fonts CDN replaced with self-hosted woff2 files in app/static/fonts/
+    (strict CSP blocks external font origins; see fonts.css).
+  - Inline style="..." attributes (tree node positions, photo tones) converted
+    to data-x/data-y and data-p1/data-p2 attributes; chronicle.js applies them
+    via element.style.setProperty() — which the CSP (style-src 'self', no
+    'unsafe-inline') DOES allow. See chronicle.js § CSP COMPLIANCE NOTE.
+  - "Enter archive" / CTA links point to url_for('auth.login'). Logged-out
+    visitors need to authenticate first; this is the natural call-to-action.
+  - MOCK DATA only — chronicle.js renders from SAMPLE_DATA. No backend queries.
 
-{% block content %}
-{% if current_user.is_authenticated %}
+  -> WGU: Front-End (D278/D279), JS (D280), UI (D281), Security (D315)
+  ============================================================================
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FamilyHub — The family archive, charted</title>
+  <meta name="description" content="FamilyHub is a private family archive: people, photographs, memories, and a charted timeline of your family's story — kept like an antique expedition journal." />
+  <meta name="theme-color" content="#f3e9d8" />
 
-    {% if hero_exists is defined and hero_exists %}
-    <img src="{{ url_for('main.hero_image') }}" alt="Our family"
-         class="img-fluid rounded mb-4 w-100 hero-banner">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="FamilyHub — The family archive, charted" />
+  <meta property="og:description" content="A private family archive: people, photographs, memories, and a charted timeline of your family's story." />
+
+  {# Self-hosted fonts — Google Fonts CDN is blocked by the strict CSP
+     (font-src 'self'). All woff2 files live in app/static/fonts/. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chronicle-main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chronicle-components.css') }}" />
+</head>
+
+<body data-page="home">
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  {# INTRO SPLASH — tree animation blooms, then logo flies up to the nav. #}
+  <div class="splash" id="splash" aria-hidden="true">
+    <div class="splash__bg"></div>
+    <div class="splash__stage">
+      <video class="splash__vid" id="splashVid"
+             src="{{ url_for('static', filename='videos/animation_2.mp4') }}"
+             muted playsinline preload="auto"></video>
+      <img class="splash__logo" id="splashLogo"
+           src="{{ url_for('static', filename='img/logo.jpg') }}" alt="" />
+    </div>
+    <button class="splash__skip" id="splashSkip" type="button">Skip intro</button>
+  </div>
+
+  {# Background atmosphere: grain, faint old-map/compass watermark, papyrus edges.
+     All fixed, pointer-events:none — pure decoration. #}
+  <div class="mapscene" aria-hidden="true"><div class="mapscene__img"></div></div>
+  <div class="paperwash" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="edges" aria-hidden="true"></div>
+  <div class="mapframe" aria-hidden="true"></div>
+
+  <!-- ===================== MASTHEAD ===================== -->
+  <header class="site-header" id="siteHeader">
+    <div class="container">
+      <a href="{{ url_for('main.home') }}" class="brand" aria-label="FamilyHub home">
+        <img class="brand__mark"
+             src="{{ url_for('static', filename='img/logo.jpg') }}"
+             alt="FamilyHub family-tree logo" width="36" height="54" />
+        <span>
+          <span class="brand__word">FamilyHub</span>
+          <span class="brand__tag">The Family Archive</span>
+        </span>
+      </a>
+
+      <nav class="nav__links" id="navLinks" aria-label="Primary">
+        <a href="#people">People</a>
+        <a href="#families">Collections</a>
+        <a href="#memories">Photographs</a>
+        <a href="#timeline">Route</a>
+        <a href="#search">Catalog</a>
+        <a href="{{ url_for('auth.login') }}" class="btn btn--ghost">Enter archive</a>
+      </nav>
+
+      <button class="nav__toggle" id="navToggle"
+              aria-label="Open menu" aria-expanded="false" aria-controls="navLinks">
+        <i aria-hidden="true">&#9776;</i>
+      </button>
+    </div>
+  </header>
+
+  {# Flash messages — appear after login/logout redirect. Styled in
+     Chronicle's palette via .flash-tray / .flash-msg (chronicle-main.css).
+     -> WGU: D280 (Flask sessions), D276 (Jinja2 templating) #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-tray" role="status" aria-live="polite">
+      {% for category, message in messages %}
+      <p class="flash-msg flash-msg--{{ category }}">{{ message }}</p>
+      {% endfor %}
+    </div>
     {% endif %}
+  {% endwith %}
 
-    <h1 class="display-5 mb-2">Welcome, {{ current_user.display_name }}!</h1>
-    {% if tagline is defined and tagline %}
-    <p class="lead">{{ tagline }}</p>
-    {% else %}
-    <p class="lead">What would you like to do today?</p>
-    {% endif %}
+  <main id="main-content">
 
-    {# WP1 RE-FOUNDATION: the dashboard buttons (Photos, Memories, Wiki,
-       Timeline) pointed at the old feature pages, which have been removed while
-       the app is rebuilt on the GEDCOM-7 genealogy core. WP2/WP3 (Cowork)
-       rebuild these as views of the new schema and restore the buttons here. #}
-    <div class="row mt-4">
-        <div class="col-md-8 col-lg-6">
-            <div class="alert alert-info" role="alert">
-                <h2 class="h5">We're rebuilding the family pages 🛠️</h2>
-                <p class="mb-0">
-                    FamilyHub is being rebuilt on a proper family-tree database so
-                    your photos, memories, people, and timeline all connect to one
-                    another. The pages will return here soon.
-                </p>
-            </div>
+    <!-- ===================== HERO: TITLE CARD + LOGO SHOWPIECE ========= -->
+    <section class="hero">
+      <div class="container hero__grid">
+        <div class="hero__copy">
+          <span class="slug reveal">The Rivera family archive &middot; Est. 1948</span>
+          <h1 class="reveal">Where we <em>came from.</em></h1>
+          <p class="hero__lead reveal">
+            FamilyHub keeps your people, photographs, and memories like an
+            expedition journal &mdash; every face named, every story preserved,
+            every record charted. The past, kept for whoever comes next.
+          </p>
+          <div class="hero__cta reveal">
+            <a href="{{ url_for('auth.login') }}" class="btn btn--primary btn--lg">Open the archive</a>
+            <a href="#timeline" class="btn btn--ghost btn--lg">Follow the route</a>
+          </div>
+          <div class="hero__meta reveal" aria-label="Archive at a glance">
+            <span><b>248</b> records</span><span><b>1948&ndash;2026</b></span>
+            <span><b>6</b> generations</span><span><b>1,412</b> photographs</span>
+          </div>
         </div>
+
+        <img class="hero__logo reveal"
+             src="{{ url_for('static', filename='img/logo.jpg') }}"
+             width="768" height="1152"
+             alt="FamilyHub logo: a tree whose branches form a family, roots below, a rising sun behind." />
+      </div>
+    </section>
+
+    <!-- ===================== THE FAMILY TREE (its own section) ============ -->
+    <section class="section section--tight" id="tree-section">
+      <div class="container">
+        <div class="section-head section-head--center reveal">
+          <span class="slug">The family tree</span>
+          <h2>Every name, on one tree.</h2>
+          <p>Parents, grandparents, and the newest little leaf &mdash; the whole
+            line in one view. Hover a portrait (or tap on a phone) to meet them.</p>
+        </div>
+        <div class="tree reveal" id="tree" role="img"
+             aria-label="The Rivera family tree: Mateo at the base, his parents, and four grandparents in antique cameo frames.">
+          <svg class="tree__layer tree__lines" data-depth="0.2" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="treeStroke" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#9d3b2c"/><stop offset="55%" stop-color="#bd7a2a"/><stop offset="100%" stop-color="#355e7c"/>
+            </linearGradient></defs>
+            <path d="M50,80 L30,52"/><path d="M50,80 L70,52"/>
+            <path d="M30,52 L14,22"/><path d="M30,52 L38,18"/>
+            <path d="M70,52 L62,18"/><path d="M70,52 L86,22"/>
+          </svg>
+          {# Tree nodes: positions use data-x/data-y (NOT style=) so the strict
+             CSP (style-src 'self', no 'unsafe-inline') doesn't block them.
+             chronicle.js reads these and applies el.style.left / el.style.top. #}
+          <div class="tree__layer tree__nodes" data-depth="0.4">
+            <span class="node node--lg node--focus" data-x="50%" data-y="80%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#caa066" data-p2="#43301a"><span class="photo__mono" aria-hidden="true">MR</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Mateo</span><span class="node__rel">8 yrs</span></span>
+            </span>
+            <span class="node" data-x="30%" data-y="52%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#b07c43" data-p2="#33230f"><span class="photo__mono" aria-hidden="true">DR</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Diego</span><span class="node__rel">Father</span></span>
+            </span>
+            <span class="node" data-x="70%" data-y="52%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#c0894c" data-p2="#3a2714"><span class="photo__mono" aria-hidden="true">SR</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Sof&iacute;a</span><span class="node__rel">Mother</span></span>
+            </span>
+            <span class="node" data-x="14%" data-y="22%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#9c6e3a" data-p2="#2c1d0d"><span class="photo__mono" aria-hidden="true">JV</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Javier</span><span class="node__rel">Gt-grandfather</span></span>
+            </span>
+            <span class="node" data-x="38%" data-y="18%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#bd8a4e" data-p2="#3d2a16"><span class="photo__mono" aria-hidden="true">RV</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Rosa</span><span class="node__rel">Gt-grandmother</span></span>
+            </span>
+            <span class="node" data-x="62%" data-y="18%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#c79355" data-p2="#3c2815"><span class="photo__mono" aria-hidden="true">GO</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Grace</span><span class="node__rel">Grandmother</span></span>
+            </span>
+            <span class="node" data-x="86%" data-y="22%">
+              <span class="cameo"><span class="cameo__img"><span class="photo" data-p1="#a9763f" data-p2="#2e1f0e"><span class="photo__mono" aria-hidden="true">EO</span></span></span><span class="cameo__frame"></span></span>
+              <span class="node__label"><span class="node__name">Elias</span><span class="node__rel">Grandfather</span></span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== DOSSIER: featured person ===================== -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="slug slug--blue">From the archive &middot; on this day</span>
+        </div>
+        <div id="dossier" class="reveal"><!-- renderDossier() injects here --></div>
+      </div>
+    </section>
+
+    <!-- ===================== PEOPLE: contact sheet ===================== -->
+    <section class="section" id="people">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="slug">The people</span>
+          <h2>The contact sheet.</h2>
+          <p>Every person in the family is a frame on the sheet &mdash; open one to
+            see their full record: names, dates, places, relationships, and the
+            photographs they appear in.</p>
+        </div>
+        {# BACKEND: GET /api/individuals → INDI records. renderPeople(). #}
+        <div class="grid grid--sheet" id="peopleSheet"><!-- injected --></div>
+        <a href="{{ url_for('auth.login') }}" class="see-all reveal">Open the full register &rarr;</a>
+      </div>
+    </section>
+
+    <!-- ===================== FAMILIES: collections ===================== -->
+    <section class="section section--band" id="families">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="slug">The collections</span>
+          <h2>Branches, filed by name.</h2>
+          <p>Each family is a collection in the archive &mdash; parents, children,
+            and the place they called home, kept together.</p>
+        </div>
+        {# BACKEND: GET /api/families → FAM records. renderCollections(). #}
+        <div class="grid grid--coll" id="collections"><!-- injected --></div>
+      </div>
+    </section>
+
+    <!-- ===================== PHOTOGRAPHS + FIELD NOTES ===================== -->
+    <section class="section" id="memories">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="slug">Photographs &amp; field notes</span>
+          <h2>The moments, developed.</h2>
+          <p>Upload photographs and write memories in plain words. Each one is
+            filed against the people, places, and dates it belongs to &mdash; a
+            memory is just another record in the archive.</p>
+        </div>
+        {# BACKEND: GET /api/media + /api/memories. renderWall(). #}
+        <div class="wall reveal" id="wall"><!-- injected --></div>
+      </div>
+    </section>
+
+    <!-- ===================== TIMELINE: the map route ===================== -->
+    <section class="section section--band" id="timeline">
+      <div class="container">
+        <div class="section-head section-head--center reveal">
+          <span class="slug">The route</span>
+          <h2>Your family, charted by year.</h2>
+          <p>Births, marriages, moves, and milestones, plotted like stops on an
+            old map. Hover any stop (or tap on a phone) to bring up its photograph.</p>
+        </div>
+        {# BACKEND: GET /api/events?order=date (+ a photo per event). renderTrail(). #}
+        <ol class="trail reveal" id="trailList"><!-- injected --></ol>
+      </div>
+    </section>
+
+    <!-- ===================== CATALOG SEARCH ===================== -->
+    <section class="section" id="search">
+      <div class="container">
+        <div class="catalog reveal">
+          <span class="slug">Look it up</span>
+          {# margin-top moved to CSS (.catalog h2) — inline style blocked by CSP #}
+          <h2>Search the catalog.</h2>
+          <p>Find any person, place, or story in the archive.</p>
+          <form class="search" id="searchForm" role="search" autocomplete="off">
+            <span class="search__label" aria-hidden="true">FIND&nbsp;&rsaquo;</span>
+            <label for="searchInput" class="sr-only">Search the archive</label>
+            <input type="search" id="searchInput" name="q" placeholder="Rosa · Tennessee · wedding · 1962" />
+          </form>
+          <div class="search__chips" aria-label="Example searches">
+            <button type="button" class="chip" data-q="Rosa">Rosa</button>
+            <button type="button" class="chip" data-q="Tennessee">Tennessee</button>
+            <button type="button" class="chip" data-q="wedding">wedding</button>
+            <button type="button" class="chip" data-q="1962">1962</button>
+          </div>
+          <p class="catalog__hint" id="searchHint" aria-live="polite">
+            <b>248</b> records &middot; <b>63</b> collections &middot; <b>1,412</b> photographs on file.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== KEEPERS OF THE RECORD ===================== -->
+    <section class="section section--band">
+      <div class="container">
+        <div class="section-head section-head--center reveal">
+          <span class="slug">Made for everyone at the table</span>
+          <h2>Three keepers of the record.</h2>
+        </div>
+        <div class="grid grid--keepers">
+          <article class="card keeper reveal">
+            <div class="keeper__no">I.</div>
+            <div class="keeper__role">The Keepers</div>
+            <h3>Preserve</h3>
+            <p>Big type, gentle forms, no clutter. The elders add a photograph or
+              tell a story without fighting the interface.</p>
+          </article>
+          <article class="card keeper reveal">
+            <div class="keeper__no">II.</div>
+            <div class="keeper__role">The Narrators</div>
+            <h3>Connect</h3>
+            <p>Link people, correct the dates, merge the duplicates. The middle
+              generation keeps the whole record straight.</p>
+          </article>
+          <article class="card keeper reveal">
+            <div class="keeper__no">III.</div>
+            <div class="keeper__role">The Discoverers</div>
+            <h3>Discover</h3>
+            <p>Where do I come from? Kids and teens follow the route, open the
+              records, and meet ancestors they never knew.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== CLOSING TITLE CARD ===================== -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="titlecard cartouche reveal">
+          <span class="slug">Chart the next leg</span>
+          <h2>Begin your family's archive.</h2>
+          <p>Create it once, invite the family, and watch the record fill in
+            &mdash; one face, one photograph, one story at a time.</p>
+          <a href="{{ url_for('auth.login') }}" class="btn btn--primary btn--lg">Start the archive</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== COLOPHON / FOOTER ===================== -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer__grid">
+        <div class="footer__brand">
+          <a href="{{ url_for('main.home') }}" class="brand">
+            <img class="brand__mark"
+                 src="{{ url_for('static', filename='img/logo.jpg') }}"
+                 alt="FamilyHub family-tree logo" width="36" height="54" />
+            <span><span class="brand__word">FamilyHub</span>
+            <span class="brand__tag">The Family Archive</span></span>
+          </a>
+          <p>A private archive of your family's people, photographs, and memories
+            &mdash; kept like an old expedition journal, for whoever comes next.</p>
+        </div>
+        <div>
+          <h4>The archive</h4>
+          <a href="#people">People</a><br />
+          <a href="#families">Collections</a><br />
+          <a href="#memories">Photographs</a><br />
+          <a href="#timeline">The route</a>
+        </div>
+        <div>
+          <h4>Access</h4>
+          <a href="#search">Catalog</a><br />
+          <a href="{{ url_for('auth.login') }}">Enter archive</a><br />
+          <a href="{{ url_for('auth.login') }}">Invite family</a>
+        </div>
+        <div>
+          <h4>Private &amp; safe</h4>
+          <a href="{{ url_for('auth.login') }}">How privacy works</a><br />
+          <a href="{{ url_for('auth.login') }}">Who can see what</a><br />
+          <a href="{{ url_for('auth.login') }}">Export your data</a>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <span>&copy; <span id="year">2026</span> FAMILYHUB &middot; A PRIVATE FAMILY PROJECT</span>
+        <span>EVERY NAME HAS A STORY</span>
+      </div>
     </div>
+  </footer>
 
-{% else %}
-
-    <div class="text-center py-5">
-        <h1 class="display-4">👪 Welcome to FamilyHub</h1>
-        <p class="lead mt-3 mb-4">
-            A private home for our family's photo albums, written memories,
-            family tree, and history — kept safe and just for us.
-        </p>
-        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg px-5">
-            Log In
-        </a>
-    </div>
-
-    {# A gentle "what's inside" strip — describes the FEATURES, never the
-       family's actual content (this page is public; zero PII). Reassures a
-       new family member what they'll find before they sign in. #}
-    <div class="row g-4 justify-content-center text-center mt-2 mb-5">
-        <div class="col-sm-6 col-lg-3">
-            <div class="p-3">
-                <div class="display-5">📷</div>
-                <h2 class="h5 mt-2">Photo Albums</h2>
-                <p class="text-muted">Share and relive family pictures together.</p>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="p-3">
-                <div class="display-5">📖</div>
-                <h2 class="h5 mt-2">Memories</h2>
-                <p class="text-muted">Write down the stories worth keeping.</p>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="p-3">
-                <div class="display-5">🌳</div>
-                <h2 class="h5 mt-2">Family Tree</h2>
-                <p class="text-muted">A page for everyone, linked together.</p>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="p-3">
-                <div class="display-5">🕰️</div>
-                <h2 class="h5 mt-2">Timeline</h2>
-                <p class="text-muted">Our history, from way back to today.</p>
-            </div>
-        </div>
-    </div>
-
-    <p class="text-center text-muted">
-        Need an account? Ask Wes — accounts are created by the family admin.
+  <noscript>
+    <p class="noscript-msg">
+      The people, collections, route, and photographs are rendered by JavaScript.
+      With JS off, the page still shows its structure and message.
     </p>
+  </noscript>
 
-    <footer class="text-center text-muted small mt-5 pt-4 border-top">
-        🔒 FamilyHub is private. Everything inside is for family only and
-        kept behind a login.
-    </footer>
-
-{% endif %}
-{% endblock %}
+  <script src="{{ url_for('static', filename='js/chronicle.js') }}" defer></script>
+</body>
+</html>

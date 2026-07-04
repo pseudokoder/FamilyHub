@@ -1,0 +1,19 @@
+{# coming_soon.html — the shared placeholder for every WP4 nav destination
+   that isn't built yet. See main.coming_soon for why this is one route
+   instead of one stub per feature. #}
+{% extends "base.html" %}
+
+{% block title %}{{ feature }}{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-6">{{ feature }} is on its way</h1>
+    <p class="fs-4 mt-3 text-muted">
+        This part of FamilyHub isn't built yet — it's coming in a future
+        update.
+    </p>
+    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('main.home') }}">
+        Back to Home
+    </a>
+</div>
+{% endblock %}

@@ -55,7 +55,11 @@ self.addEventListener("fetch", function (event) {
             caches.open(CACHE).then(function (cache) {
                 return cache.match(request).then(function (hit) {
                     return hit || fetch(request).then(function (response) {
-                        cache.put(request, response.clone());
+                        // Only cache complete responses — partial/range responses
+                        // (206) cannot be stored and throw if you try.
+                        if (response.status === 200) {
+                            cache.put(request, response.clone());
+                        }
                         return response;
                     });
                 });

@@ -1,0 +1,125 @@
+{# dashboard.html — Home, the logged-in landing page (Master Plan §4, WP4
+   Piece 2). Extends base.html; current_user is routed here from
+   app/routes/main.py's home() view.
+
+   Everything below the welcome banner is filled in by home.js calling the
+   WP2 JSON API (docs/openapi.yaml): GET /api/stats, /api/on-this-day, and
+   (Curator+ only — see the BLOCKERS.md note below) /api/activity. Server-
+   side we only decide WHICH containers exist (role-gating what's fetched);
+   the data itself is always client-fetched, same contract a v2 Angular
+   component would call.
+   -> WGU: D276 (template inheritance), D280 (Flask/Jinja2 routing + fetch()). #}
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+    {% if hero_exists is defined and hero_exists %}
+    <img src="{{ url_for('main.hero_image') }}" alt="Our family"
+         class="img-fluid rounded mb-4 w-100 hero-banner">
+    {% endif %}
+
+    <h1 class="display-5 mb-2">Welcome, {{ current_user.display_name }}!</h1>
+    {% if tagline is defined and tagline %}
+    <p class="lead">{{ tagline }}</p>
+    {% else %}
+    <p class="lead">What would you like to do today?</p>
+    {% endif %}
+
+    {# --- QUICK ADD --------------------------------------------------------
+       Gated on the `contribute` permission (§10): a Viewer can look around
+       but has nothing to add, so these tiles simply don't render for them —
+       the honest version of "gate edit affordances by role" (WP4 brief). #}
+    {% if current_user.has_role('contributor') %}
+    <section class="mt-4" aria-label="Quick add">
+        <h2 class="h5 text-muted mb-3">Quick Add</h2>
+        <div class="row row-cols-2 row-cols-md-4 g-3">
+            <div class="col">
+                <a class="quick-add-tile" href="{{ url_for('people.new') }}">
+                    <span class="quick-add-tile__icon" aria-hidden="true">🧑</span>
+                    <span>Person</span>
+                </a>
+            </div>
+            <div class="col">
+                <a class="quick-add-tile" href="{{ url_for('main.coming_soon', feature='Add a Photo') }}">
+                    <span class="quick-add-tile__icon" aria-hidden="true">📷</span>
+                    <span>Photo</span>
+                </a>
+            </div>
+            <div class="col">
+                <a class="quick-add-tile" href="{{ url_for('main.coming_soon', feature='Add a Source') }}">
+                    <span class="quick-add-tile__icon" aria-hidden="true">📜</span>
+                    <span>Source</span>
+                </a>
+            </div>
+            <div class="col">
+                <a class="quick-add-tile" href="{{ url_for('main.coming_soon', feature='Write a Story') }}">
+                    <span class="quick-add-tile__icon" aria-hidden="true">📝</span>
+                    <span>Story</span>
+                </a>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="row g-4 mt-1">
+        <div class="col-lg-7">
+            {# --- ON THIS DAY ---------------------------------------------
+               Warm, not clinical: births read celebratory, deaths read as a
+               gentle remembrance (WP4 brief). Filled in by home.js from
+               GET /api/on-this-day. #}
+            <section class="mt-3" aria-label="On this day">
+                <h2 class="h5 text-muted mb-3">On This Day</h2>
+                <div id="onThisDay" class="on-this-day" data-loading="true">
+                    <p class="text-muted">Loading today's family history…</p>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-5">
+            {# --- STAT STRIP -------------------------------------------
+               "The motivating subset only" (WP4 brief) — not the full
+               admin stats page, just a small growing-archive teaser. #}
+            <section class="mt-3" aria-label="Archive stats">
+                <div id="statStrip" class="stat-strip" data-loading="true">
+                    <p class="text-muted small mb-0">Loading…</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row mt-1">
+        <div class="col-lg-8">
+            <section class="mt-3" aria-label="Recent activity">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 text-muted mb-0">Recent Activity</h2>
+                    <a class="small" href="{{ url_for('main.coming_soon', feature='Activity') }}">See all activity</a>
+                </div>
+
+                {% if current_user.has_role('curator') %}
+                {# The audit trail (ADR-0001) needs Curator+ (docs/openapi.yaml
+                   GET /api/activity). See BLOCKERS.md 2026-07-03: this WP
+                   couldn't get a friendlier, all-members feed added in time,
+                   so only Curator/Admin see real activity on Home; everyone
+                   else gets the honest message in the `{% else %}` below
+                   rather than a silently-broken 403 fetch. #}
+                <div id="recentActivity" class="list-group" data-loading="true">
+                    <p class="text-muted">Loading recent activity…</p>
+                </div>
+                {% else %}
+                <p class="text-muted">
+                    Activity history is visible to Curators and Admins for now.
+                    Ask a family Curator if you'd like to know what's new.
+                </p>
+                {% endif %}
+            </section>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}
