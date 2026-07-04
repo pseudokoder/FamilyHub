@@ -822,3 +822,98 @@ Landed on `docs/MASTER_PLAN.md`, no app code touched:
 Nothing browser-only — docs-only diff. `pytest -q` run clean (all green) to
 confirm the doc-only change didn't disturb anything; committed on
 `docs-plan-rev230`, not pushed or merged (Wes integrates).
+
+## Docs — Master Plan Revision 2.4.0 + ADR-0004 (2026-07-04)
+
+**Goal:** repair a data-loss bug in the 2026-07-03 merge that produced 2.0.0 —
+that merge kept the plan's 2.0.0 rewrite wholesale and silently dropped four
+revisions (v1.3 through v1.6.0) that had landed on the stranded
+`wp3-frontend-crud` branch first. Revision 2.3.0 (previous session) re-ported
+v1.3's content back in, but — not knowing v1.4 had *deliberately emptied* §5B
+one revision later — it re-populated §5B with the v1.3-era constraints,
+silently reverting a real decision for the second time. This run restores
+v1.4–v1.6.0 on top of 2.3.0 and locks the §5B decision behind an ADR so it
+can't be "helpfully" un-done again.
+
+### 0. Repo hygiene first
+
+Found the repo mid-investigation: on `wp3-frontend-crud` with a rebase marker
+left in `.git` and six local branches, several stale. Aborted the rebase,
+reset to `origin/master`, then checked all six local branches
+(`docs-plan-rev230`, `docs/adr-0001`, `wp3-backend-admin`, `wp3-backend-gaps`,
+`wp3-frontend-crud`, `wp4-fe-shell`) against `origin/master` with
+`git merge-base` — all six were pure ancestors (zero unique commits), so
+deleted all six. (The permission layer paused this mid-run to double-check the
+four branches beyond the two Wes named as expected debris; Wes confirmed the
+ancestry check was sufficient and cleared it to proceed.) `docs-plan-rev240`
+branched clean off `origin/master` (which already included 2.3.0, merged as
+PR #9, plus an unrelated `CONTEXT_LOG.md` update that was superseded by 2.3.0's
+retirement of that file in the prior rebase).
+
+### 1. What actually got restored
+
+Pulled the lost content from `wp3-frontend-crud`'s last commit (`b928133`,
+still reachable in reflog/git history even after the branch delete) rather
+than reconstructing it from memory, per the brief's "commit it verbatim"
+instruction:
+- **Contents/TOC** + a `[↑ Back to Contents]` link at the end of every
+  section (v1.5.0).
+- **5A/5B demoted** to `###` subsections of §5, single back-to-contents link
+  after 5B instead of three separate `---`-delimited sections (v1.4/d65b4e4).
+- **§5B emptied again** — back to *"(Intentionally empty — see ADR-0004...)"*.
+  2.3.0's durable-constraints version is gone from the baseline; the
+  §5A "design leadership" bullet's "§5B constraints" phrase now reads
+  "§5B (see ADR-0004)" per the brief, so a reader hits the ADR before
+  wondering why §5B is empty.
+- **Implementer-agnostic roles** — "Claude Code"/"Cowork" as *role* names
+  become "Backend Builder (BE)"/"Frontend Builder (FE)" throughout §1/§6/§7
+  (v1.5.0), so the plan no longer hard-codes which tool fills which lane.
+  Left untouched, per the brief's explicit carve-outs: the §1 version-naming
+  rationale and §7's "Scope B"/"outgrown → split out" references to the
+  *external* Cowork Websites project, and §6's "Wes can have Claude fetch the
+  public GitHub repo."
+- **§11 SemVer bump rules** (MAJOR/MINOR/PATCH definitions) (v1.5.0).
+- **Re-inserted the v1.3–v1.6.0 Revision History entries verbatim** from
+  `b928133`, in chronological position between v2.0.0 and v1.2.
+
+### 2. ADR-0004 — making the §5B decision un-revertible
+
+Wrote `docs/adr/0004-defer-frontend-design-constraints.md` verbatim per the
+brief: the constraint load in the *baseline*, not builder capability, was
+what suppressed FE design quality in early runs; an unconstrained session
+produced Chronicle, proving it. Decision: §5B stays empty until an
+end-of-v1 pre-launch validation pass. Added the "Enforcement note" calling
+out that 2.3.0 already reverted this once from an unrecorded rationale —
+the whole point of writing this down now. Added the row to `docs/adr/README.md`
+and folded ADR-0004 into the top-of-doc ADR pointer blockquote (not explicitly
+asked, but that blockquote's whole job is to enumerate every ADR the plan
+cites, and §5A/§5B now both cite ADR-0004).
+
+### Decisions Made Without Wes (docs-plan-rev240)
+
+1. **Six branches deleted, not two.** The brief only named
+   `wp3-frontend-crud` and `docs-plan-rev230` as expected debris; I extended
+   the same "nothing unique → safe to delete" test to the other four local
+   branches per the brief's own rule ("delete branches with nothing unique").
+   Paused for explicit confirmation when the permission layer flagged it;
+   Wes confirmed.
+2. **"Cowork-owned" left inside the re-inserted v1.3 Revision History entry**
+   even though the Task 5 terminology sweep would otherwise catch it — the
+   brief requires that entry verbatim from `b928133`, and at v1.3's own time
+   (2026-06-18) the FE builder actually *was* Cowork, so rewriting it would
+   misrepresent history. Same exemption logic as Revision-History entries
+   generally; the Task 5 verification grep was checked against this
+   explicitly and the one hit is this exemption.
+3. **Added ADR-0004 to the top-of-doc ADR pointer blockquote.** Not one of
+   the ten numbered tasks, but leaving it out would mean the blockquote (whose
+   stated job is "cites them where they bite") silently omits an ADR the body
+   text cites twice.
+
+### Manual Testing Checklist (docs-plan-rev240)
+
+Nothing browser-only — docs-only diff. `pytest -q` clean (all green). Verified:
+TOC anchors match heading text exactly; single `### 5A`/`### 5B`; the Task-5
+grep returns only the allowed exceptions; Revision History reads 2.4.0 → v1.0
+with no gaps; `docs/FRONTEND_DESIGN.md` untouched (FE-owned). Committed on
+`docs-plan-rev240`, pushed, and PR opened per Wes's updated instruction this
+session (push + open PR now allowed; merge still Wes-only).

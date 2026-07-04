@@ -1,10 +1,9 @@
 # FamilyHub — Master Plan
 
 > The single source of truth for the project's architecture, schema, scope, and
-> roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
-> piece at a time; review each piece before starting the next.
+> roadmap. Build one piece at a time; review each piece before starting the next.
 
-**Revision 2.3.0** · Last updated 2026-07-04 · Status: v1 build in progress — WP3 (frontend) underway.
+**Revision 2.4.0** · Last updated 2026-07-04 · Status: v1 build in progress — WP3 (frontend) underway.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version (SemVer) and add a line to the Revision History
 (bottom).*
@@ -16,9 +15,29 @@ change control). It is independent of the product versions — v1 "Full" (Flask)
 
 > **Design decisions live in ADRs.** Point-in-time architecture decisions are recorded
 > under [`docs/adr/`](adr/README.md): **ADR-0001** (write-control model — post-moderation:
-> RBAC + audit + soft-delete + revert), **ADR-0002** (Account↔Person link), and **ADR-0003**
-> (white-label — neutral language, no personal data in the app itself). The Master Plan
+> RBAC + audit + soft-delete + revert), **ADR-0002** (Account↔Person link), **ADR-0003**
+> (white-label — neutral language, no personal data in the app itself), and **ADR-0004**
+> (defer all FE design constraints until the front end is stable). The Master Plan
 > cites them where they bite; the ADRs hold the full rationale.
+
+## Contents
+
+- [1. The Corrected Vision](#1-the-corrected-vision)
+- [2. Core Principle: One Database, Many Views](#2-core-principle-one-database-many-views)
+- [3. The Schema (the centerpiece)](#3-the-schema-the-centerpiece)
+- [4. Feature → View Mapping](#4-feature--view-mapping)
+- [5. FamilySearch-Modeled Functionality (v1 scope)](#5-familysearch-modeled-functionality-v1-scope)
+  - [5A. Build Quality Bar — Depth, Not Stubs](#5a-build-quality-bar--depth-not-stubs)
+  - [5B. Visual Requirements & Constraints (frontend)](#5b-visual-requirements--constraints-frontend)
+- [6. Roadmap (CompTIA Project+ aligned)](#6-roadmap-comptia-project-aligned)
+- [7. Orchestration & Division of Labor](#7-orchestration--division-of-labor)
+- [8. Decisions Made On Your Behalf (correct any of these)](#8-decisions-made-on-your-behalf-correct-any-of-these)
+- [9. Security & Privacy Maturity Ladder](#9-security--privacy-maturity-ladder)
+- [10. Access Control — Roles & Admin Panel (progressive)](#10-access-control--roles--admin-panel-progressive)
+- [11. Change Management & Parking Lots (Project+ change control)](#11-change-management--parking-lots-project-change-control)
+- [12. Search (a genealogy site is useless without it)](#12-search-a-genealogy-site-is-useless-without-it)
+- [Revision History](#revision-history)
+
 ---
 
 ## 1. The Corrected Vision
@@ -39,7 +58,7 @@ a patch, per this map:
   style, CI + test infrastructure, Docker, the layered architecture pattern, security
   hardening, the backup system, DEVDIARY/CONTRIBUTING, management commands.
 - **REBUILD:** the data model (→ the GEDCOM-7 core below) and the **entire feature +
-  UX layer** (→ full-depth, Cowork-designed pages per §5A/§5B).
+  UX layer** (→ full-depth, Frontend Builder (FE)-designed pages per §5A/§5B).
 
 **Version naming** (avoids collision with the Cowork Websites project's scope words):
 - **v1 = "Full"** (Flask/Python) — built now. **v2 = "Enterprise"** (Java/Spring
@@ -47,6 +66,8 @@ a patch, per this map:
 - **v1 / v2 are the durable anchors;** "Full"/"Enterprise" are edition labels. Never
   use "Lite" here — in the Cowork project "Lite" = static HTML and "Full" = Flask, so
   our v1 (Flask) aligns with their "Full."
+
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -70,6 +91,8 @@ a patch, per this map:
 ```
 
 Every view reads from the same tables. No feature gets its own private data store.
+
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -354,6 +377,8 @@ in. Recommended home: **v2** (could land in a later v1 revision if ever needed).
 > **ADR-0001** — `audit_log` (before→after) + soft-delete + Curator revert are core v1
 > scope (§3.5, §8, §9), not the old "timestamps only" fallback.
 
+[↑ Back to Contents](#contents)
+
 ---
 
 ## 4. Feature → View Mapping
@@ -374,6 +399,8 @@ in. Recommended home: **v2** (could land in a later v1 revision if ever needed).
 > **"Other Relationships"** section (non-family ASSO), and the **dynamic pan/zoom tree
 > canvas** (§11). The v1 pedigree renderer and traversal endpoint are built with the
 > seams for these (§3 design rules, §5).
+
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -422,9 +449,7 @@ costs nothing:
 - **Merge / duplicate** tools for individuals (also listed v2-adjacent in §3.6; may land
   in v1.x).
 
----
-
-## 5A. Build Quality Bar — Depth, Not Stubs
+### 5A. Build Quality Bar — Depth, Not Stubs
 
 The first build failed by over-simplifying every feature into a hollow shell (e.g.
 "Memories" was two blank fields — no who, when, where, or photo). The rework's
@@ -445,7 +470,7 @@ non-negotiable quality bar:
   photos · tags — mirroring the `notes`/`note_links` (+ optional event/place) schema
   instead of ignoring it.
 - **The FE builder gets design leadership**, not micromanagement. Give it the data
-  model + §5B constraints and let it architect rich, intuitive pages — to the
+  model + §5B (see ADR-0004) and let it architect rich, intuitive pages — to the
   *standard* of polish and intuitiveness set by the Datumology and CinephileHub
   sites (including Cinephile's admin panel), **not as a copy of them.** The specific
   control, layout, and visual expression is governed by
@@ -453,32 +478,13 @@ non-negotiable quality bar:
   every user-meaningful field must be capturable, however the page chooses to
   present it.
 
----
+### 5B. Visual *Requirements* & Constraints (frontend)
 
-## 5B. Visual Requirements & Constraints (frontend)
+_(Intentionally empty — see **ADR-0004**. Visual requirements/constraints will be
+re-introduced here only after the front end is built, stable, and tested — see
+docs/FRONTEND_DESIGN.md → Design Parking Lot for the candidates.)_
 
-Functionality models FamilySearch; appearance must NOT (FamilySearch looks corporate
-because its goal is data, not delight). The full, living visual + UX design language —
-palette, typography, motion, components, theme — is owned by the FE builder in
-`docs/FRONTEND_DESIGN.md`, which may change freely WITHIN the constraints below (see
-§11 two-tier change control). This section holds only the durable constraints that do
-NOT change between work packages.
-
-Durable visual constraints (verifiable, cross-WP):
-- **Accessible:** large readable type, big tap targets, WCAG-AA contrast on every
-  surface (including dark), forgiving forms.
-- **Calm by design** — must not overwhelm ADD or anxious visitors: generous
-  whitespace, one primary action per screen, progressive disclosure. Interest comes
-  from imagery and type, never density.
-- **Cross-generational appeal** — three generations at once, WITH a deliberate lean
-  toward the youngest generation to drive engagement and adoption.
-- **Identity guardrail:** distinctive, characterful, polished to the
-  Datumology/CinephileHub quality bar — not a clone, never corporate.
-- **Imagery as texture:** family photos and "interesting family facts" may be woven
-  throughout, but must NEVER crowd the controls (subordinate to calm + accessibility).
-
-The expression of the above (exact palette/hex, fonts, dark/light, motion, component
-look) lives in `docs/FRONTEND_DESIGN.md` and is the FE builder's to evolve.
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -513,7 +519,7 @@ Build ONE work package at a time; phase-gate review before the next.
 - **WP2 – Backend CRUD.** Service + REST-shaped route layer for individuals, families,
   events, sources, media, notes. *pytest each resource.* **Deliverable: the API
   contract** (endpoints + JSON shapes) — the interface the frontend builds against.
-- **WP3 – Frontend.** Cowork builds the UI per the §5B constraints against the WP2
+- **WP3 – Frontend.** The Frontend Builder (FE) builds the UI per the §5B constraints against the WP2
   API contract. Elderly-accessible + cross-generational polish.
 - **WP4 – The Views & Search.** Tree (pedigree + family-group + relationship view),
   timeline, album, memory blog, and a rich **Search** interface — all queries against
@@ -537,46 +543,52 @@ Build ONE work package at a time; phase-gate review before the next.
 - **WP-F** Full GEDCOM-7 import/export engine (firm v2 deliverable, if not done in WP6)
 - **WP-E** Containerize, deploy, capstone write-up
 
+[↑ Back to Contents](#contents)
+
 ---
 
 ## 7. Orchestration & Division of Labor
 
 **Two builders, one repo, a contract between them.**
 
-- **Claude Code → backend + the whole repo/infra.** The preserved scaffolding,
+> FE and BE are distinct roles/lanes (separate ownership; the cross-builder blocker
+> protocol applies) regardless of whether the same or different implementer fills them.
+
+- **Backend Builder (BE) → backend + the whole repo/infra.** The preserved scaffolding,
   GEDCOM-7 schema, models, migrations, services, REST routes, pytest, seed data,
   backups, Docker, deployment. Commits as it goes.
-- **Cowork → front-end ONLY.** **HTML (Jinja2 templates), CSS, and vanilla JS — with
-  UX and UI as first-class concerns** — for the v1 ("Full") site, per the §5A depth
-  bar and §5B constraints. Cowork does **not** own the backend, infra, or
-  deployment — that's Code's domain. This is *less* than a normal Cowork "Scope B"
-  site, so the Cowork project's "outgrown → split out" rule is **explicitly waived**
-  for FamilyHub.
+- **Frontend Builder (FE) → front-end ONLY.** **HTML (Jinja2 templates), CSS, and
+  vanilla JS — with UX and UI as first-class concerns** — for the v1 ("Full") site,
+  per the §5A depth bar and §5B constraints. The Frontend Builder (FE) does **not**
+  own the backend, infra, or deployment — that's the BE's domain. This is *less*
+  than a normal Cowork "Scope B" site, so the Cowork project's "outgrown → split
+  out" rule is **explicitly waived** for FamilyHub.
 - **v2 ("Enterprise") is handled entirely outside the Cowork project.**
 
 ### The contract that guarantees the pieces fit
 - **WP2 produces the API/route contract** — endpoints + JSON shapes (the existing
-  OpenAPI spec is the artifact). This is the stable interface Cowork builds against.
-- **Build order:** Code finishes the backend contract (WP1–WP2) *before* Cowork starts
-  the front-end (WP3). Cowork builds to the contract, not a moving target.
+  OpenAPI spec is the artifact). This is the stable interface the FE builds against.
+- **Build order:** the BE finishes the backend contract (WP1–WP2) *before* the FE
+  starts the front-end (WP3). The FE builds to the contract, not a moving target.
 - **One canonical working folder.** Clone the repo once into the chosen location;
-  point PyCharm, Code, and Cowork all at that single folder. Never edit in two copies.
+  point all development tools and builders at that single folder. Never edit in two
+  copies.
 - **Deploy target = AWS (Lightsail).** DigitalOcean is at most a fallback and needs no
-  configuration. Deployment is Code's job, not Cowork's.
+  configuration. Deployment is the BE's job, not the FE's.
 
 ### Build sequence (who's active when — Wes is the switch operator)
 Only one builder is active at a time, except WP4's controlled interleave.
 
 | WP | Active | Other | Sync / handoff |
 |---|---|---|---|
-| WP1 Database Foundation | Code | Cowork idle | schema + migrations + seed; pytest green |
-| WP2 Backend CRUD + API contract | Code | Cowork idle | **Code publishes the contract → handoff to Cowork** |
-| WP3 Front-end (core CRUD UI) | Cowork | Code on-call for contract fixes | built to the WP2 contract |
-| WP4 Views + Search | Code → Cowork per view | — | Code adds each query endpoint, then Cowork builds that view |
-| WP5 Deploy | Code | Cowork idle | AWS Lightsail, SSL, DNS, backups |
-| WP6 Import/Export (tentative) | Code | Cowork idle | decision gate at start of WP5 |
+| WP1 Database Foundation | BE | FE idle | schema + migrations + seed; pytest green |
+| WP2 Backend CRUD + API contract | BE | FE idle | **BE publishes the contract → handoff to FE** |
+| WP3 Front-end (core CRUD UI) | FE | BE on-call for contract fixes | built to the WP2 contract |
+| WP4 Views + Search | BE → FE per view | — | BE adds each query endpoint, then FE builds that view |
+| WP5 Deploy | BE | FE idle | AWS Lightsail, SSL, DNS, backups |
+| WP6 Import/Export (tentative) | BE | FE idle | decision gate at start of WP5 |
 
-**The one rule that matters most:** Cowork does not start until WP2's contract exists.
+**The one rule that matters most:** the FE does not start until WP2's contract exists.
 
 ### Branch-per-work-package (trunk protection / the merge gate)
 Each WP is built on its **own branch off master** (e.g., `wp3-frontend-crud`).
@@ -584,20 +596,21 @@ Tests MAY be red on a WP branch while it's mid-build (expected work-in-progress)
 A branch merges to master **ONLY when the full suite is green — the CI merge
 gate**. **master is always green.** Cross-lane contract edits (e.g., the
 front-end adding `text/html` routes to `docs/openapi.yaml`) are allowed **on the
-WP branch**; the owning builder (Code) reviews/approves them at merge. **Wes is
+WP branch**; the owning builder (BE) reviews/approves them at merge. **Wes is
 the integrator:** he reviews and merges/pushes. One builder active at a time
 still holds.
 
 ### Two dev diaries (avoid the write conflict)
-Code and Cowork must not write the same file. Split it:
-- **`DEVDIARY_BE.md`** — backend (Code). H1 title: "FamilyHub — Backend Dev Diary."
-- **`DEVDIARY_FE.md`** — frontend (Cowork). H1 title: "FamilyHub — Frontend Dev Diary."
+FE and BE must not write the same file. Split it:
+- **`DEVDIARY_BE.md`** — backend (BE). H1 title: "FamilyHub — Backend Dev Diary."
+- **`DEVDIARY_FE.md`** — frontend (FE). H1 title: "FamilyHub — Frontend Dev Diary."
 - **`DEVDIARY.md`** — thin index pointing to both, so the README "start here" still works.
 
-### README ownership (Code keeps the portfolio face current)
-Owner: Claude Code — the README is repo presentation, which is Code's domain (Cowork is frontend-only). 
-Keep it accurate at each WP boundary (never describing removed features), and deliver the definitive, 
-capstone-grade professional rewrite by WP5 at the latest, matching the polish of the original presentation.
+### README ownership (the Backend Builder (BE) keeps the portfolio face current)
+Owner: the Backend Builder (BE) — the README is repo presentation, which is the BE's
+domain (FE is frontend-only). Keep it accurate at each WP boundary (never describing
+removed features), and deliver the definitive, capstone-grade professional rewrite by
+WP5 at the latest, matching the polish of the original presentation.
 
 ### Document map & ownership (RACI)
 Who owns which document, and how each one changes:
@@ -640,12 +653,12 @@ this table maps each standard artifact to where it lives here.
 | Release versioning | Git tags + `CHANGELOG.md`, from WP5 (§6) |
 
 ### Cross-builder blocker handoff (so you always know who to spin up)
-A builder will hit things only the *other* builder can fix (Cowork finds a missing or
-wrong endpoint; Code finds the front-end needs a different data shape). Protocol:
+A builder will hit things only the *other* builder can fix (the FE finds a missing or
+wrong endpoint; the BE finds the front-end needs a different data shape). Protocol:
 - **Never fake or stub around a cross-boundary blocker** — that recreates the hollow
   failure mode. Stop *that item*; continue other in-scope work if safe.
 - **Record it in `BLOCKERS.md`** (repo root) as an OPEN entry: date · raised-by
-  (Code/Cowork) · what's blocked · exactly what the other builder must do · status.
+  (BE/FE) · what's blocked · exactly what the other builder must do · status.
 - **Surface it in the end-of-session summary** so Wes sees it unmistakably and knows
   which tool to spin up next.
 - **Start of every session:** each builder reads `BLOCKERS.md` first, resolves any OPEN
@@ -655,10 +668,12 @@ wrong endpoint; Code finds the front-end needs a different data shape). Protocol
   flag, never fake.
 
 ### Workflow discipline (the lesson from the credits burned)
-- **One work package at a time.** Don't let either tool run the whole project
+- **One work package at a time.** Don't let either builder run the whole project
   unattended. Phase-gate review (run it, read the DEVDIARY entry) before the next WP.
 - **Self-verifying:** backend work includes pytest; no "please test this for me"
   pauses. Manual checks batch into a checklist cleared at each WP boundary.
+
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -703,6 +718,8 @@ wrong endpoint; Code finds the front-end needs a different data shape). Protocol
     *the app's operative voice* (must stay generic, e.g. "contact your family
     administrator").
 
+[↑ Back to Contents](#contents)
+
 ---
 
 ## 9. Security & Privacy Maturity Ladder
@@ -728,6 +745,8 @@ deliberately. The first build already cleared the MVP tier — build upward from
   penetration testing, PII minimization, data export/delete (subject-rights) tooling,
   monitoring / intrusion detection.
 - Ties directly to Wes's **ISC2 CC** and the **WGU Security** coursework.
+
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -757,9 +776,11 @@ or mint custom roles is reserved for **v2**.
 
 **Progressive ladder (a little more each WP):**
 - **WP2:** role scaffolding (enum + single auth layer) + basic Contributor/Admin. *(done)*
-- **WP3–WP4:** rich admin-panel UX (Cowork) + Curator and Viewer tiers + the read-only
+- **WP3–WP4:** rich admin-panel UX (FE) + Curator and Viewer tiers + the read-only
   permission matrix; role-change requests routed to admin approval (§5).
 - **v2:** editable permission-matrix UI + custom roles (the data model already allows it).
+
+[↑ Back to Contents](#contents)
 
 ---
 
@@ -785,6 +806,19 @@ Not every change is the same weight. Route each by which document it touches:
 - **Escalation (Tier 2 → Tier 1).** A design idea that would **breach a §5B
   constraint**, or that needs **new functionality/endpoints**, escalates to Tier 1:
   log it, Wes approves, the baseline is updated before it ships.
+
+### SemVer bump rules (for Tier-1 changes)
+
+Revision format is **MAJOR.MINOR.PATCH**.
+- **MAJOR (X.0.0):** breaking or scope-altering — add/remove a work package, schema
+  change, security/architecture shift, or anything that invalidates built work or a
+  published contract.
+- **MINOR (x.Y.0):** substantive but non-breaking — new sections, process or ownership
+  refinements, role model changes.
+- **PATCH (x.y.Z):** clarifications, wording, formatting, typos, TOC updates.
+
+Tier-2 changes (`docs/FRONTEND_DESIGN.md`) stay in that doc's decision log; they do
+not carry a Master Plan revision bump.
 
 ### Parking lots (two of them — captured, not scheduled)
 - **Master Plan parking lot (below)** — larger **feature / functionality** ideas
@@ -836,6 +870,8 @@ Not every change is the same weight. Route each by which document it touches:
   future Family Bunch could authenticate against it.
 - (Add future ideas here rather than expanding MVP scope.)
 
+[↑ Back to Contents](#contents)
+
 ---
 
 ## 12. Search (a genealogy site is useless without it)
@@ -853,9 +889,20 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 - **Backend note:** the search endpoint is part of the WP2 API contract surface so the
   WP4 search UI has a stable target. No technical limit at family scale.
 
+[↑ Back to Contents](#contents)
+
 ---
 
 ## Revision History
+- **2.4.0 — 2026-07-04 — MINOR.** Restored content lost in the 2026-07-03 merge-conflict
+  resolution that kept the 2.0.0 rewrite over revisions v1.3–v1.6.0: implementer-agnostic
+  builder roles (Backend Builder (BE) / Frontend Builder (FE)) across §1/§6/§7 (v1.5.0);
+  Contents/TOC + back-to-contents links (v1.5.0); §11 SemVer bump rules (v1.5.0); 5A/5B
+  demoted to §5 subsections; §5B returned to its **intentionally empty** v1.4 state —
+  reversing 2.3.0's §5B re-population — with the rationale now permanently recorded as
+  **ADR-0004** (defer all FE design constraints until the front end is stable; end-of-v1
+  pre-launch gate). Re-inserted the v1.3–v1.6.0 Revision History entries for a complete
+  audit trail. (Raised by Wes.)
 - **2.3.0 — 2026-07-04 — MINOR.** Ported the stranded v1.3 revision (2026-06-18,
   `wp3-frontend-crud` branch) into the current plan: §5B trimmed to durable **Visual
   Requirements & Constraints** (the living design language lives in
@@ -904,6 +951,25 @@ strong version ships in v1 — easy here because the dataset is family-sized.
   7. **Parking lot (§11):** MFA (TOTP), notification-email system, dynamic pan/zoom tree
      canvas, admin theme switcher, and the **Family Bunch** identity/API seam (reserved,
      not built).
+- v1.6.0 — 2026-06-29 — Parked the public-surface + PII-gate model in §11: curated
+  public view of the database (per-item "public" flag, default OFF; `living`-person
+  guardrail via §9; admin PII-gate + preview + `audit_log`; configurable section
+  layout via `site_settings`; Chronicle shared design system spanning public and
+  logged-in app). MINOR bump — parking-lot capture only; no scope committed.
+  (Approved by Wes.)
+- v1.5.0 — 2026-06-28 — Adopted SemVer (MAJOR.MINOR.PATCH; prior 1.4 = 1.4.0) with
+  defined change tiers in §11; generalized the builder model to implementer-agnostic
+  roles Frontend Builder (FE) / Backend Builder (BE) — implementer is now assigned at
+  task time, not named in this document; added a Contents/TOC. (Approved by Wes.)
+- v1.4 — 2026-06-28 — Emptied §5B durable visual constraints (moved to FRONTEND_DESIGN.md
+  design parking lot as post-stable candidates); §5B left as a placeholder to be re-populated
+  after the front end is built and tested. (Approved by Wes.)
+- v1.3 — 2026-06-18 — Separated fluid design from the baseline: trimmed §5B to durable
+  Visual Requirements & Constraints (accessibility, calm-by-design, cross-generational
+  goal with a lean toward the youngest generation, identity guardrail, imagery-as-
+  texture) and moved the living visual/UX design language to a new Cowork-owned
+  docs/FRONTEND_DESIGN.md. Added a document map + RACI (§7) and a two-tier change-control
+  model + dual parking lots (§11). (Raised by Wes.)
 - v1.2 — 2026-06-18 — Added the **branch-per-work-package** workflow to §7: each WP is
   built on its own branch off master; tests may be red on-branch (WIP); a branch merges
   to master only when green (the CI merge gate), so master is always green; cross-lane
@@ -916,3 +982,5 @@ strong version ships in v1 — easy here because the dataset is family-sized.
   handoff (§7), Project+ roadmap (§6), security ladder (§9), RBAC ladder (§10), change
   control + parking lot (§11), search (§12).
 <!-- Add new revisions above this line, newest first, when §11 change control approves a change to bump this Revision. -->
+
+[↑ Back to Contents](#contents)
