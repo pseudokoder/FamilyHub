@@ -166,9 +166,15 @@ def security_txt():
     """RFC 9116: a machine-readable 'how to report a security problem'
     note at a standard path. Professional sites have one; it costs six
     lines. The Expires field is REQUIRED by the RFC (stale contact info
-    is worse than none)."""
+    is worse than none).
+
+    ADR-0003 (white-label / neutral language): the contact address is
+    config, not a hardcoded personal inbox — every deployment of this
+    project sets its own MAIL_DEFAULT_SENDER (app/config.py) and that's
+    what security researchers reach.
+    """
     body = (
-        "Contact: mailto:wesley.leiter@gmail.com\n"
+        f"Contact: mailto:{current_app.config['MAIL_DEFAULT_SENDER']}\n"
         "Expires: 2027-06-12T00:00:00.000Z\n"
         "Preferred-Languages: en\n"
     )

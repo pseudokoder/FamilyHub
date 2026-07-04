@@ -14,19 +14,31 @@
 
 ### Palette
 
-| Token         | Hex       | Role                                      |
-|---------------|-----------|-------------------------------------------|
-| `--ink`       | `#1c1008` | Primary text / masthead                   |
-| `--rust`      | `#8b2e12` | Archival red — primary accent, CTAs       |
-| `--navy`      | `#1a3254` | Antique blue — secondary accent           |
-| `--gold`      | `#c8860a` | Warm amber — stamps, marks, hover         |
-| `--paper`     | `#f5edd6` | Aged parchment — page background          |
-| `--paper-mid` | `#ede0bf` | Slightly deeper parchment — card tones    |
-| `--fog`       | `#d4c8ad` | Muted border / divider                    |
-| `--warm-wh`   | `#fdf8ef` | Near-white for text on dark backgrounds   |
+> **Corrected 2026-07-04 (WP5):** this table had drifted from the actual
+> shipped tokens in `app/static/css/chronicle-main.css` — it described an
+> earlier iteration. The table below is the real `:root` block; treat the CSS
+> file as the source of truth going forward and fix this table if it drifts
+> again.
 
-Dark section backgrounds use `--ink` (nearly black-brown); the masthead
-and footer live in deep navy or near-black.
+| Token          | Hex       | Role                                         |
+|----------------|-----------|-----------------------------------------------|
+| `--paper`      | `#efe1c6` | Page background — aged parchment              |
+| `--paper-2`    | `#e6d6b6` | Deeper parchment — banded sections, hover     |
+| `--card`       | `#f6edd6` | Card/panel fill (dossier, frame-card, panels) |
+| `--frame`      | `#211a13` | Near-black — dark plates (catalog, title card)|
+| `--ink`        | `#2a2014` | Primary text                                  |
+| `--ink-soft`   | `#5f5037` | Secondary text, body copy                     |
+| `--ink-faint`  | `#6f5b40` | Tertiary text — meta, labels                  |
+| `--rust`       | `#9d3b2c` | Archival red — primary accent, CTAs           |
+| `--rust-dk`    | `#7d2c20` | Rust hover/active state                       |
+| `--amber`      | `#bd7a2a` | Sepia gold — decorative accents, 2nd accent   |
+| `--sepia`      | `#a9763f` | Warm neutral accent                           |
+| `--blue`       | `#355e7c` | Antique map blue — cool trim accent (AA)      |
+| `--blue-lt`    | `#7ea9c6` | Lighter blue — text/lines on dark frames      |
+
+`--on-frame` (`#f0e4cf`) / `--on-frame-soft` (`#c9b896`) are the near-white
+text tones used on dark (`--frame`) backgrounds. Dark section backgrounds use
+`--frame`; the catalog plate and closing title card are the main examples.
 
 ### Typography
 
@@ -208,6 +220,106 @@ blueprint + the branding context processor), `app/config.py`
 {api,home,people}.js`, `app/static/css/style.css` (additions only),
 `docs/openapi.yaml` (new `Views` tag: `/coming-soon`, `/people`, `/people/new`,
 `/people/{individual_id}`).
+
+---
+
+### 2026-07-04 — WP5: Chronicle reaches the authenticated app
+
+**What changed:** the app shell, Home, and People now read as Chronicle, not
+plain Bootstrap — the WP4 deferral ends here. Per the WP5 brief, **styling
+lands now; only §5B's accessibility/elderly *constraints* stay deferred**
+(the WP4 entry above got this wrong — Chronicle styling itself was never
+meant to wait for end-of-v1, only the WCAG/tap-target/elderly pass was).
+
+**Mechanism: "layer Chronicle tokens over Bootstrap structure."** Bootstrap
+keeps doing its job — grid, dropdown JS, form validation states, `.table`
+markup in admin's untouched templates. A new stylesheet,
+`app/static/css/chronicle-app.css`, loads after `chronicle-main.css` +
+`chronicle-components.css` and repaints Bootstrap's own component classes
+(`.btn`, `.btn-primary`, `.form-control`, `.form-select`, `.dropdown-menu`,
+`.list-group-item`, `.table`, `.badge`/`.text-bg-*`) in the same tokens,
+fonts, and idioms as the public page. **This is why admin's user table and
+the login/error pages now look Chronicle too, with zero edits to their
+template files** — only `base.html`, `dashboard.html`, and `people/*.html`
+were touched (Task 2's actual scope); everything else inherited the look for
+free because it already used Bootstrap's own classes. Two new component
+classes were needed where Bootstrap had nothing to repaint: `.panel`/
+`.quick-add-tile`/`.on-this-day`/`.stat-strip`/`.person-row` (Home + People,
+moved out of `style.css` into `chronicle-app.css`) and `.filter-chip` (People's
+status/surname chips — a NEW class, not chronicle-components.css's `.chip`,
+which is styled for the public page's dark `.catalog` plate and would have
+had the wrong contrast on a light parchment page; the two now coexist without
+collision).
+
+**The header is reused verbatim, not reinvented.** `base.html`'s `<header
+class="site-header" id="siteHeader">`/`.brand`/`.nav__links` is the *same*
+markup and ids as the public `index.html`, so `chronicle.js` (already loaded
+publicly, already CSP-safe, already tested) drives the sticky-header class
+and the mobile hamburger toggle for the app too — nothing new was written for
+either. Every other section of that file no-ops safely on pages without its
+matching element (splash, tree, timeline, catalog — see its own CSP
+compliance note), which is what makes loading the whole file app-wide safe.
+One adaptation was necessary: the public header is deliberately *transparent*
+at the top (it reads over a hero image); app pages have no hero behind it, so
+`body.app-shell .site-header` is pinned to the solid "scrolled" look
+unconditionally, regardless of which way `chronicle.js`'s scroll listener
+toggles `.is-scrolled`.
+
+**A real conflict found and designed around: the user-menu dropdown lives
+OUTSIDE `#navLinks`.** `chronicle.js`'s mobile menu closes on ANY click inside
+`#navLinks` (reasonable for a page with no submenus). Nesting the user-menu
+dropdown inside it, as a first draft did, meant tapping "Robert Hartwell ▾" on
+mobile fired two handlers at once: Bootstrap's dropdown JS opening the menu,
+and `chronicle.js` immediately hiding the whole nav panel it lives inside —
+the menu would open and instantly become unreachable. Fixed by moving the
+dropdown to a sibling `.header-actions` wrapper next to the hamburger button,
+outside the collapsible nav entirely; verified in the browser on a 375px
+viewport that the dropdown opens and the primary nav's mobile state is
+untouched either way.
+
+**Recent Activity is no longer Curator+-only.** BLOCKERS.md's WP4 items were
+resolved by BE before this WP started: `GET /api/activity/feed` (permission
+`view`, any member) returns a pre-formatted friendly sentence per row, so
+`dashboard.html`'s Recent Activity container now renders for every logged-in
+member, and `home.js` dropped the client-side verb/noun mapping it used to
+need (the backend does that now). Verified as Viewer, Contributor, Curator,
+and Admin — a Viewer sees the real feed, not the old "ask a Curator" message.
+
+**Task 3 — copy neutralization (ADR-0003):** grepped the whole app surface
+(`app/templates/`, `app/routes/`, `app/services/`) for the author's name and
+any phone/email/address. Two hits, both fixed:
+- `/.well-known/security.txt` (`app/routes/main.py`) hardcoded a personal
+  Gmail address as the RFC 9116 security contact. Now reads
+  `current_app.config["MAIL_DEFAULT_SENDER"]` — config, not source, per ADR-0003
+  rule 6. (`login.html`, `forgot_password.html`, and the 403/429/500 pages were
+  already fixed by BE's `4bd1182` before this WP — verified, not re-touched.)
+- A Jinja *comment* in `index.html` ("FE decisions made without Wes") named the
+  owner in what ADR-0003 rule 3 treats as technical/build-detail language;
+  reworded to "without owner sign-off." Not rendered output, but for
+  consistency with BE's equivalent comment cleanup in `4bd1182`.
+
+**Known minor inconsistency, deliberately not fixed this WP:** `errors/
+403.html`, `429.html`, and `500.html` still use Bootstrap's `.display-6` class
+on their `<h1>`, which (being a class selector) outranks chronicle-main.css's
+plain `h1 { font-size: clamp(...) }` rule regardless of load order — so those
+three headings render at Bootstrap's fixed size rather than the Chronicle
+scale, even though the surrounding page (nav, buttons, body text) is fully
+reskinned. `coming_soon.html` and `people/show.html` had the same class and
+were fixed (they're reachable from the nav built this WP); the error pages
+were out of Task 2's explicit scope (app shell + Home + People) and are left
+for the next template pass — same one-line fix (drop `.display-6`) when
+someone's there anyway.
+
+**Files created/changed:** `app/static/css/chronicle-app.css` (new); `app/
+templates/base.html` (Chronicle header/dropdown/flash markup); `app/templates/
+dashboard.html` (Recent Activity ungated, section labels use `.section-title`);
+`app/templates/people/index.html` (`.chip` → `.filter-chip`); `app/templates/
+people/show.html`, `app/templates/coming_soon.html` (dropped `.display-6`);
+`app/static/js/home.js` (Recent Activity now calls `/api/activity/feed`, no
+verb/noun maps); `app/static/js/people.js` (`.chip` → `.filter-chip` selector);
+`app/static/css/style.css` (WP4 app-shell rules removed — superseded);
+`app/routes/main.py` (`security_txt` reads `MAIL_DEFAULT_SENDER`); `app/
+templates/index.html` (comment reworded, ADR-0003).
 
 ---
 

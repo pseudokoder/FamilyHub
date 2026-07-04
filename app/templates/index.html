@@ -5,7 +5,7 @@
   base.html. Renders only for logged-out visitors (see app/routes/main.py —
   authenticated users are routed to dashboard.html which extends base.html).
 
-  FE decisions made without Wes (2026-06-28):
+  FE decisions made without owner sign-off (2026-06-28):
   - All asset paths use url_for('static', filename=...) — Flask's URL builder.
   - Google Fonts CDN replaced with self-hosted woff2 files in app/static/fonts/
     (strict CSP blocks external font origins; see fonts.css).

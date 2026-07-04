@@ -173,111 +173,15 @@ body {
 }
 
 /* ============================================================================
- * WP4 — authenticated app shell (Home + People). Bootstrap-based, same
- * elderly-first rules as the rest of this file (big type, big tap targets,
- * obvious focus rings) — the Chronicle visual pass is a later, deliberately
- * deferred WP (see docs/FRONTEND_DESIGN.md).
+ * The WP4 app-shell rules that used to live here (Quick Add tiles, On This
+ * Day, stat strip, filter chips, person rows) moved to chronicle-app.css in
+ * WP5 — the authenticated app is now styled in Chronicle, not plain
+ * Bootstrap. See docs/FRONTEND_DESIGN.md's WP5 decision log.
  * ==========================================================================*/
 
-/* Quick Add tiles (Home): one big, obviously-tappable card per action. */
-.quick-add-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 1.25rem 0.5rem;
-    border: 1px solid #dee2e6;
-    border-radius: 0.75rem;
-    background: #fff;
-    text-decoration: none;
-    color: #1a1a1a;
-    font-size: 1.1rem;
-    font-weight: 600;
-    height: 100%;
-    transition: box-shadow 0.15s ease-in-out, transform 0.15s ease-in-out;
-}
-.quick-add-tile:hover, .quick-add-tile:focus {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
-    color: #1a1a1a;
-}
-.quick-add-tile__icon {
-    font-size: 2rem;
-    line-height: 1;
-}
-
-/* On This Day (Home): a warm little feed, not a data table. */
-.on-this-day__row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.6rem;
-    padding: 0.6rem 0;
-    border-bottom: 1px solid #eee;
-    font-size: 1.05rem;
-}
-.on-this-day__row:last-child {
-    border-bottom: none;
-}
-.on-this-day__icon {
-    font-size: 1.3rem;
-}
-
-/* Stat strip (Home): a small "growing archive" teaser, not the full admin
-   stats page — see docs/FRONTEND_DESIGN.md for the "motivating subset" call. */
-.stat-strip {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-    height: 100%;
-}
-.stat-strip__item {
-    display: flex;
-    flex-direction: column;
-}
-.stat-strip__n {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1;
-}
-.stat-strip__label {
-    color: #6c757d;
-    font-size: 0.95rem;
-}
-
-/* Filter chips (People find/browse): a row of toggle pills. */
+/* .chip-group survives here unchanged — it's a layout-only wrapper (no
+   colors/fonts to migrate) still used by app/templates/people/index.html. */
 .chip-group {
     display: inline-flex;
     gap: 0.4rem;
-}
-.chip {
-    border: 1px solid #adb5bd;
-    background: #fff;
-    color: #495057;
-    border-radius: 999px;
-    padding: 0.45rem 1rem;
-    font-size: 1rem;
-    line-height: 1.2;
-}
-.chip.is-active {
-    background: #0d6efd;
-    border-color: #0d6efd;
-    color: #fff;
-}
-
-/* Person rows (People list): name + vitals, roomy enough to tap easily. */
-.person-row {
-    display: flex;
-    flex-direction: column;
-    padding: 0.9rem 1.1rem;
-}
-.person-row__name {
-    font-size: 1.15rem;
-    font-weight: 600;
-}
-.person-row__meta {
-    font-size: 0.95rem;
 }
