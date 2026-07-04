@@ -753,3 +753,72 @@ not a weaker one).
 Nothing browser-only for BE — both fixes are fully covered by pytest (232 tests,
 ~92% coverage, floor 90%). Nothing pushed; branch `wp5-be-docs-blockers` is ready
 for Wes to push + open the PR.
+
+## Docs — Master Plan Revision 2.3.0 (2026-07-04)
+
+**Goal:** a docs-only run porting a stranded plan revision (v1.3, 2026-06-18) that
+never got merged — it was cut on the old `wp3-frontend-crud` branch, and by the
+time v2.0.0 rewrote the plan on master, that branch's §5B/§7/§11 changes were
+gone. `docs/FRONTEND_DESIGN.md` (FE-owned) already cites a "§11 Tier-2" and a
+trimmed "§5B constraints" that don't exist in the current plan — this run makes
+those citations resolve, updated to current reality rather than a verbatim
+1.3 replay.
+
+Landed on `docs/MASTER_PLAN.md`, no app code touched:
+- **Document control relabel.** The top-of-doc version line is now **"Revision"**
+  (not "Version"), with a new paragraph clarifying it versions the *document*
+  (SemVer, §11), independent of the product's own v1.x/v2.x release tags
+  (Git tags, starting WP5).
+- **§5A** now points at `docs/FRONTEND_DESIGN.md` for the FE builder's design
+  leadership, instead of a "§5B brief" that no longer matches what §5B holds.
+- **§5B rewritten** from a one-shot "Visual Design Brief" into durable **Visual
+  Requirements & Constraints** — the five cross-WP-stable rules (accessible, calm,
+  cross-generational, identity guardrail, imagery-as-texture). The living palette/
+  type/motion/component language moves entirely to `docs/FRONTEND_DESIGN.md`,
+  which the FE builder can now evolve without a Master Plan revision (see the new
+  §11 two-tier rule below). All "§5B design brief" cross-references (§6 WP3, §7)
+  updated to "§5B constraints."
+- **§7 gained two subsections:** a **Document map & ownership (RACI)** table (who
+  owns which doc, how each changes) and a **Standards alignment** table mapping
+  this project's consolidated planning doc back to the individual artifacts
+  (Charter, SRS, SDD, RACI, ADRs, test plan, etc.) a traditional Project+/SDLC
+  process would produce separately — useful both as a portfolio artifact and as a
+  reference the FE builder can point at instead of re-deriving ownership rules.
+- **§11 retitled and restructured** around a **two-tier change-control** model:
+  Tier 1 (baseline — `docs/MASTER_PLAN.md`, Wes-approved, Revision-bumped) vs.
+  Tier 2 (design — `docs/FRONTEND_DESIGN.md`, FE changes directly within the §5B
+  constraints, no Master Plan revision), with an explicit escalation path when a
+  design idea would breach a §5B constraint or need new endpoints. The single
+  parking lot is now framed as **two** parking lots (Master Plan = Tier-1 feature
+  ideas; `FRONTEND_DESIGN.md` = Tier-2 visual brainstorm) — the existing Master
+  Plan parking-lot entries (including the full "Public surface + PII guardrail"
+  block and the v2 future-captures block) carried forward unchanged.
+- **§6 WP5** gained a release-versioning sentence: first release is Git tag
+  `v1.0.0` + a `CHANGELOG.md` ("Keep a Changelog") + an app version string; v1
+  releases as 1.x, the v2 rewrite starts at 2.0.0 (a rewrite is a major version).
+- **Retired `docs/CONTEXT_LOG.md`** (`git rm`) — it was an internal operations
+  log; the new §7 document map now fully describes repo documentation, so a
+  separate cross-thread log is redundant. Checked the rest of the repo for live
+  references: the only mentions left are inside `DEVDIARY_BE.md`/`DEVDIARY_FE.md`/
+  `BLOCKERS.md` dated session entries and the Master Plan's own v2.0.0 Revision
+  History line — all historical records of past sessions, not pointers telling a
+  reader to go consult the file today, so (per the same reasoning the brief uses
+  to exempt Revision History) they were left as-is rather than rewritten.
+- **New Revision History entry (2.3.0)** at the top summarizing all of the above.
+
+### Decisions Made Without Wes (docs-plan-rev230)
+
+1. **CONTEXT_LOG references in dated session logs left untouched.** The brief
+   explicitly exempts Revision History; I extended that same logic to the dated,
+   past-tense entries in the dev diaries and `BLOCKERS.md`, since rewriting "the
+   CONTEXT_LOG's drift list matched..." after the fact would misrepresent what
+   was true when those entries were written.
+2. **Footer comment reworded to "Add new revisions... to bump this Revision"**
+   rather than a literal find/replace of "version" → "Revision" throughout,
+   since the surrounding sentence still needs to read naturally.
+
+### Manual Testing Checklist (docs-plan-rev230)
+
+Nothing browser-only — docs-only diff. `pytest -q` run clean (all green) to
+confirm the doc-only change didn't disturb anything; committed on
+`docs-plan-rev230`, not pushed or merged (Wes integrates).
