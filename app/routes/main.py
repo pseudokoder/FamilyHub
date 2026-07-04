@@ -11,7 +11,7 @@ import os
 
 from flask import (
     Blueprint, Response, current_app, jsonify, render_template,
-    send_from_directory,
+    request, send_from_directory,
 )
 from flask_login import current_user, login_required
 from sqlalchemy import text
@@ -35,6 +35,23 @@ def home():
             hero_exists=settings_service.hero_exists(),
         )
     return render_template("index.html")
+
+
+@main_bp.route("/coming-soon")
+@login_required
+def coming_soon():
+    """FE(WP4): a single friendly placeholder for every nav/menu destination
+    this WP doesn't build yet (Tree, Memories, Search, Suggest an idea…).
+
+    One route + one template instead of one stub route per feature — the
+    ?feature= query string is display text ONLY (never trusted for logic),
+    so a later WP can replace this one at a time with a real page just by
+    pointing the nav link at a new endpoint; nothing else has to change.
+    """
+    return render_template(
+        "coming_soon.html",
+        feature=request.args.get("feature", "This page"),
+    )
 
 
 @main_bp.route("/about")

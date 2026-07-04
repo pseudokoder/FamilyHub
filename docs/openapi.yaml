@@ -68,6 +68,8 @@ tags:
     description: Suggestions inbox and role-change requests (§5, §10)
   - name: AdminApi
     description: Admin actions — users, settings, backups, permission matrix (§9, §10)
+  - name: Views
+    description: WP4 (Cowork) — HTML pages that render the app shell + call the JSON API from the browser
 
 paths:
   # --- Plumbing ---------------------------------------------------------------
@@ -445,6 +447,21 @@ paths:
       tags: [WriteControl]
       summary: Undo the change an audit entry describes (permission&#58; revert)
       responses: {"200": {description: Reverted (result is the new snapshot, or null if now deleted)}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {$ref: '#/components/responses/Forbidden'}, "404": {$ref: '#/components/responses/NotFound'}}
+
+  # --- Views (WP4) — HTML pages; the data comes from the JSON API above ------
+  /coming-soon:
+    get:
+      tags: [Views]
+      summary: Shared "not built yet" placeholder for nav destinations this WP doesn't build
+      parameters: [{name: feature, in: query, schema: {type: string}, description: display text only, never trusted for logic}]
+      responses: {"200": {description: HTML page}}
+  /people:
+    get: {tags: [Views], summary: "Find/browse people (client-rendered against GET /api/search)", responses: {"200": {description: HTML page}}}
+  /people/new:
+    get: {tags: [Views], summary: "Register-a-person form (submits via JS to POST /api/individuals + /api/places + /api/events)", responses: {"200": {description: HTML page}}}
+  /people/{individual_id}:
+    parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Views], summary: "The Person Page (placeholder — FE-2 builds the real page; a stable per-id route already)", responses: {"200": {description: HTML page}}}
 
 components:
   responses:

@@ -35,3 +35,7 @@ at the same time (Master Plan §7).
 - **WP2** (Backend CRUD + API contract + RBAC) — complete. See `DEVDIARY_BE.md` → "WP2."
 - **WP3** (Front-end Chronicle home page) — implementation complete on
   `wp3-frontend-crud`; pending Wes review + merge. See `DEVDIARY_FE.md` → "WP3."
+- **WP3 (backend gaps + admin)** and **WP4** (front-end: app shell, Home,
+  People) — complete on `wp4-fe-shell` (merged forward from `wp3-frontend-crud`
+  onto master); pending Wes review + merge. See `DEVDIARY_BE.md` and
+  `DEVDIARY_FE.md` → "WP4."

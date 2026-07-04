@@ -37,6 +37,85 @@ Entry format:
 
 ## Open items
 
+### [OPEN] WP4 nav brief says "Admin" is Curator+; the backend admin surface is Admin-only
+- Date: 2026-07-03
+- Raised by: FE
+- Blocks: nothing critical — the app shell (`app/templates/base.html`) gates the
+  user-menu "Admin" item on `current_user.is_admin` (true Admin), NOT Curator+ as
+  the WP4 brief literally asked ("Admin (only if the current user is Curator/
+  Admin per the role)"), so the link never 403s. That's the safe default, but it
+  means Curators get no admin-menu entry at all right now, even though §10 makes
+  Curator a real, elevated rung (it holds `revert`, i.e. the audit trail +
+  restore/undo).
+- Needs (BE must, or Wes must decide): pick one —
+  1. Confirm the nav is right as built (Admin-only) and the brief's "Curator/
+     Admin" phrasing was loose — nothing to change; OR
+  2. Add a Curator-visible capability to gate a menu item on instead — most
+     naturally the audit trail (`GET /api/activity`, already `role_required
+     (Role.CURATOR)`) — so Curators get e.g. an "Activity" entry pointing at a
+     real page, distinct from the Admin-only `/admin/*` panel.
+  Every `/admin/*` HTML route and every `/api/admin/*` + `/api/suggestions`
+  (GET/PUT) + `/api/role-requests` (GET/approve/deny) JSON route is hard-coded
+  `@admin_required` (`app/services/authz.py`, `app/routes/admin.py`,
+  `app/routes/api/admin_api.py`, `app/routes/api/inbox.py`) — loosening any of
+  those to Curator+ is a §10 permissions-map change, not a template change, so
+  it's BE's call either way.
+- Status: OPEN.
+
+### [OPEN] Home's "Recent Activity" needs a friendly, all-members feed; today it's Curator+ only
+- Date: 2026-07-03
+- Raised by: FE
+- Blocks: nothing critical — `app/templates/dashboard.html` only renders the
+  Recent Activity container for `current_user.has_role('curator')`; everyone
+  else sees an honest static message instead of a feed that would 403. But the
+  WP4 Home brief describes this section for every logged-in member ("Mom added
+  a photo to …"), and the only endpoint that exists, `GET /api/activity`
+  (`app/routes/api/activity.py`), is `@role_required(Role.CURATOR)` by design
+  (ADR-0001 — it's the audit/write-control trail, which also carries
+  restore/revert/security actions a Viewer or Contributor arguably shouldn't
+  see). `app/static/js/home.js` already has the friendly action→verb /
+  subject_type→noun phrasing ready (`ACTION_VERB`/`SUBJECT_NOUN`) — it just has
+  nothing to call for non-Curators.
+- Needs (BE must): add a `view`-permission-gated feed of *friendly, non-sensitive*
+  creation/update events (new people, photos, stories — not deletes/reverts/
+  security actions) that every logged-in member can call, OR confirm Curator+
+  gating is the intended v1 answer and this is a documentation-only fix (update
+  the Master Plan §4 Home description to say "Curator+" instead of "every
+  member").
+- Status: OPEN.
+
+### [RESOLVED] Found + fixed: Bootstrap was silently CDN-only, dead on arrival under the CSP
+- Date: 2026-07-03
+- Raised by: FE
+- Was blocking: nothing filed an issue — this was a **pre-existing bug** WP4
+  testing surfaced, not something introduced this session. Manually loading any
+  authenticated Bootstrap page in a real browser (not pytest, which never
+  fetches `<link>`/`<script>` tags) showed Bootstrap's CSS/JS failing to load
+  from `cdn.jsdelivr.net`, blocked by the strict CSP (`style-src`/`script-src
+  'self'`, `app/__init__.py`). Every Bootstrap page — admin panel included —
+  was unstyled and had no working dropdowns/collapse for anyone testing in a
+  browser, contradicting `base.html`'s own comment ("served from the installed
+  package — no CDN").
+- Root cause: `BOOTSTRAP_SERVE_LOCAL` was never set, so Bootstrap-Flask
+  defaulted to `False` (CDN mode).
+- Fix (FE, this session): added `BOOTSTRAP_SERVE_LOCAL = True` to
+  `app/config.py`, with a comment explaining why. Verified in a real browser
+  (Bootstrap CSS/JS/Popper now load from `/bootstrap/static/...`, same-origin)
+  and the full suite stays green (207/207).
+- Also touched, same session, same transparency rule as the FE `main.py` entry
+  above — small, mechanical, needed for the WP4 nav to work at all, not a
+  design decision:
+  - `app/__init__.py` — added an `app.context_processor` injecting `brand`
+    (site_name/family_name) into every template, so the navbar brand doesn't
+    require every route to pass it in explicitly.
+  - `run.py` — reads `PORT` from the environment (default 5000 unchanged)
+    purely so local dev can pick a free port; no behavior change when unset.
+- Needs (BE should): spot-check `BOOTSTRAP_SERVE_LOCAL` at PR review — it's a
+  one-line config fix, but it changes what every existing Bootstrap page (incl.
+  admin) actually looks like in a browser for the first time.
+- Status: **RESOLVED 2026-07-03** — fixed, tested (pytest green + manual
+  browser verification via the preview tool).
+
 ### [RESOLVED] FE touched `app/routes/main.py` — BE review at merge
 
 - Date: 2026-06-28

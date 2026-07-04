@@ -1,0 +1,57 @@
+{# people/index.html — Find + Register + Browse (Master Plan §4, WP4 Piece 3).
+   The list itself is entirely client-rendered by people.js against
+   GET /api/search (docs/openapi.yaml) — with no filters that endpoint
+   returns everyone, so it doubles as "browse the whole register". #}
+{% extends "base.html" %}
+
+{% block title %}People{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0">People</h1>
+    {% if current_user.has_role('contributor') %}
+    {# Contribute permission required to write (§10) — a Viewer can find and
+       browse but has no "Add a person" affordance to gate here. #}
+    <a class="btn btn-primary btn-lg" href="{{ url_for('people.new') }}">+ Add a person</a>
+    {% endif %}
+</div>
+
+<form id="peopleFindForm" class="mb-3" role="search" aria-label="Find a person">
+    <label for="peopleFindInput" class="form-label">Find a person</label>
+    <input type="search" id="peopleFindInput" class="form-control form-control-lg"
+           placeholder="Search by name…" autocomplete="off">
+</form>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3" id="peopleFilters">
+    <div class="chip-group" role="group" aria-label="Filter by status" data-chip-group="living">
+        <button type="button" class="chip is-active" data-value="">All</button>
+        <button type="button" class="chip" data-value="true">Living</button>
+        <button type="button" class="chip" data-value="false">Deceased</button>
+    </div>
+    <button type="button" class="chip" id="surnameChip" aria-pressed="false">Surname</button>
+    <input type="text" id="surnameFilterInput" class="form-control d-none"
+           placeholder="Type a surname…" aria-label="Filter by surname">
+
+    <div class="ms-md-auto">
+        <label for="peopleSort" class="visually-hidden">Sort by</label>
+        <select id="peopleSort" class="form-select">
+            <option value="name">Name (A–Z)</option>
+            <option value="birth_asc">Birth year (oldest first)</option>
+            <option value="birth_desc">Birth year (newest first)</option>
+        </select>
+    </div>
+</div>
+
+<div id="peopleList" class="list-group mb-3" data-loading="true">
+    <p class="text-muted">Loading people…</p>
+</div>
+
+<nav aria-label="People pagination">
+    <div class="d-flex justify-content-between align-items-center" id="peoplePagination"></div>
+</nav>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/people.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,21 @@
+{# people/show.html — the Person Page. A placeholder for now (Master Plan
+   says this is a LATER FE prompt, "FE-2"), but a real per-id route already,
+   so every People-list row and search result links somewhere stable that
+   FE-2 fills in without anyone having to change a link. #}
+{% extends "base.html" %}
+
+{% block title %}Person #{{ individual_id }}{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-6">This person's page is on its way</h1>
+    <p class="fs-4 mt-3 text-muted">
+        Person #{{ individual_id }} is registered — their full page (vitals,
+        names, events, relationships, sources, photos, and stories) is coming
+        in a future update.
+    </p>
+    <a class="btn btn-primary btn-lg mt-3" href="{{ url_for('people.index') }}">
+        Back to People
+    </a>
+</div>
+{% endblock %}

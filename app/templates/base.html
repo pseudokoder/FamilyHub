@@ -49,7 +49,14 @@
 
 <nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4">
     <div class="container">
-        <a class="navbar-brand" href="{{ url_for('main.home') }}">👪 FamilyHub</a>
+        {# FE(WP4): the brand is the family's own name if they've set one
+           (site_settings.family_name, admin-editable white-label branding —
+           Master Plan §3.5), else the FamilyHub default. Injected into every
+           template by the app.context_processor in app/__init__.py, so this
+           works whether the current route passed it in or not. #}
+        <a class="navbar-brand" href="{{ url_for('main.home') }}">👪
+            {{ (brand.family_name or brand.site_name) if brand is defined and (brand.family_name or brand.site_name) else 'FamilyHub' }}
+        </a>
 
         {# The "hamburger" button — Bootstrap collapses the menu on small
            screens so nav links stay big and tappable. #}
@@ -64,38 +71,32 @@
                template automatically. Logged-out visitors see almost nothing —
                all family content stays behind the login wall. #}
             {% if current_user.is_authenticated %}
-            {# WP1 RE-FOUNDATION: the family-content nav links (Photos, Memories,
-               Family Wiki, Timeline, Plans, What's New, Search) were removed
-               with the old feature layer. WP2/WP3 (Cowork) rebuild these as
-               views of the GEDCOM-7 schema and restore the links here. For now
-               the nav carries only what exists: Home, About, and admin tools. #}
+            {# WP4: the global app shell nav (Master Plan §4/§7 — Cowork's
+               piece). Every item here either renders a real page (Home,
+               People) or a friendly "coming soon" placeholder for a LATER FE
+               prompt (Tree, Memories, Search) — see main.coming_soon. Nothing
+               here is a dead link. #}
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('main.home') }}">Home</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('main.about') }}">About</a>
+                    <a class="nav-link" href="{{ url_for('main.coming_soon', feature='Tree') }}">Tree</a>
                 </li>
-                {% if current_user.is_admin %}
-                {# Admin tools live in one dropdown so the everyday menu
-                   stays short for everyone else. #}
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button"
-                       data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{{ url_for('admin.list_users') }}">Manage Users</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.site_settings') }}">Site Settings</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.backups') }}">Backups</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.activity') }}">Activity Log</a></li>
-                    </ul>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('people.index') }}">People</a>
                 </li>
-                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.coming_soon', feature='Memories') }}">Memories</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.coming_soon', feature='Search') }}">Search</a>
+                </li>
             </ul>
-            {# The site-wide search box was removed with the old feature layer.
-               WP4 rebuilds a richer search (people by name, date/place filters,
-               full-text over notes — Master Plan §12) and restores it here. #}
-            {# The greeting doubles as a tiny account menu — one place for
-               "things about ME" (just password for now; v2 adds more). #}
+            {# The user menu: everything that's about the ACCOUNT rather than
+               the family tree lives here, one dropdown, so the primary nav
+               above stays short. Admin is gated by role (§10) — a Viewer or
+               Contributor never even sees the word "Admin". #}
             <ul class="navbar-nav me-3">
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle text-white" href="#"
@@ -106,19 +107,41 @@
                         <li>
                             <a class="dropdown-item"
                                href="{{ url_for('auth.change_password') }}">
-                                🔑 Change my password
+                                🔑 Account &amp; Security
                             </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               href="{{ url_for('main.coming_soon', feature='Suggest an idea') }}">
+                                💡 Suggest an idea
+                            </a>
+                        </li>
+                        {% if current_user.is_admin %}
+                        {# BLOCKERS.md (2026-07-03, open): the WP4 brief asked to
+                           gate this for Curator+, but every /admin/* route is
+                           hard-coded @admin_required (Admin only, §10) — a
+                           Curator holds `revert`, not `administer`. Gating on
+                           is_admin here so the link never 403s; flagged for BE. #}
+                        <li>
+                            <a class="dropdown-item"
+                               href="{{ url_for('admin.list_users') }}">
+                                🛠️ Admin
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            {# Logout is a POST form, not a link — state-changing
+                               actions are never GET. It still renders as a plain
+                               dropdown row via the dropdown-item button style. #}
+                            <form method="post" action="{{ url_for('auth.logout') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="dropdown-item">Log Out</button>
+                            </form>
                         </li>
                     </ul>
                 </li>
             </ul>
-            {# Logout is a POST form, not a link — state-changing actions are
-               never GET (see the teaching note on the logout route). The
-               hidden csrf_token proves the click came from OUR page. #}
-            <form method="post" action="{{ url_for('auth.logout') }}" class="d-flex">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-outline-light">Log Out</button>
-            </form>
             {% else %}
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">

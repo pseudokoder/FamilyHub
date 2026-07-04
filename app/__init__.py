@@ -189,10 +189,13 @@ def create_app(config_class=Config):
     from app.routes.api import api_bp
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
+    from app.routes.people import people_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    # WP4 (Cowork): the People find/register/browse pages — see routes/people.py.
+    app.register_blueprint(people_bp)
     # The WP2 JSON API (Master Plan §6/§7) — the contract Cowork builds WP3 on.
     app.register_blueprint(api_bp)
 
@@ -200,6 +203,23 @@ def create_app(config_class=Config):
     # text as safe, paragraphed HTML (see text_service for the escaping story).
     from app.services.text_service import family_text
     app.jinja_env.filters["family_text"] = family_text
+
+    # FE(WP4): the nav brand ("FamilyHub" / a family's own name) is admin-editable
+    # site_settings (§3.5 white-label branding), needed on EVERY authenticated
+    # page's navbar — not just the routes that already pass it in explicitly.
+    # A context processor is the one-line way to make a value available to
+    # every template without threading it through every render_template() call
+    # (v2 mapping: a Spring @ControllerAdvice model attribute).
+    @app.context_processor
+    def _inject_branding():
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return {}
+        try:
+            from app.services import settings_service
+            return {"brand": settings_service.branding()}
+        except Exception:  # noqa: BLE001 — DB not ready / first boot
+            return {"brand": {"site_name": "FamilyHub", "family_name": ""}}
 
     # Custom terminal commands (flask init-db, flask create-admin, flask seed)
     from app.cli import register_cli

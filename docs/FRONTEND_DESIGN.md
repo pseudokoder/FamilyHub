@@ -117,6 +117,100 @@ API calls in a future WP.
 
 ---
 
+### 2026-07-03 — WP4: authenticated app shell, Home, and People (Bootstrap workspace)
+
+**What changed:** built the logged-in app shell per the WP4 brief:
+- `app/templates/base.html` — new primary nav (Home · Tree · People · Memories ·
+  Search) + a user-menu dropdown (Account & Security · Suggest an idea ·
+  Admin[gated] · Log Out), brand pulled from `site_settings` via a new
+  `app.context_processor` (`app/__init__.py`).
+- `app/templates/dashboard.html` (Home) — Quick Add row, On This Day, a small
+  stat strip, and Recent Activity, all client-fetched from the WP2 JSON API by
+  `app/static/js/home.js`.
+- `app/routes/people.py` (new blueprint) + `app/templates/people/*` — Find/
+  filter/sort/paginate (`people/index.html`) and a depth-complete Register
+  form (`people/new.html`, `people/_fuzzy_date_fields.html`), both driven by
+  `app/static/js/people.js`.
+- `app/static/js/api.js` — the one shared `apiFetch()` helper (CSRF header +
+  `credentials: same-origin` + JSON body handling) every authenticated page's
+  JS now uses.
+- `app/templates/coming_soon.html` + `main.coming_soon` — one shared
+  placeholder route for every nav/menu destination this WP doesn't build
+  (Tree, Memories, global Search, Account & Security's fuller "User area",
+  Suggest an idea, the Person Page's "See all activity" link, and the Quick
+  Add Photo/Source/Story tiles). Person creation (`/people/new`) and the
+  People list (`/people`) are real; the Person Page (`/people/<id>`) is a real,
+  stable, per-id route with placeholder content (FE-2 fills it in).
+
+**This continues Bootstrap, not Chronicle, on purpose.** §5B's design-brief
+constraints (elderly-accessible, cross-generational warmth, "calm by design")
+are explicitly **deferred to the end of v1** for this WP per the build brief —
+functional, contract-wired pages now, visual polish later. `style.css` picked
+up a small, plain set of classes (quick-add tiles, on-this-day rows, the stat
+strip, filter chips, person rows) using the existing elderly-first tokens
+(big type, big tap targets, obvious focus rings) already in that file — no
+Chronicle tokens, motifs, or fonts were touched. The "Calm-by-design on
+interior pages" and "Cross-generational tone" parking-lot items below still
+apply to a *future* visual pass over these same templates.
+
+**Depth-bar decisions (§5A) worth recording:**
+- **Register Person is JS-orchestrated, not a Flask POST route.** The form
+  posts nothing itself; `people.js` calls `POST /api/individuals` (name +
+  sex + living), then — only if a year was entered — find-or-creates a
+  `Place` (`POST /api/places`, matched case-insensitively against the already-
+  loaded list) and `POST /api/events` for BIRT/DEAT. This is the same JSON
+  contract a v2 Angular reactive form calls, so nothing here is throwaway.
+- **Fuzzy dates** are a Precision (Exact/About/Before/After) + Year + optional
+  Month + optional Day group, converted client-side into the schema's
+  `date_original` ("ABT May 1951") / `date_sort` ("1951-05-00") pair — full
+  GEDCOM date grammar is out of scope; this covers the common cases §5A asks
+  for without inventing an endpoint.
+- **The People list's sort control omits "by surname."** `PersonListItem`
+  (the shape `GET /api/search` and `GET /api/individuals` both return) only
+  carries `primary_name`, not discrete given/surname fields, so a reliable
+  client-side surname sort isn't possible without a contract change. Sort is
+  Name (A–Z) and Birth year (oldest/newest) only. The **Surname filter chip**
+  is unaffected — it's a *server-side* `GET /api/search?surname=` filter
+  (matches ANY of a person's names, not just their primary/display one — this
+  is correct behavior for genealogy: a person with a married-name row keeps
+  showing up under their married surname even though their primary name is
+  their birth name; verified against the seed data).
+- **"Admin" nav gating uses `is_admin`, not Curator+,** despite the WP4 brief's
+  literal wording — every `/admin/*` and `/api/admin/*` route is hard-coded
+  Admin-only (§10), so gating on Curator would render a menu item that 403s.
+  Logged as an OPEN item in `BLOCKERS.md` (2026-07-03) rather than silently
+  reinterpreting the brief.
+- **Recent Activity is Curator+-only on Home**, for the same reason: the only
+  existing endpoint (`GET /api/activity`) is the Curator+ audit trail
+  (ADR-0001), not a friendly all-members feed. Viewers/Contributors see an
+  honest static message instead of a feed that would 403. Also logged as an
+  OPEN item in `BLOCKERS.md`.
+- **"About" dropped from the primary nav.** The WP4 brief specifies exactly
+  five primary items (Home/Tree/People/Memories/Search); the pre-existing
+  `/about` page (admin-editable site text) still renders at its URL but has no
+  nav link in this build. A footer is the natural home for it once there is a
+  footer (later visual pass).
+
+**Bug found + fixed in the process (not new scope, logged in `BLOCKERS.md`):**
+Bootstrap was loading from a CDN and silently failing under the strict CSP in
+every real browser (pytest never caught it — the test client doesn't fetch
+`<script>`/`<link>` tags). Fixed with one config line
+(`BOOTSTRAP_SERVE_LOCAL = True` in `app/config.py`); every existing Bootstrap
+page (including the WP3 admin panel) is now actually styled and interactive
+for the first time in a real browser.
+
+**Files created/changed:** `app/templates/base.html`, `app/templates/
+dashboard.html`, `app/templates/coming_soon.html`, `app/templates/people/
+{index,new,show,_fuzzy_date_fields}.html`, `app/routes/people.py`,
+`app/routes/main.py` (added `coming_soon`), `app/__init__.py` (registered the
+blueprint + the branding context processor), `app/config.py`
+(`BOOTSTRAP_SERVE_LOCAL`), `run.py` (`PORT` env var), `app/static/js/
+{api,home,people}.js`, `app/static/css/style.css` (additions only),
+`docs/openapi.yaml` (new `Views` tag: `/coming-soon`, `/people`, `/people/new`,
+`/people/{individual_id}`).
+
+---
+
 ## Design Parking Lot
 
 Future constraints and ideas — captured here, not yet scheduled or enforced.
