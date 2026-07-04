@@ -68,7 +68,7 @@ limiter = Limiter(key_func=get_remote_address, storage_uri="memory://")
 
 # Outbound email — used for exactly one thing: password-reset links.
 # Unconfigured (no MAIL_SERVER in .env) the feature politely hides itself
-# and the login page points people at Wes instead.
+# and the login page points people at the family administrator instead.
 mail = Mail()
 
 # When an anonymous visitor hits a @login_required page, send them to the

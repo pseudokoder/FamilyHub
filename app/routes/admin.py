@@ -2,7 +2,7 @@
 
 CLAUDE.md's auth requirement is "admin-created accounts" — there is no
 public registration page in this app at all. The family is invite-only:
-an admin (Wes) creates each account and hands over a temporary password.
+an admin creates each account and hands over a temporary password.
 
 v2 mapping: AdminController.java guarded by Spring Security's
 @PreAuthorize("hasRole('ADMIN')") — our @admin_required below is the
