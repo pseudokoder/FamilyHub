@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var surnameInput = document.getElementById('surnameFilterInput');
     var sortSelect  = document.getElementById('peopleSort');
     var pagination  = document.getElementById('peoplePagination');
-    var livingChips = document.querySelectorAll('[data-chip-group="living"] .chip');
+    var livingChips = document.querySelectorAll('[data-chip-group="living"] .filter-chip');
 
     var state = { q: '', living: '', surname: '', sort: 'name', page: 1, perPage: 20 };
     var results = [];

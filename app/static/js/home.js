@@ -89,29 +89,20 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   /* --- RECENT ACTIVITY ---------------------------------------------------
-   * Only present in the DOM for Curator+ (dashboard.html gates the container
-   * on current_user.has_role('curator') — see BLOCKERS.md 2026-07-03: the
-   * audit trail itself is Curator+-only, so there's nothing to fetch for
-   * everyone else yet). The audit trail's `action`/`subject_type` are
-   * technical; FRIENDLY turns them into "added a photo" style phrasing. */
+   * WP5 (BLOCKERS.md 2026-07-03, RESOLVED): GET /api/activity/feed is a
+   * friendly, ALL-MEMBERS view over the same audit_log table — safe creates
+   * only (new people/photos/stories), never deletes/reverts/account actions
+   * — and the backend already returns a pre-formatted sentence per row
+   * ("Jane added a photo: Family reunion 1962"), so there's no verb/noun
+   * mapping to do here anymore; this is just render + escape. The fuller
+   * Curator+ audit trail (GET /api/activity) is a separate, untouched view
+   * for a future Activity/audit page. */
   var recentActivity = document.getElementById('recentActivity');
   if (recentActivity) {
-    var SUBJECT_NOUN = {
-      individual: 'a person', family: 'a family', event: 'an event',
-      name: 'a name', source: 'a source', citation: 'a citation',
-      media: 'a photo', note: 'a story', place: 'a place', user: 'an account',
-    };
-    var ACTION_VERB = {
-      create: 'added', update: 'updated', delete: 'removed',
-      restore: 'restored', revert: 'undid a change to',
-    };
-    apiFetch('/api/activity?per_page=10').then(function(data) {
+    apiFetch('/api/activity/feed?limit=10').then(function(data) {
       var rows = (data.activity || []).map(function(entry) {
-        var who = escapeHtml(entry.actor || 'Someone');
-        var verb = ACTION_VERB[entry.action] || entry.action;
-        var noun = SUBJECT_NOUN[entry.subject_type] || 'a record';
         return '<div class="list-group-item">' +
-          '<span>' + who + ' ' + escapeHtml(verb) + ' ' + noun + '</span>' +
+          '<span>' + escapeHtml(entry.text) + '</span>' +
           '<span class="text-muted small d-block">' + escapeHtml(new Date(entry.created_at).toLocaleString()) + '</span>' +
         '</div>';
       });

@@ -1,0 +1,257 @@
+/* ============================================================================
+ * FAMILYHUB — chronicle-app.css   ·   "CHRONICLE" for the AUTHENTICATED APP
+ *
+ * WHY THIS FILE EXISTS: chronicle-main.css + chronicle-components.css are the
+ * PUBLIC landing page's stylesheet — hero, splash, tree, dossier, timeline,
+ * catalog. This file is the SAME design language (same :root tokens, same
+ * fonts, same .btn/.stamp/.slug idioms from those two files) adapted for the
+ * logged-in app's dense CRUD screens: nav, dropdowns, forms, panels, chips,
+ * list rows, tables, badges. It is loaded AFTER Bootstrap and AFTER the two
+ * Chronicle files, so it can both override Bootstrap's own component defaults
+ * (button/form/dropdown/table colors) and add new app-only components — one
+ * coherent system instead of two competing ones.
+ *
+ * MECHANISM (Master Plan §5B, WP5 brief): "layer Chronicle tokens over
+ * Bootstrap structure" — Bootstrap keeps doing its job (grid, dropdown JS,
+ * form validation states); every visual property it renders is repainted in
+ * Chronicle's palette/type here. Zero new JS: this file is CSS-only.
+ *
+ * DEFERRED ON PURPOSE (WP5 brief): WCAG-AA contrast audit, elderly tap-target
+ * sizing, and every other §5B *constraint* — tracked in FRONTEND_DESIGN.md's
+ * parking lot. This pass is the LOOK, not the accessibility pass.
+ *   -> WGU: Front-End Web Development (D278/D279), UI Design (D281)
+ * ==========================================================================*/
+
+/* ----------------------------------------------------------------------------
+ * 1) APP SHELL — header, main offset, flash toasts
+ * --------------------------------------------------------------------------*/
+
+/* The public page's header is deliberately transparent at the top (it reads
+ * over a hero image). App pages have no hero behind the header — there is
+ * nothing to read "over" — so the app shell's header is ALWAYS the solid,
+ * "scrolled" look; chronicle.js's own is-scrolled scroll-listener toggling
+ * that class on/off is harmless here because this rule wins regardless.
+ * (Reusing chronicle.js's sticky/mobile-toggle behavior verbatim — see
+ * FRONTEND_DESIGN.md's WP5 decision log for why nothing new was written.) */
+body.app-shell .site-header {
+  background: rgba(243, 233, 216, 0.97);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  border-bottom: 1px solid var(--line-hi);
+}
+body.app-shell .site-header .nav__links a:not(.btn) {
+  color: var(--ink-soft); font-weight: 400; text-shadow: none;
+}
+body.app-shell .site-header .nav__links a:not(.btn):hover,
+body.app-shell .site-header .nav__links a:not(.btn):focus-visible { color: var(--ink); }
+body.app-shell .brand__word,
+body.app-shell .brand__tag { text-shadow: none; }
+body.app-shell .brand__tag { color: var(--ink-faint); }
+
+/* Fixed header needs the page content pushed down by its own height — the
+ * public page only needed this on the hero section; every app page needs it. */
+.app-main { padding-top: calc(var(--nav-h) + var(--space-4)); padding-bottom: var(--space-8); }
+
+/* The user-menu dropdown lives OUTSIDE the collapsible #navLinks (see
+ * base.html) so opening it on mobile can never be closed-out by chronicle.js's
+ * "collapse the mobile nav on any link click" handler, which only wires links
+ * found inside #navLinks. A real conflict found and designed around — see
+ * FRONTEND_DESIGN.md. */
+.header-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.user-menu { position: relative; }
+.user-menu > .dropdown-toggle {
+  font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.03em;
+  color: var(--ink-soft); display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.4rem 0.2rem; cursor: pointer;
+}
+.user-menu > .dropdown-toggle:hover,
+.user-menu > .dropdown-toggle:focus-visible { color: var(--ink); }
+.user-menu > .dropdown-toggle::after { /* Bootstrap's caret, recolored via currentColor */
+  filter: none; opacity: 0.7;
+}
+
+/* Bootstrap dropdown menu -> a small parchment card, same idiom as .frame-card. */
+.dropdown-menu {
+  font-family: var(--font-body); background: var(--card); border: 1px solid var(--line-hi);
+  border-radius: var(--radius); box-shadow: 5px 7px 0 -3px rgba(42, 32, 20, 0.14), 0 18px 40px -22px rgba(20, 14, 8, 0.5);
+  padding: 0.4rem; min-width: 14rem;
+}
+.dropdown-item {
+  font-family: var(--font-body); font-size: 0.98rem; color: var(--ink);
+  border-radius: var(--radius-sm); padding: 0.55rem 0.8rem;
+}
+.dropdown-item:hover, .dropdown-item:focus { background: var(--paper-2); color: var(--ink); }
+.dropdown-divider { border-top: 1px solid var(--line); margin: 0.35rem 0.3rem; }
+
+/* Flash toasts: reuse chronicle-main.css's .flash-tray/.flash-msg verbatim by
+ * rendering those classes in base.html — nothing to redeclare here. */
+
+/* ----------------------------------------------------------------------------
+ * 2) BUTTONS — repaint Bootstrap's own classes so no template had to change
+ * class names to get the Chronicle look. Same shape/idiom as .btn--* in
+ * chronicle-components.css (squared, typewriter caps, 48px target).
+ * --------------------------------------------------------------------------*/
+.btn {
+  font-family: var(--font-mono); font-weight: 400; letter-spacing: 0.05em;
+  text-transform: uppercase; border-radius: var(--radius-sm);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease),
+              color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+.btn-primary, .btn-primary:disabled {
+  background: var(--rust); border-color: var(--rust); color: var(--on-frame, #f0e4cf);
+}
+.btn-primary:hover, .btn-primary:focus {
+  background: var(--rust-dk); border-color: var(--rust-dk); color: var(--on-frame, #f0e4cf);
+  box-shadow: 4px 4px 0 0 rgba(42, 32, 20, 0.18);
+}
+.btn-outline-secondary, .btn-outline-dark {
+  background: transparent; border-color: var(--line-hi); color: var(--ink);
+}
+.btn-outline-secondary:hover, .btn-outline-dark:hover {
+  background: var(--ink); border-color: var(--ink); color: var(--paper);
+}
+.btn-light { background: var(--card); border: 1px solid var(--line-hi); color: var(--ink); }
+.btn-light:hover { background: var(--paper-2); }
+.btn-outline-light { background: transparent; border-color: var(--line-frame, var(--line-hi)); color: inherit; }
+.btn-close { opacity: 0.6; }
+.btn-close:hover { opacity: 1; }
+
+/* ----------------------------------------------------------------------------
+ * 3) FORMS — inputs, selects, labels, switches
+ * --------------------------------------------------------------------------*/
+.form-label {
+  font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-faint); font-weight: 400;
+}
+.form-control, .form-select {
+  font-family: var(--font-body); font-size: 1.05rem; color: var(--ink);
+  background-color: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius-sm);
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53, 94, 124, 0.22);
+  background-color: var(--card);
+}
+.form-control::placeholder { color: var(--ink-faint); opacity: 0.75; }
+.form-text { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-faint); }
+.form-check-input:checked { background-color: var(--rust); border-color: var(--rust); }
+.form-check-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53, 94, 124, 0.22); }
+.form-check-label { font-family: var(--font-body); color: var(--ink); }
+fieldset legend, legend.h4 {
+  font-family: var(--font-display); font-weight: 700; color: var(--ink);
+  border-bottom: 1px solid var(--line); padding-bottom: var(--space-1); margin-bottom: var(--space-2);
+}
+
+/* ----------------------------------------------------------------------------
+ * 4) PANELS — the generic parchment card used by Home's sections and any
+ * grouped content. Same visual family as .frame-card / .dossier.
+ * --------------------------------------------------------------------------*/
+.panel {
+  background: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+}
+.section-title {
+  font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: var(--space-2);
+}
+
+/* Quick Add (Home): four archive "record cards," not generic buttons. */
+.quick-add-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  padding: var(--space-3) var(--space-2); height: 100%;
+  background: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius);
+  text-decoration: none; color: var(--ink);
+  font-family: var(--font-mono); font-size: 0.86rem; letter-spacing: 0.04em; text-transform: uppercase;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.quick-add-tile:hover, .quick-add-tile:focus-visible {
+  transform: translateY(-3px); box-shadow: 5px 7px 0 -2px rgba(42, 32, 20, 0.16); color: var(--ink);
+}
+.quick-add-tile__icon { font-size: 2rem; line-height: 1; }
+
+/* On This Day (Home): a warm little feed, typewriter meta + serif body. */
+.on-this-day {
+  background: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius);
+  padding: var(--space-2) var(--space-4);
+}
+.on-this-day__row {
+  display: flex; align-items: baseline; gap: 0.65rem; padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line); font-family: var(--font-body); font-size: 1.05rem; color: var(--ink);
+}
+.on-this-day__row:last-child { border-bottom: none; }
+.on-this-day__icon { font-size: 1.25rem; }
+
+/* Stat strip (Home): a small archive tally — Old Standard TT numerals. */
+.stat-strip {
+  display: flex; gap: var(--space-6); flex-wrap: wrap; height: 100%;
+  background: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4); align-items: center;
+}
+.stat-strip__item { display: flex; flex-direction: column; }
+.stat-strip__n { font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; color: var(--rust); line-height: 1; }
+.stat-strip__label {
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+}
+
+/* Recent Activity list rows (Home) — reuse Bootstrap's list-group structure,
+ * repainted; a friendly one-line sentence + a typewriter timestamp. */
+.list-group-item {
+  font-family: var(--font-body); background: var(--card); border-color: var(--line);
+  color: var(--ink);
+}
+.list-group-item + .list-group-item { border-top-width: 1px; }
+.list-group-item:first-child { border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
+.list-group-item:last-child { border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); }
+.list-group-item .text-muted, .list-group-item small { font-family: var(--font-mono); font-size: 0.74rem; }
+
+/* ----------------------------------------------------------------------------
+ * 5) FILTER CHIPS (People) — a LIGHT-background variant. chronicle-components
+ * .chip is dark-context only (it's styled for the public page's .catalog
+ * plate); this is a distinct class so the two never collide.
+ * --------------------------------------------------------------------------*/
+.filter-chip {
+  font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--card); border: 1.5px solid var(--line-hi); color: var(--ink-soft);
+  border-radius: 999px; padding: 0.45rem 1rem; cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.filter-chip:hover { border-color: var(--ink); color: var(--ink); }
+.filter-chip.is-active { background: var(--rust); border-color: var(--rust); color: var(--on-frame, #f0e4cf); }
+
+/* ----------------------------------------------------------------------------
+ * 6) PERSON ROWS (People list) — a condensed dossier row, not a raw table.
+ * --------------------------------------------------------------------------*/
+.person-row {
+  display: flex; flex-direction: column; padding: 0.85rem 1.1rem;
+  font-family: var(--font-body);
+}
+.person-row__name { font-family: var(--font-display); font-weight: 700; font-size: 1.12rem; color: var(--ink); }
+.person-row__meta { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.15rem; }
+
+/* ----------------------------------------------------------------------------
+ * 7) TABLES + BADGES — global repaint so admin's existing tables/badges (not
+ * touched this WP) inherit the look for free, same "layer over structure"
+ * mechanism as buttons/forms above.
+ * --------------------------------------------------------------------------*/
+.table { font-family: var(--font-body); color: var(--ink); }
+.table > thead {
+  font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); border-bottom: 2px solid var(--ink);
+}
+.table > :not(caption) > * > * { border-bottom-color: var(--line); background-color: transparent; }
+.table-hover > tbody > tr:hover > * { background-color: var(--paper-2); }
+
+.badge { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0.04em; border-radius: var(--radius-sm); }
+.text-bg-primary { background-color: var(--rust) !important; }
+.text-bg-secondary { background-color: var(--ink-faint) !important; }
+.text-bg-info { background-color: var(--blue) !important; }
+.text-bg-light { background-color: var(--paper-2) !important; color: var(--ink) !important; border: 1px solid var(--line-hi); }
+
+/* ----------------------------------------------------------------------------
+ * 8) RESPONSIVE
+ * --------------------------------------------------------------------------*/
+@media (max-width: 760px) {
+  .header-actions { gap: var(--space-1); }
+  .user-menu > .dropdown-toggle span.user-menu__full { display: none; }
+}

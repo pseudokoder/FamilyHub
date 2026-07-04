@@ -352,3 +352,117 @@ All logged in `BLOCKERS.md` for BE review, same pattern as WP3's `main.py` touch
 - `app.context_processor` (the branding injection) has no direct Spring
   equivalent needed — v2's Angular app would just call a `/api/settings`-style
   endpoint once at bootstrap and hold it in a shared service.
+
+---
+
+## WP5 — Chronicle Reaches the Authenticated App + Copy Neutralization
+
+**Branch:** `wp5-fe-chronicle`
+**Date:** 2026-07-04
+**Status:** Complete; manually verified across all four roles; pending Wes
+review + merge to master.
+
+### What WP5 Delivered
+
+Two tasks, both scoped tightly per the brief (no new pages this WP):
+
+1. **Chronicle reskin of the authenticated app.** A new stylesheet,
+   `app/static/css/chronicle-app.css`, repaints Bootstrap's own component
+   classes (buttons, forms, dropdowns, list groups, tables, badges) in the
+   same tokens/fonts as the public Chronicle page, and `base.html` now uses
+   the *actual* `.site-header`/`.brand`/`.nav__links` markup from
+   `index.html` — not just similar colors, the same component. Only three
+   template files were touched (`base.html`, `dashboard.html`,
+   `people/*.html` — Task 2's exact scope) but the whole authenticated app
+   (admin panel, auth pages, error pages) inherited the look for free, because
+   they already used Bootstrap's own classes and this WP repaints those
+   classes globally.
+2. **Copy neutralization sweep (ADR-0003).** Grepped the app surface for the
+   author's name and personal contact details. Found and fixed one real bug
+   (`/.well-known/security.txt` hardcoded a personal email — now reads
+   `MAIL_DEFAULT_SENDER` config) and one source comment. BE had already fixed
+   the login/error-page copy in a prior commit (`4bd1182`) — verified, not
+   re-touched.
+
+Full decision log (mechanism, the header-reuse approach, the mobile dropdown
+conflict and its fix, the palette-table correction) is in
+`docs/FRONTEND_DESIGN.md`'s 2026-07-04 entry — not duplicated here.
+
+### Files Created or Modified
+
+| File | Status | Notes |
+|---|---|---|
+| `app/static/css/chronicle-app.css` | Created | The Bootstrap-repaint layer + new app-only components |
+| `app/templates/base.html` | Modified | Chronicle header/dropdown/flash markup, brand in `<title>` |
+| `app/templates/dashboard.html` | Modified | Recent Activity ungated; `.section-title` labels |
+| `app/templates/people/index.html` | Modified | `.chip` → `.filter-chip` |
+| `app/templates/people/show.html`, `coming_soon.html` | Modified | Dropped `.display-6` (see "known inconsistency" below) |
+| `app/static/js/home.js` | Modified | Recent Activity calls `/api/activity/feed`; verb/noun maps removed |
+| `app/static/js/people.js` | Modified | `.chip` → `.filter-chip` selector |
+| `app/static/css/style.css` | Modified | WP4 app-shell rules removed (moved to chronicle-app.css) |
+| `app/routes/main.py` | Modified | `security_txt` reads `MAIL_DEFAULT_SENDER` instead of a hardcoded address |
+| `app/templates/index.html` | Modified | One comment reworded (ADR-0003) |
+| `docs/FRONTEND_DESIGN.md` | Modified | Palette table corrected to match shipped CSS; WP5 decision log |
+
+### A Bug Fixed That Wasn't New Scope
+
+Confirmed the WP4 brief's own framing was wrong about *when* Chronicle
+styling was supposed to land: it deferred the whole visual pass to
+"end-of-v1," but `docs/CONTEXT_LOG.md`'s 2026-07-03 CLARIFICATIONS block
+(written the same day, after WP4 shipped) says styling applies *during* the
+build — only the accessibility/elderly/§5B *constraints* are the end-of-v1
+gate. This WP's brief matches the clarified rule; the FRONTEND_DESIGN.md WP4
+entry has a correction note pointing here.
+
+### Manual Testing Checklist
+
+> Clear this section once Wes has done a browser pass and confirmed green.
+
+- [x] Home, People (find/filter/sort), and Register-a-person all render in
+      Chronicle across Viewer/Contributor/Curator/Admin — screenshotted each.
+- [x] Recent Activity shows the real friendly feed for a Viewer (not the old
+      "ask a Curator" message) — confirmed via `pat@example.com`.
+- [x] Admin menu item appears only for Admin; admin's user table (untouched
+      template) picked up the Chronicle look for free.
+- [x] Mobile (375px): hamburger opens/closes the primary nav; the user-menu
+      dropdown opens independently without the mobile nav interfering, in
+      either order.
+- [x] Zero console errors / CSP violations on any page tested.
+- [x] `flask db upgrade` had nothing pending; 232/232 tests green before and
+      after.
+- [ ] Wes: sanity-check the palette against real daylight / a phone screen —
+      the WCAG-AA audit itself is still the deferred parking-lot item, but a
+      gut-check now is cheap.
+
+### Cross-Boundary Touches
+
+- `app/routes/main.py` — `security_txt()` now reads `current_app.config
+  ["MAIL_DEFAULT_SENDER"]`. Same transparency pattern as WP3/WP4's touches to
+  this file; logged in `BLOCKERS.md` is not needed this time (bugfix within
+  FE's existing footprint in this file, no new cross-boundary dependency).
+
+### WGU Connections
+
+- **D278/D279 Front-End Web Development, D281 UI Design** — the "repaint a
+  component library's own classes with new tokens" pattern (a custom
+  Bootstrap theme) instead of hand-rolling new markup everywhere; CSS
+  cascade/specificity reasoning (why `.display-6` beats a bare `h1` selector
+  regardless of stylesheet load order — class beats element every time).
+- **D280 JavaScript Programming** — diagnosing an event-handling conflict
+  between two independent scripts sharing a DOM region (chronicle.js's
+  "close on any link click" vs. Bootstrap's dropdown toggle) and resolving it
+  with markup structure (moving the dropdown out of the shared region) rather
+  than patching either script.
+- **D315 Security** — ADR-0003's config-not-code rule for the security-contact
+  address is the same "secrets/identity live in config" principle as
+  `MAIL_PASSWORD` living in `.env`, applied to a non-secret but still
+  personal value.
+
+### v2 Spring Boot Migration Notes
+
+Nothing here changes the v2 mapping already recorded for WP4 — this WP was
+CSS + a handful of template/JS edits, no new routes or contract surface. The
+one durable lesson: Angular's component-scoped styles would have made the
+"repaint Bootstrap's classes" mechanism unnecessary (each component brings its
+own styles) — worth remembering when v2 designs its Material/Angular theme
+instead of trying to port `chronicle-app.css` line-for-line.
