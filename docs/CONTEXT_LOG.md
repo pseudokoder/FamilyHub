@@ -54,6 +54,14 @@ doc quality regress on smaller models.
 
 ---
 
+## 2026-07-03 · CLARIFICATIONS (Chronicle styling + author-name nuance)
+- **Chronicle styling is applied DURING the build, not deferred.** Only the
+  accessibility/elderly/§5B visual *constraints* are deferred to end-of-v1 (they can gate; the
+  styling cannot). Authenticated pages get the Chronicle look as they are built.
+- **Author name nuance (ADR-0003):** the author's name is allowed for credit/attribution and
+  the project-inspiration story in docs, but NOT in the app's UI copy, config defaults, or the
+  technical/plan build-detail language.
+
 ## 2026-07-03 · PROCESS conventions (co-manager ↔ builder workflow)
 - **Embed verbatim doc content in prompts.** When a prompt must land a doc committed as-is
   (ADR, Context Log, etc.), the co-manager embeds the full content in the prompt so the
