@@ -10,6 +10,7 @@ is the living spec; ADRs are the immutable record of the calls behind it.
 | [0001](0001-write-control-model.md) | Write-control model | Accepted | Post-moderation: direct writes gated by RBAC + full `audit_log` (before→after) + soft-delete + Curator revert. No pre-moderation queue in v1. |
 | [0002](0002-account-person-link.md) | Account↔Person link | Accepted | Nullable `users.individual_id` FK ties an account to its INDI record; unlinked users fall back to the oldest-ancestor tree root. |
 | [0003](0003-white-label-neutral-language.md) | White-label / neutral language | Accepted | No personal names/contact in the app's UI copy, config defaults, or build-detail docs; author credit and origin narrative remain allowed. |
+| [0004](0004-defer-frontend-design-constraints.md) | Defer FE design constraints | Accepted | No design constraints in the baseline during the v1 build; §5B intentionally empty; candidates parked in FRONTEND_DESIGN; re-introduced as an end-of-v1 pre-launch gate. |
 
 **Convention:** files are `NNNN-short-slug.md`, numbered sequentially and never renumbered.
 Once **Accepted**, an ADR is not edited to reverse it — a *new* ADR supersedes it (noted in
