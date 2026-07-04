@@ -4,10 +4,15 @@
 > roadmap. Hand this to Claude Code (backend) and Cowork (frontend). Build one
 > piece at a time; review each piece before starting the next.
 
-**Version 2.2.0** · Last updated 2026-07-03 · Status: WP3 (backend) complete; WP4 (frontend) next.
+**Revision 2.3.0** · Last updated 2026-07-04 · Status: v1 build in progress — WP3 (frontend) underway.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version (SemVer) and add a line to the Revision History
 (bottom).*
+
+*Document control: the Revision number above versions THIS DOCUMENT (SemVer, per §11
+change control). It is independent of the product versions — v1 "Full" (Flask) and v2
+"Enterprise" (Java) — whose release versions are Git tags (1.x / 2.x) beginning at WP5
+(see §6).*
 
 > **Design decisions live in ADRs.** Point-in-time architecture decisions are recorded
 > under [`docs/adr/`](adr/README.md): **ADR-0001** (write-control model — post-moderation:
@@ -439,41 +444,41 @@ non-negotiable quality bar:
   selector) · when (fuzzy dates) · where (place) · the story (rich text) · attached
   photos · tags — mirroring the `notes`/`note_links` (+ optional event/place) schema
   instead of ignoring it.
-- **Cowork gets design leadership**, not micromanagement. Give it the data model +
-  §5B brief and let it architect rich, intuitive pages — to the *standard* of polish
-  and intuitiveness set by Wes's Datumology and CinephileHub sites (including
-  Cinephile's admin panel), **not as a copy of them.**
+- **The FE builder gets design leadership**, not micromanagement. Give it the data
+  model + §5B constraints and let it architect rich, intuitive pages — to the
+  *standard* of polish and intuitiveness set by the Datumology and CinephileHub
+  sites (including Cinephile's admin panel), **not as a copy of them.** The specific
+  control, layout, and visual expression is governed by
+  **`docs/FRONTEND_DESIGN.md`** (FE-owned); §5A still sets the **depth** bar —
+  every user-meaningful field must be capturable, however the page chooses to
+  present it.
 
 ---
 
-## 5B. Visual Design Brief (frontend)
+## 5B. Visual Requirements & Constraints (frontend)
 
-**Functionality** models FamilySearch. **Appearance** must NOT — FamilySearch looks
-corporate because its goal is data, not delight. FamilyHub's look should match the
-*polish and intuitiveness* of **CinephileHub and Datumology** as a **quality bar, not a
-style to copy** (brief Cowork as "the world's best web designer"). FamilyHub has its
-own warm, cross-generational identity — it must not be a Cinephile clone.
+Functionality models FamilySearch; appearance must NOT (FamilySearch looks corporate
+because its goal is data, not delight). The full, living visual + UX design language —
+palette, typography, motion, components, theme — is owned by the FE builder in
+`docs/FRONTEND_DESIGN.md`, which may change freely WITHIN the constraints below (see
+§11 two-tier change control). This section holds only the durable constraints that do
+NOT change between work packages.
 
-**Goal:** appeal across three generations at once —
-- **Parents (motivated):** want to preserve and pass on history — make it warm,
-  dignified, easy.
-- **Wes's generation (warming up):** make discovery feel rewarding and a little
-  addictive.
-- **Nephew's generation (not yet interested):** make it visually fun enough to pull
-  them in before they know why it matters.
+Durable visual constraints (verifiable, cross-WP):
+- **Accessible:** large readable type, big tap targets, WCAG-AA contrast on every
+  surface (including dark), forgiving forms.
+- **Calm by design** — must not overwhelm ADD or anxious visitors: generous
+  whitespace, one primary action per screen, progressive disclosure. Interest comes
+  from imagery and type, never density.
+- **Cross-generational appeal** — three generations at once, WITH a deliberate lean
+  toward the youngest generation to drive engagement and adoption.
+- **Identity guardrail:** distinctive, characterful, polished to the
+  Datumology/CinephileHub quality bar — not a clone, never corporate.
+- **Imagery as texture:** family photos and "interesting family facts" may be woven
+  throughout, but must NEVER crowd the controls (subordinate to calm + accessibility).
 
-**Design directives:**
-- **Polished, characterful, and fun** — not a business CRUD form. Distinctive
-  typography, a warm inviting palette, tasteful motion.
-- **Family photos and "interesting family facts" woven throughout** — scattered around
-  and offsetting the UI as visual texture, never crowding the controls.
-- **Calm by design — must not overwhelm ADD or anxious visitors.** Generous
-  whitespace, clear visual hierarchy, one primary action per screen, progressive
-  disclosure (don't show everything at once). Visual interest comes from imagery and
-  type, not from density.
-- **Elderly-accessible at the same time:** large readable type, big tap targets, high
-  contrast, forgiving forms. (Polish and accessibility are not in tension here —
-  both favor clarity and space.)
+The expression of the above (exact palette/hex, fonts, dark/light, motion, component
+look) lives in `docs/FRONTEND_DESIGN.md` and is the FE builder's to evolve.
 
 ---
 
@@ -508,12 +513,16 @@ Build ONE work package at a time; phase-gate review before the next.
 - **WP2 – Backend CRUD.** Service + REST-shaped route layer for individuals, families,
   events, sources, media, notes. *pytest each resource.* **Deliverable: the API
   contract** (endpoints + JSON shapes) — the interface the frontend builds against.
-- **WP3 – Frontend.** Cowork builds the UI per the §5B design brief against the WP2
+- **WP3 – Frontend.** Cowork builds the UI per the §5B constraints against the WP2
   API contract. Elderly-accessible + cross-generational polish.
 - **WP4 – The Views & Search.** Tree (pedigree + family-group + relationship view),
   timeline, album, memory blog, and a rich **Search** interface — all queries against
   the existing schema. (See §12; fan chart is v2 per §3.6.)
 - **WP5 – Deploy.** AWS Lightsail, gunicorn + nginx, SSL, DNS, nightly backups.
+  First release = Git tag `v1.0.0` + GitHub Release + a new `CHANGELOG.md` ("Keep a
+  Changelog" format) + an app version string (`pyproject.toml` / `app.__version__`);
+  the product v1 "Full" line releases as 1.x and the v2 "Enterprise" rewrite will
+  begin at 2.0.0 (SemVer: a rewrite is a major version).
 - **WP6 (TENTATIVE) – GEDCOM Import/Export Engine.** Full GEDCOM-7 round-trip,
   validated against the gedcom.io registry. Technically possible in v1, but it's the
   heaviest single piece. **Decision gate:** at the *start of WP5*, reevaluate whether
@@ -539,7 +548,7 @@ Build ONE work package at a time; phase-gate review before the next.
   backups, Docker, deployment. Commits as it goes.
 - **Cowork → front-end ONLY.** **HTML (Jinja2 templates), CSS, and vanilla JS — with
   UX and UI as first-class concerns** — for the v1 ("Full") site, per the §5A depth
-  bar and §5B design brief. Cowork does **not** own the backend, infra, or
+  bar and §5B constraints. Cowork does **not** own the backend, infra, or
   deployment — that's Code's domain. This is *less* than a normal Cowork "Scope B"
   site, so the Cowork project's "outgrown → split out" rule is **explicitly waived**
   for FamilyHub.
@@ -589,6 +598,46 @@ Code and Cowork must not write the same file. Split it:
 Owner: Claude Code — the README is repo presentation, which is Code's domain (Cowork is frontend-only). 
 Keep it accurate at each WP boundary (never describing removed features), and deliver the definitive, 
 capstone-grade professional rewrite by WP5 at the latest, matching the polish of the original presentation.
+
+### Document map & ownership (RACI)
+Who owns which document, and how each one changes:
+- **`docs/MASTER_PLAN.md`** — the durable **baseline** (requirements, schema, scope,
+  security, architecture, process). **Owner: BE.** Changes via §11 Tier 1 + a
+  Revision bump and Revision History line.
+- **`docs/FRONTEND_DESIGN.md`** — the living **front-end design language** +
+  design-decision log + design parking lot. **Owner: FE.** Changes freely *within*
+  the §5B constraints (§11 Tier 2), logged in its own decision log — no Master Plan
+  revision.
+- **`docs/adr/`** — immutable **Architecture Decision Records** (context · decision ·
+  consequences). A new ADR requires project-owner approval; once Accepted, an ADR is
+  superseded by a new one, never edited.
+- **`docs/openapi.yaml`** — the API contract. **Owner: BE.** The FE may add
+  `text/html` routes on its WP branch with BE approval at merge (per the §7
+  branch-per-WP rule).
+- **`DEVDIARY_BE.md`** (BE) · **`DEVDIARY_FE.md`** (FE) · **`DEVDIARY.md`** (index).
+- **`README.md`** — BE (repo presentation). · **`BLOCKERS.md`** — shared (the
+  cross-builder handoff log).
+- **`CHANGELOG.md`** — created at first release (WP5); release notes per SemVer tag.
+
+### Standards alignment (which industry artifact each document fulfills)
+This project deliberately consolidates the traditional planning artifacts into one
+maintained plan (the small-team "design doc" pattern) rather than separate documents;
+this table maps each standard artifact to where it lives here.
+
+| Industry artifact | Where it lives in this project |
+|---|---|
+| Project Charter | §1 (vision, success criteria) + §6 Initiation |
+| Scope Statement & WBS | §5 (scope) + §6 (work packages) |
+| Software Requirements Specification (SRS) | §5 / §5A (functional + quality bar) + §5B (UX constraints) + §12 |
+| Software Design Description (SDD) | §2–§4 (architecture, schema, view mapping) |
+| RACI / resource plan | §7 |
+| Risk & security plan | §9 |
+| Change-management plan + change log | §11 + Revision History |
+| Architecture Decision Records | `docs/adr/` |
+| API contract | `docs/openapi.yaml` |
+| Test plan | pytest per WP + the CI merge gate (§6, §7) |
+| Status / knowledge record | `DEVDIARY_BE.md` / `DEVDIARY_FE.md` |
+| Release versioning | Git tags + `CHANGELOG.md`, from WP5 (§6) |
 
 ### Cross-builder blocker handoff (so you always know who to spin up)
 A builder will hit things only the *other* builder can fix (Cowork finds a missing or
@@ -714,7 +763,7 @@ or mint custom roles is reserved for **v2**.
 
 ---
 
-## 11. Change Management & Parking Lot (Project+ change control)
+## 11. Change Management & Parking Lots (Project+ change control)
 
 New ideas or changes after handoff go through a lightweight Project+ flow instead of
 derailing an in-flight work package:
@@ -724,7 +773,26 @@ derailing an in-flight work package:
 3. **Decide** — approve into a WP, or **park** it.
 4. **Assign** — give approved changes a target WP.
 
-**Parking Lot (captured, not scheduled)** — revisit after the initial site is seen:
+### Two tiers of change (baseline vs. design)
+Not every change is the same weight. Route each by which document it touches:
+- **Tier 1 — Baseline (`docs/MASTER_PLAN.md`).** Any change to requirements, schema,
+  scope, security, architecture, process, or **any §5B visual constraint** → log it,
+  assess impact, **Wes approves**, then **Revision bump + a Revision History line**.
+- **Tier 2 — Design (`docs/FRONTEND_DESIGN.md`).** Visual/UX *expression* within the
+  §5B constraints (palette, fonts, dark/light, motion, component look) → **the FE
+  builder changes directly** and logs it in that doc's design-decision log; **no
+  Master Plan revision**.
+- **Escalation (Tier 2 → Tier 1).** A design idea that would **breach a §5B
+  constraint**, or that needs **new functionality/endpoints**, escalates to Tier 1:
+  log it, Wes approves, the baseline is updated before it ships.
+
+### Parking lots (two of them — captured, not scheduled)
+- **Master Plan parking lot (below)** — larger **feature / functionality** ideas
+  (Tier-1 scope), revisited after the initial site is seen.
+- **`docs/FRONTEND_DESIGN.md` parking lot** — the **visual / design** brainstorm
+  (Tier-2), the FE builder's to keep.
+
+**Master Plan parking lot:**
 - Per-member **dashboard** (FamilySearch-style "my contributions" summary).
 - **Browse-vs-edit UX** split (subtle edit icon → inline/popup edit) so editing
   controls never intrude on the reading experience.
@@ -788,6 +856,17 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- **2.3.0 — 2026-07-04 — MINOR.** Ported the stranded v1.3 revision (2026-06-18,
+  `wp3-frontend-crud` branch) into the current plan: §5B trimmed to durable **Visual
+  Requirements & Constraints** (the living design language lives in
+  `docs/FRONTEND_DESIGN.md`); §7 **Document map & ownership (RACI)**; §11 **two-tier
+  change control + dual parking lots** — this also repairs the cross-references in
+  `docs/FRONTEND_DESIGN.md` that cited these sections. Additionally: added the §7
+  **Standards-alignment table** (industry artifact → location), a WP5
+  **release-versioning** note (Git tag `v1.0.0` + `CHANGELOG.md`), relabeled the
+  document version as **"Revision"** (document control is independent of the product's
+  v1/v2 release versions), and retired `docs/CONTEXT_LOG.md` (internal operations
+  moved out of the public repo). (Raised by Wes.)
 - **v2.2.0 — 2026-07-03 — MINOR.** Adopted **ADR-0003** (white-label — neutral language,
   no personal data in the app itself): §8 decision #11 points at the ADR; the top-of-doc
   ADR pointer lists it alongside ADR-0001/0002. Decision-capture only — the rule was
@@ -836,4 +915,4 @@ strong version ships in v1 — easy here because the dataset is family-sized.
   depth bar (§5A), visual design brief (§5B), orchestration + build sequence + blocker
   handoff (§7), Project+ roadmap (§6), security ladder (§9), RBAC ladder (§10), change
   control + parking lot (§11), search (§12).
-<!-- Add new versions above this line, newest first, when §11 change control approves a change. -->
+<!-- Add new revisions above this line, newest first, when §11 change control approves a change to bump this Revision. -->
