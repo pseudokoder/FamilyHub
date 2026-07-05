@@ -323,6 +323,109 @@ templates/index.html` (comment reworded, ADR-0003).
 
 ---
 
+### 2026-07-04 — FE-2: the Person Page (six tabs, native Chronicle)
+
+**What changed:** `people/show.html`'s placeholder became the real Person
+Page — one route, six hash-switched tabs (Story · Relationships · Timeline ·
+Photos · Details · Sources), entirely client-rendered by the new
+`app/static/js/person.js` against the WP2 JSON API. No new Flask routes; no
+change to `docs/openapi.yaml`'s paths (the `/people/{individual_id}` Views
+entry already existed for this route).
+
+**Tab pattern:** URL hash (`#story`, `#relationships`, …) drives which panel
+shows, so every tab is deep-linkable and back/forward works; each tab's data
+loads lazily on first visit (`loadedTabs`), and a single memoized fetch cache
+(`cache`/`once`/`invalidate`) means data shared across tabs — Relationships'
+family graph, Story's Family card, Timeline's Family-class events — is only
+ever fetched once per page load. Mutations reset the relevant cache keys and
+mark dependent tabs as "not yet reloaded," so switching tabs after an edit
+always shows fresh data without a full page reload.
+
+**Header/cameo:** reuses chronicle.js's own `photo()`/`applyTones()`/`initials()`
+globals (already loaded by `base.html`) for the sepia toned-cameo placeholder
+every relationship card and the header portrait fall back to when a person has
+no linked photo — the exact CSP-safe data-p1/data-p2 mechanism the public page
+already established, just applied to new dynamically-injected markup instead
+of static HTML. Tones are picked deterministically from the person's id (no
+"tone" field exists on `Individual` — purely a front-end decorative choice).
+
+**Relationships tab data assembly:** `GET /api/families` never returns child
+rows in its list shape (only a single family's detail GET does), and there is
+no "families I'm a child in" endpoint — so parent-family discovery goes
+through `GET /api/individuals/{id}/pedigree?direction=ancestors&depth=1`,
+whose edges name the family id(s) where this person is the child. Every
+related person's vitals (birth/death year, living) come from one
+`GET /api/individuals` call, mapped by id — the same "fetch it all, filter
+client-side" call already made for the People list's sort (family-scale
+dataset, Master Plan §12).
+
+**Editing an existing child link (pedigree_type/child_order):** the contract
+has no `PUT` for an active `family_children` row, only `POST` (create-or-
+restore) and `DELETE`. The edit action calls `DELETE` then immediately
+re-`POST`s with the new values — `family_service.add_child` already treats a
+just-soft-deleted link as "restore with updated fields," a real code path, not
+a stub. The only cost is a two-row (delete + create) audit trail instead of
+one `update` row; logged as an OPEN forward note in `BLOCKERS.md` asking for a
+dedicated `PUT` when convenient. Not blocking — the feature works correctly
+today.
+
+**Life Sketch vs. Name Meaning:** `Note` has no `is_primary` flag (unlike
+`Name`), so "the person's primary attached note" for the Story tab's Life
+Sketch card is defined as "the first attached note whose title doesn't start
+with 'Name Meaning'" — a title-string convention, not a schema field. The Name
+Meaning card renders only when such a note exists, per the brief.
+
+**Markdown rendering:** `Note.content` is raw Markdown by contract
+(`note_service.py`: "rendering to safe HTML is a VIEW concern"). No Markdown
+library is vendored (no CDN allowed under the strict CSP; Python dependencies
+are BE's lane, not FE's) — `person.js` implements a small, deliberately
+limited subset (paragraphs, headings, bold/italic/code spans, "- " lists),
+escaping the raw text FIRST so no Markdown syntax can smuggle real HTML
+through. Full CommonMark is out of scope, the same call already made for
+fuzzy-date grammar.
+
+**Timeline tab:** life-chapter buckets (Childhood/Adolescence/Young
+Adult/Adult/Senior) and the "migration thread" (a place-change mark between
+consecutive dated events) are computed client-side from `date_sort` + `place`
+— no schema support needed. Family-class events are deliberately narrow per
+the brief: children's *births* and spouse/parent *deaths* only (not the
+reverse), fetched as two separate id sets rather than one blanket BIRT-or-DEAT
+filter. World events blend in via `GET /api/historical-events` bounded to the
+person's birth year through their death year (or the current year if living).
+"N sources" badges and the whole Sources tab both read from ONE unfiltered
+`GET /api/citations` call, filtered client-side by subject id — avoids an
+N-events, N-requests fan-out at family scale.
+
+**Event-tag picker (Details tab):** `event_tag` is a free string server-side
+(no enum — `event.py`'s column is a plain `VARCHAR(10)`), so the curated
+Life-Events/Attributes dropdown is a UI convenience, not a schema limit — an
+"Other (type a GEDCOM tag)…" option reveals a free-text field, so §5A's "every
+user-meaningful field capturable" holds even for a tag the curated list
+doesn't name.
+
+**A real CSS bug found in the browser, not caught by pytest:** the first
+Relationships-tab render had every `.rel-card`'s "Remove" button overlapping
+the person's name. Cause: `.rel-card__body` had no `flex-grow`, so when the
+fixed-width card ran short on space, flexbox's default shrink behavior forced
+ALL the missing space out of `.rel-card__body` (down to ~24px) while
+`.rel-card__actions` (given `flex: none` to protect it from disappearing)
+kept its full size — the button's own content then rendered past its
+box's shrunken neighbor. Fixed by giving the actions block `flex: 0 0 100%`
+(its own row, under the photo/name) instead of trying to keep it beside a
+long name in a 260px card. A good example of why `<when_to_verify>` real-
+browser checks catch things pytest's HTML-only test client cannot.
+
+**Files created/changed:** `app/templates/people/show.html` (real content,
+replacing the FE-1 placeholder); `app/static/js/person.js` (new — all six
+tabs); `app/static/css/chronicle-app.css` (new Person Page component classes:
+`.person-header`, `.person-tabs`, `.story-layout`/`.story-rail`,
+`.rel-card`/`.rel-family-card`, `.timeline-chapter`/`.tl-event`,
+`.gallery-wall`, `.lightbox`, `.inline-form-slot`, `.vitals-list`). Two OPEN
+items and one OPEN forward note logged in `BLOCKERS.md` (Follow endpoint,
+per-subject activity filter, the family-children PUT).
+
+---
+
 ## Design Parking Lot
 
 Future constraints and ideas — captured here, not yet scheduled or enforced.

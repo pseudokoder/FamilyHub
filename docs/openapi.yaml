@@ -467,7 +467,7 @@ paths:
     get: {tags: [Views], summary: "Register-a-person form (submits via JS to POST /api/individuals + /api/places + /api/events)", responses: {"200": {description: HTML page}}}
   /people/{individual_id}:
     parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
-    get: {tags: [Views], summary: "The Person Page (placeholder — FE-2 builds the real page; a stable per-id route already)", responses: {"200": {description: HTML page}}}
+    get: {tags: [Views], summary: "The Person Page (FE-2): 6 client-rendered tabs — Story/Relationships/Timeline/Photos/Details/Sources — over the JSON API above", responses: {"200": {description: HTML page}}}
 
 components:
   responses:

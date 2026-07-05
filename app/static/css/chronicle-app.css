@@ -249,9 +249,136 @@ fieldset legend, legend.h4 {
 .text-bg-light { background-color: var(--paper-2) !important; color: var(--ink) !important; border: 1px solid var(--line-hi); }
 
 /* ----------------------------------------------------------------------------
- * 8) RESPONSIVE
+ * 9) PERSON PAGE (FE-2) — header, tabs, and the six tab bodies. Same "layer
+ * Chronicle tokens over structure" mechanism as the rest of this file: plain
+ * divs/tables/Bootstrap classes, repainted here rather than hand-rolled.
  * --------------------------------------------------------------------------*/
+
+.person-header {
+  display: flex; gap: var(--space-4); align-items: center; margin-bottom: var(--space-3);
+}
+.person-header__photo { width: 120px; flex: none; }
+.person-header__cameo { aspect-ratio: 4 / 5; border: 1px solid var(--line-hi); }
+.person-header__name { font-size: clamp(1.7rem, 4vw, 2.4rem); margin: 0; }
+.person-header__meta {
+  font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.04em;
+  color: var(--ink-soft); margin: 0.3rem 0 var(--space-2);
+}
+.person-header__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.person-tabs {
+  display: flex; gap: var(--space-4); overflow-x: auto; white-space: nowrap;
+  border-bottom: 1px solid var(--line-hi); margin-bottom: var(--space-3); padding-bottom: 1px;
+}
+.person-tabs__link {
+  font-family: var(--font-mono); font-size: 0.86rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-soft); padding: 0.6rem 0.1rem; border-bottom: 2px solid transparent;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.person-tabs__link:hover, .person-tabs__link:focus-visible { color: var(--ink); }
+.person-tabs__link.is-active { color: var(--rust); border-bottom-color: var(--rust); }
+
+/* Story tab: main column + a slim, internally-scrolling right rail. */
+.story-layout { display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-3); align-items: start; }
+.story-main { display: flex; flex-direction: column; gap: var(--space-3); }
+.story-card :is(h2, h3):first-child { margin-top: 0; }
+.story-rail { position: sticky; top: calc(var(--nav-h) + var(--space-3)); max-height: calc(100vh - var(--nav-h) - var(--space-6)); overflow-y: auto; }
+.story-rail__row {
+  display: flex; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--line);
+  font-family: var(--font-body); font-size: 0.92rem;
+}
+.story-rail__row:last-child { border-bottom: none; }
+.story-rail__year { font-family: var(--font-mono); font-weight: 400; color: var(--rust); flex: none; width: 3.2em; }
+
+.photo-strip { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: 2px; }
+.photo-strip__item { flex: none; width: 84px; }
+.photo-strip__item .photo { aspect-ratio: 3 / 4; border: 1px solid var(--line-hi); border-radius: var(--radius-sm); }
+
+.vitals-list { border-block: 1px solid var(--line); }
+.vitals-list__row {
+  display: grid; grid-template-columns: 140px 1fr; gap: var(--space-2);
+  padding: 0.55rem 0; border-bottom: 1px solid var(--line); font-family: var(--font-body);
+}
+.vitals-list__row:last-child { border-bottom: none; }
+.vitals-list__k { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+
+/* Relationships tab: a small card per person, grouped into wrapping rows. */
+.rel-section-head { margin: var(--space-3) 0 var(--space-2); }
+.rel-section-head:first-child { margin-top: 0; }
+.rel-cards { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-2); }
+.rel-card {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 0.7rem; align-items: flex-start; width: 260px;
+  background: var(--paper-2); border: 1px solid var(--line-hi); border-radius: var(--radius); padding: 0.7rem;
+}
+.rel-card__photo { width: 48px; flex: none; }
+.rel-card__cameo { aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; }
+.rel-card__body { flex: 1 1 140px; min-width: 120px; }
+.rel-card__badges { margin-top: 0.3rem; }
+/* flex-basis 100% forces this onto its own row below the photo/name — a
+ * fixed-width card has no room for a "Remove" button beside a long name
+ * without one of them getting crushed (found via a real browser check;
+ * flexbox's default automatic minimum size doesn't save a `flex: none`
+ * sibling from starving a `flex-grow: 0` one). */
+.rel-card__actions { flex: 0 0 100%; margin-left: calc(48px + 0.7rem); }
+.rel-family-card {
+  background: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius);
+  padding: var(--space-3); margin-bottom: var(--space-3);
+}
+.rel-family-card__head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+
+/* Inline "+ Add …" drawers — shared by Relationships/Details/Sources. */
+.inline-form-slot:not(.d-none) {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2);
+}
+.person-picker__results { max-height: 220px; overflow-y: auto; margin-top: 0.4rem; }
+
+/* Timeline tab. */
+.timeline-chapter__title { margin-top: var(--space-4); }
+.timeline-chapter:first-child .timeline-chapter__title { margin-top: 0; }
+.tl-event {
+  display: grid; grid-template-columns: 4.2em 3.4em 1fr auto; align-items: baseline; gap: 0.6rem;
+  padding: 0.6rem 0.4rem 0.6rem 0.8rem; border-bottom: 1px solid var(--line); border-left: 3px solid var(--line-hi);
+}
+.tl-event:last-child { border-bottom: none; }
+.tl-event--life { border-left-color: var(--rust); }
+.tl-event--family { border-left-color: var(--blue); }
+.tl-event--world { border-left-color: var(--amber); opacity: 0.85; }
+.tl-event__age { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); }
+.tl-event__year { font-family: var(--font-display); font-weight: 700; color: var(--ink); }
+.tl-event__body { min-width: 0; }
+.tl-event__title { display: block; font-family: var(--font-body); color: var(--ink); }
+.tl-event__place { display: block; font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-soft); }
+.tl-event__moved { color: var(--rust); }
+.tl-event__sources { font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap; }
+
+/* Photos tab: reuses chronicle-components.css's .wall/.cell photo-wall — this
+ * modifier only changes the grid to auto-fill (an arbitrary photo count per
+ * person, not the public page's fixed 4-up layout). */
+.gallery-wall { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); grid-auto-rows: 160px; }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 960; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--space-2);
+  background: rgba(20, 14, 8, 0.88); opacity: 0; pointer-events: none; transition: opacity var(--dur) var(--ease);
+}
+.lightbox.is-on { opacity: 1; pointer-events: auto; }
+.lightbox__img { max-width: 90vw; max-height: 76vh; border: 1px solid var(--line-frame); border-radius: var(--radius); }
+.lightbox__cap { color: var(--on-frame); font-family: var(--font-mono); font-size: 0.82rem; text-align: center; }
+.lightbox__close {
+  position: absolute; top: 1.2rem; right: 1.5rem; background: none; border: none;
+  color: var(--on-frame); font-size: 2rem; line-height: 1; cursor: pointer;
+}
+
+/* ----------------------------------------------------------------------------
+ * 10) RESPONSIVE
+ * --------------------------------------------------------------------------*/
+@media (max-width: 900px) {
+  .story-layout { grid-template-columns: 1fr; }
+  .story-rail { position: static; max-height: none; }
+}
 @media (max-width: 760px) {
   .header-actions { gap: var(--space-1); }
   .user-menu > .dropdown-toggle span.user-menu__full { display: none; }
+  .person-header { flex-wrap: wrap; }
+  .rel-card { width: 100%; }
 }
