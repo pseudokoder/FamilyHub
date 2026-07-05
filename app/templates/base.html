@@ -92,8 +92,8 @@
             <a href="{{ url_for('main.home') }}">Home</a>
             <a href="{{ url_for('tree.pedigree') }}">Tree</a>
             <a href="{{ url_for('people.index') }}">People</a>
-            <a href="{{ url_for('main.coming_soon', feature='Memories') }}">Memories</a>
-            <a href="{{ url_for('main.coming_soon', feature='Search') }}">Search</a>
+            <a href="{{ url_for('memories.index') }}">Memories</a>
+            <a href="{{ url_for('search.index') }}">Search</a>
         </nav>
 
         {# The user menu deliberately lives OUTSIDE #navLinks: chronicle.js
@@ -103,6 +103,14 @@
            both scripts work without touching either — see
            docs/FRONTEND_DESIGN.md's WP5 decision log. #}
         <div class="header-actions">
+            {# FE-4: a quick-search shortcut from ANY authenticated page, not
+               just the /search page itself (Tier-2 design call — see
+               FRONTEND_DESIGN.md). Powered by search.js, DOM-guarded like
+               every other page script in this app. #}
+            <button type="button" class="header-search-btn" id="headerSearchBtn"
+                    aria-label="Search" aria-haspopup="true" aria-expanded="false">
+                <i aria-hidden="true">&#128269;</i>
+            </button>
             <div class="dropdown user-menu">
                 <a class="dropdown-toggle" href="#" role="button"
                    data-bs-toggle="dropdown" aria-expanded="false">
@@ -155,6 +163,21 @@
     </div>
 </header>
 
+{% if current_user.is_authenticated %}
+{# The quick-search overlay toggled by #headerSearchBtn above — a self-
+   contained widget search.js wires from any page (DOM-guarded, same
+   no-op-if-absent rule every other page script in this app follows). #}
+<div class="search-overlay" id="headerSearchOverlay" role="dialog" aria-label="Quick search" aria-hidden="true">
+    <div class="search-overlay__panel">
+        <label for="headerSearchInput" class="form-label">Search people &amp; families</label>
+        <input type="search" id="headerSearchInput" class="form-control form-control-lg"
+               placeholder="Search by name…" autocomplete="off">
+        <div id="headerSearchResults" class="list-group mt-2"></div>
+        <a class="small d-inline-block mt-2" href="{{ url_for('search.index') }}#advanced">Advanced search &rarr;</a>
+    </div>
+</div>
+{% endif %}
+
 {# Flash messages — same .flash-tray/.flash-msg toast as the public page
    (chronicle-main.css), not Bootstrap's dismissible alert box. #}
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -183,6 +206,17 @@
 <script src="{{ url_for('static', filename='js/chronicle.js') }}"></script>
 {# Site-wide behaviors (the data-confirm dialogs) — see the file itself. #}
 <script src="{{ url_for('static', filename='js/familyhub.js') }}"></script>
+{% if current_user.is_authenticated %}
+{# FE-4: loaded app-wide (not per-page like before) because the header
+   quick-search widget above needs apiFetch()/subjectPicker() on EVERY
+   authenticated page, not just the pages that already fetch data. Both
+   files are pure globals, DOM-guarded — safe alongside pages that also
+   load api.js in their own {% block scripts %} (see people/person/tree
+   templates; harmless redundant re-declaration, not touched here). #}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fh-common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endif %}
 {# Service-worker registration (PWA) — a no-op on unsupporting browsers. #}
 <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
 {# Pages that need their own JavaScript add it here (e.g. the album page's

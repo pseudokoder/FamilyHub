@@ -1,0 +1,11 @@
+{# memories/_subnav.html — the shared tab strip across the Memories section.
+   Set `active` ('chronological'|'person'|'family'|'event'|'stories') before
+   including. Same .subnav pattern Tree's own subnav established (FE-3),
+   generalized in chronicle-app.css so both sections share one CSS rule. #}
+<nav class="subnav" aria-label="Memories views">
+    <a href="{{ url_for('memories.index') }}" class="subnav__link{{ ' is-active' if active == 'chronological' else '' }}">Chronological</a>
+    <a href="{{ url_for('memories.by_person') }}" class="subnav__link{{ ' is-active' if active == 'person' else '' }}">By Person</a>
+    <a href="{{ url_for('memories.by_family') }}" class="subnav__link{{ ' is-active' if active == 'family' else '' }}">By Family</a>
+    <a href="{{ url_for('memories.by_event') }}" class="subnav__link{{ ' is-active' if active == 'event' else '' }}">By Event</a>
+    <a href="{{ url_for('memories.stories') }}" class="subnav__link{{ ' is-active' if active == 'stories' else '' }}">Stories</a>
+</nav>

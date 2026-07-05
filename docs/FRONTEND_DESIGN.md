@@ -538,6 +538,147 @@ Views-tag paths).
 
 ---
 
+### 2026-07-05 — FE-4: Memories (album views + Stories), Search, and the elderly-first sizing strip
+
+**Task 0 — why the strip was a real fix, not just tidying.** `style.css`
+loaded AFTER `chronicle-app.css` in `base.html`, so its oversized `.btn`/
+`.form-control`/`.form-label` rules were winning the cascade and silently
+overriding Chronicle's intended scale on every authenticated page since WP5
+shipped — nobody had noticed because the two looked similar enough at a
+glance. Worse, `html { font-size: 18px }` changed what `1rem` MEANS
+app-wide: `chronicle-main.css`'s entire `--space-*`/`clamp()` token system
+assumes the browser default (16px) root, so that one line was quietly
+scaling the *whole app* up ~12%. Removed rather than migrated, per the owner
+directive (ADR-0004): large-print support is the browser/OS's job (pinch-
+zoom, `Ctrl`+`+`, OS text scaling), not something the app forces on every
+visitor. What survived because a current template still references it:
+`.hero-banner`, `.hero-preview`, `.chip-group`, `#main-content:focus`. Seven
+other classes (`.btn-dashboard`, `.photo-card`, `.album-card`, `.photo-full`,
+`.infobox-card`, `.album-cover-placeholder`, `.photo-preview`, `.drag-ghost`)
+had zero references anywhere in the tree — leftovers from the removed
+pre-WP1 "Lite" photo/wiki app — so they came out too rather than migrating
+dead code. `style.css` is now 40 lines; logged in `BLOCKERS.md` for BE to
+decide whether it's worth deleting outright.
+
+**"One photo store, album views," made literal.** Chronological/By Person/
+By Family/By Event are four different client-side filters over the SAME
+`GET /api/media` — none of them is a separate store, and a photo can be
+uploaded with NO subject at all (`POST /api/media` only requires the file)
+and linked afterward from the Photo Detail panel. This mirrors how a real
+family archive actually gets built: someone dumps a box of scanned photos in
+first, then tags who's in them over time.
+
+**By Family's aggregation is a defined, honest scope — not a missing
+endpoint.** "Photos from a family's life together" is defined as: media
+linked directly to the family, media linked to the family's own events
+(marriage, divorce…), and media linked to any of its members' own individual
+events. Every one of those is a real, already-existing `GET /api/media?
+subject_type=…&subject_id=…` call (`individual`/`family`/`event` are all in
+the Media Link schema); the only cost is a client-side fan-out (one media
+call per relevant target: the family, its events, each member's events), the
+same "one call per target, not per leaf record" shape `person.js`'s Timeline
+tab already uses for family-scale event aggregation. No blocker filed —
+nothing here is a capability the API lacks.
+
+**Photo Detail extends, not reuses, FE-2's lightbox.** Person Page's
+`.lightbox` (person.js) is a caption + one unlink button — enough for "this
+person's own photos." Memories' photo detail needs full metadata, EVERY
+link as a navigable chip (an event link has no page of its own, so it
+resolves to the event's OWN subject — a person or family — via one extra
+`GET /api/events/{id}`), and Contributor+ edit/manage-links/delete. Built as
+its own component (`.photo-detail`, `memories.js`) rather than bolting all of
+that onto person.js's simpler one, which stays exactly as FE-2 shipped it.
+
+**Capture-date depth bar: the new upload form is the first to populate
+`capture_date_sort`.** person.js's existing Photos-tab upload only ever sent
+`capture_date` (raw text like "Summer 1952"), leaving `capture_date_sort`
+null forever — fine for a caption, useless for the Chronological view's
+actual sort order. The Memories upload/edit forms use the same Precision +
+Year + Month + Day fuzzy-date group already established for events/vitals,
+now generalized into `fh-common.js`, so newly uploaded photos sort correctly
+by when they were taken; older photos uploaded before this form existed
+correctly fall back to upload-date ordering (visibly labeled "Uploaded …"),
+exactly the behavior the brief asked for, not a bug.
+
+**A new shared module, scoped on purpose: `app/static/js/fh-common.js`.**
+Three new pages in one work package would otherwise each re-type
+`escapeHtml`/`debounce`/the search-as-you-type picker/the Markdown renderer/
+the photo-cameo helpers — exactly the duplication the brief asks to avoid.
+Rather than refactor `person.js`/`tree.js`/`people.js` (already shipped,
+browser-verified in prior WPs, never touched by this brief) to also consume
+it — a riskier, unrequested refactor of working code — `fh-common.js` is a
+clean extraction point for the NEW code only (`memories.js`, `stories.js`,
+`search.js`). Its `subjectPicker()` generalizes `person.js`'s person-only
+picker to optionally include families too (a note or photo can be linked to
+either), fetching `GET /api/families` once and matching client-side against
+the same `partner1`/`partner2` display strings the API already computes —
+the same "family-scale, brute force is fine" precedent as People's sort.
+
+**Search: quick search in the header is a Tier-2 design call.** The brief
+invited "consider surfacing this in the header" and left the call to FE. A
+permanently-visible wide input would crowd the header at 375px, so it's a
+toggleable overlay (`#headerSearchBtn`/`#headerSearchOverlay`) reusing the
+exact same `subjectPicker()` the `/search` page's Quick tab uses — one
+implementation, two presentations. Loaded app-wide via `base.html` (not
+per-page) since the button lives in the shared header.
+
+**Death-year range: implemented client-side, not filed as a blocker.**
+Master Plan §12 promises a birth/death year range filter; `GET /api/search`
+only has `birth_from`/`birth_to` (confirmed by reading `search_service.py` —
+no `death_from`/`death_to` parameter exists). But `PersonListItem.death_year`
+IS already a real field on every row the server returns regardless — so
+filtering the already-server-filtered result set by death year client-side
+produces the exact correct final answer, not an approximation of a missing
+capability. This is the identical shape of call the codebase already made
+for People's birth-year sort (achievable, just executed client-side because
+the server doesn't offer it as a parameter) — a design/implementation
+choice, not a hard dependency on BE, so no `BLOCKERS.md` entry.
+
+**Two real bugs found only in the browser (not caught by pytest):**
+1. **Bootstrap's breakpoint columns key off VIEWPORT width, not the
+   immediate container's width.** The fuzzy-date group's `col-md-3` fields
+   rendered fine full-width, but squeezed unreadably into one row inside the
+   Photo Detail panel (a 340px sidebar) even on a 1280px-wide desktop,
+   because `col-md-3`'s 25%-width rule keys off the *viewport* breakpoint
+   (≥768px), not the 340px container actually holding it — a "container
+   query" gap plain Bootstrap doesn't cover. Fixed two ways: `fh-common.js`'s
+   `fuzzyDateFieldsHtml` now uses `col-6 col-md-3` (helps genuinely narrow
+   phone viewports), and `.photo-detail__panel .row > [class*="col-"]` forces
+   full-width stacking regardless of viewport, since that panel is narrow
+   *unconditionally*.
+2. **The new header search button overlapped the brand wordmark at a real
+   375px width.** `.header-actions` gained one more fixed-width (44px) child;
+   `.brand`'s text content doesn't actually shrink just because it's a flex
+   item (no `min-width: 0`), so at 375px the two overlapped instead of
+   wrapping. Fixed with a scoped `body.app-shell` media rule (shrinks the
+   wordmark, hides the tagline below 400px) — deliberately NOT touched in
+   `chronicle-main.css`, so the public page's header (no search button) is
+   completely unaffected.
+
+**Re-encountered, not re-caused: the service worker cache trap.** FE-3's
+diary already documented `sw.js`'s cache-first `/static/` strategy as the
+reason a served file being byte-correct doesn't mean the browser is running
+it. This session hit it repeatedly while iterating on the two bugs above —
+each edit needed the Cache Storage cleared (or the `CACHE` constant bumped)
+before the fix was visible, confirming FE-3's finding rather than being a
+new one. Bumped `CACHE` to `"familyhub-shell-v3"`.
+
+**Files created/changed:** `app/routes/memories.py`, `app/routes/search.py`
+(new blueprints); `app/__init__.py` (registered both); `app/templates/
+memories/{index,by_person,by_family,by_event,stories,story_new,story_show,
+_subnav}.html`, `app/templates/search/index.html` (new); `app/templates/
+base.html` (nav links, header search button + overlay, app-wide `api.js`/
+`fh-common.js`/`search.js`); `app/templates/dashboard.html` (Quick Add
+Photo/Story tiles wired to real routes); `app/templates/errors/
+{403,429,500}.html` (dropped `.display-6`); `app/static/js/{memories,
+stories,search,fh-common}.js` (new); `app/static/css/style.css` (Task 0
+strip, see above); `app/static/css/chronicle-app.css` (generalized
+`.tree-subnav` → `.subnav`/`.tree-subnav` alias; new Memories/Photo-Detail/
+Stories/Search sections; the two browser-bug fixes above); `app/static/js/
+sw.js` (cache version bump); `docs/openapi.yaml` (nine new Views-tag paths).
+
+---
+
 ## Design Parking Lot
 
 Future constraints and ideas — captured here, not yet scheduled or enforced.

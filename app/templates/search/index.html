@@ -1,0 +1,100 @@
+{# search/index.html — Quick + Advanced search (Master Plan §4/§12, FE-4).
+   One route, two hash-switched panels (#quick default, #advanced) — same
+   URL-hash tab pattern as the Person Page (person.js). Quick search reuses
+   the exact combined people+family picker the header widget uses
+   (fh-common.js's subjectPicker); Advanced is a real multi-field form over
+   GET /api/search. #}
+{% extends "base.html" %}
+
+{% block title %}Search{% endblock %}
+
+{% block content %}
+<div id="searchPage">
+    <header class="mb-3">
+        <h1 class="mb-0">Search</h1>
+        <p class="text-muted mb-0">Find a person, a family, or a story by any fragment you remember.</p>
+    </header>
+
+    <nav class="subnav" id="searchTabs" aria-label="Search modes">
+        <a href="#quick" class="subnav__link" data-tab="quick">Quick</a>
+        <a href="#advanced" class="subnav__link" data-tab="advanced">Advanced</a>
+    </nav>
+
+    <section id="searchTab-quick" data-tab-panel="quick">
+        <div class="panel picker-panel">
+            <label class="form-label">Search people &amp; families</label>
+            <div id="quickSearchPicker"></div>
+        </div>
+    </section>
+
+    <section id="searchTab-advanced" class="d-none" data-tab-panel="advanced">
+        <form id="advancedSearchForm" class="panel mb-3">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="advGiven">Given name</label>
+                    <input type="text" class="form-control" id="advGiven" name="given" autocomplete="off">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="advSurname">Surname</label>
+                    <input type="text" class="form-control" id="advSurname" name="surname" autocomplete="off">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="advSex">Sex</label>
+                    <select class="form-select" id="advSex" name="sex">
+                        <option value="">Any</option>
+                        <option value="F">Female</option>
+                        <option value="M">Male</option>
+                        <option value="X">Other</option>
+                        <option value="U">Unknown</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="advBirthFrom">Born from</label>
+                    <input type="number" class="form-control" id="advBirthFrom" name="birth_from" placeholder="Year">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="advBirthTo">Born to</label>
+                    <input type="number" class="form-control" id="advBirthTo" name="birth_to" placeholder="Year">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="advDeathFrom">Died from</label>
+                    <input type="number" class="form-control" id="advDeathFrom" name="death_from" placeholder="Year">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="advDeathTo">Died to</label>
+                    <input type="number" class="form-control" id="advDeathTo" name="death_to" placeholder="Year">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="advPlace">Place</label>
+                    <input type="text" class="form-control" id="advPlace" name="place" placeholder="City, state, country…" autocomplete="off">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="advKeywords">Keywords (also searches stories &amp; notes)</label>
+                    <input type="text" class="form-control" id="advKeywords" name="q" autocomplete="off">
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label d-block">Living or deceased</label>
+                    <div class="chip-group" role="group" aria-label="Living or deceased" data-chip-group="living">
+                        <button type="button" class="filter-chip is-active" data-value="">Any</button>
+                        <button type="button" class="filter-chip" data-value="true">Living</button>
+                        <button type="button" class="filter-chip" data-value="false">Deceased</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="advanced-search__actions mt-3">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <span class="text-muted" id="advancedSearchCount"></span>
+            </div>
+        </form>
+
+        <div id="advancedSearchResults"></div>
+    </section>
+</div>
+{% endblock %}
+
+{# search.js is already loaded globally by base.html (the header quick-search
+   widget needs it on every page) — no per-page script tag needed here. #}

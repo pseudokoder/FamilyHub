@@ -1,0 +1,30 @@
+{# memories/stories.html — Stories: the memory-blog lane of Memories (FE-4,
+   Master Plan §4). Every note, newest first (client-rendered against
+   GET /api/notes) — the same "one store, this is a view over it" idea as
+   the photo album pages. #}
+{% extends "base.html" %}
+
+{% block title %}Stories{% endblock %}
+
+{% block content %}
+<div id="storiesListView">
+    {% set active = 'stories' %}
+    {% include "memories/_subnav.html" %}
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="mb-0">Stories</h1>
+            <p class="text-muted mb-0">The memory blog — life stories, in members' own words.</p>
+        </div>
+        {% if current_user.has_role('contributor') %}
+        <a class="btn btn-primary" href="{{ url_for('memories.new_story') }}">+ Write a story</a>
+        {% endif %}
+    </div>
+
+    <div id="storiesList"><p class="text-muted">Loading…</p></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stories.js') }}"></script>
+{% endblock %}

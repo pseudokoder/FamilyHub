@@ -37,7 +37,40 @@ Entry format:
 
 ## Open items
 
-### [OPEN] FE-3 added `app/routes/tree.py` + `docs/openapi.yaml` Views entries — BE review at merge
+### [OPEN] FE-4 added `app/routes/memories.py` + `app/routes/search.py` + `docs/openapi.yaml` Views entries — BE review at merge
+- Date: 2026-07-05
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE must): review the two new blueprints — `memories_bp`
+  (`app/routes/memories.py`: `GET /memories`, `/memories/person`,
+  `/memories/family`, `/memories/event`, `/memories/stories`,
+  `/memories/stories/new`, `/memories/stories/<int:note_id>`) and `search_bp`
+  (`app/routes/search.py`: `GET /search`) — and their registration in
+  `app/__init__.py`, plus the matching `docs/openapi.yaml` Views-tag entries
+  the FE-4 brief authorized FE to add on-branch. View-routing only — no
+  business logic, schema, or `/api/*` endpoints changed. Confirm it doesn't
+  break any existing BE tests (it doesn't — 239/239 green) and sign off at
+  merge time.
+- Status: OPEN.
+
+### [OPEN] FE-4 added `app/static/css/style.css` cleanup — BE decides on deleting the file
+- Date: 2026-07-05
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE should): per the FE-4 brief's Task 0 (owner directive, ADR-0004),
+  the pre-Chronicle "elderly-first sizing" layer was stripped from
+  `app/static/css/style.css` (oversized root font-size, jumbo buttons/inputs,
+  a non-Chronicle hardcoded-blue focus ring/skip-link that duplicated
+  `chronicle-main.css`'s own, plus several classes from the removed pre-WP1
+  "Lite" photo/wiki app that had zero references left anywhere:
+  `.btn-dashboard`, `.photo-card`, `.album-card`, `.photo-full`,
+  `.infobox-card`, `.album-cover-placeholder`, `.photo-preview`,
+  `.drag-ghost`). What's left (`.hero-banner`, `.hero-preview`, `.chip-group`,
+  `#main-content:focus`) is everything still referenced by a current
+  template. The file is now 40 lines, effectively a small residual file
+  rather than a real stylesheet — BE's call whether to delete it outright
+  and inline its remaining rules into `chronicle-app.css`, or leave it as is.
+- Status: OPEN.
 - Date: 2026-07-05
 - Raised by: FE
 - Blocks: nothing (safe to merge once BE reviews)

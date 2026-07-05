@@ -370,17 +370,23 @@ fieldset legend, legend.h4 {
 }
 
 /* ----------------------------------------------------------------------------
- * 11) TREE SECTION (FE-3) — Pedigree, Family Group, Relationship Finder.
+ * 11) SECTION SUBNAV — a tab-strip of sibling views within one section. First
+ * built for Tree (FE-3: Pedigree/Family Group/Relationship Finder); FE-4's
+ * Memories section (Chronological/By Person/By Family/By Event/Stories) is
+ * the same UI over different pages, so the class is named generically
+ * (`.subnav`) with `.tree-subnav` kept as an alias so FE-3's already-shipped
+ * templates need no edits.
  * --------------------------------------------------------------------------*/
 
-.tree-subnav { display: flex; gap: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--line-hi); }
-.tree-subnav__link {
+.subnav, .tree-subnav { display: flex; gap: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--line-hi); flex-wrap: wrap; }
+.subnav__link, .tree-subnav__link {
   font-family: var(--font-mono); font-size: 0.86rem; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--ink-soft); padding: 0.6rem 0.1rem; border-bottom: 2px solid transparent;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
+.subnav__link:hover, .subnav__link:focus-visible,
 .tree-subnav__link:hover, .tree-subnav__link:focus-visible { color: var(--ink); }
-.tree-subnav__link.is-active { color: var(--rust); border-bottom-color: var(--rust); }
+.subnav__link.is-active, .tree-subnav__link.is-active { color: var(--rust); border-bottom-color: var(--rust); }
 .tree-header { margin-bottom: var(--space-3); }
 
 /* PEDIGREE — a pure-CSS nested-list "org chart," upside down: the ROOT is
@@ -485,6 +491,17 @@ fieldset legend, legend.h4 {
   .person-header { flex-wrap: wrap; }
   .rel-card { width: 100%; }
 }
+/* FE-4: adding the header quick-search button gave .header-actions one more
+ * fixed-width (44px) child; at a real 375px phone width that pushed the
+ * total header content past the container's width, overlapping the brand
+ * wordmark (a real bug found in the browser, not caught by pytest). Scoped
+ * to body.app-shell only — the PUBLIC page's header (index.html) has no
+ * search button and is untouched; chronicle-main.css's shared .brand__word/
+ * .brand__tag rules stay as they are for it. */
+@media (max-width: 400px) {
+  body.app-shell .brand__tag { display: none; }
+  body.app-shell .brand__word { font-size: 1.5rem; }
+}
 
 /* Pedigree's vertical org-chart degrades to a scrollable, indented OUTLINE
  * below this breakpoint: a wide, ever-widening chart stops being usable on a
@@ -517,3 +534,113 @@ fieldset legend, legend.h4 {
   .pedigree-node__actions { flex: 0 0 100%; justify-content: flex-start; margin-top: 0.3rem; }
   .relationship-chain { flex-direction: column; }
 }
+
+/* ----------------------------------------------------------------------------
+ * 12) MEMORIES (FE-4) — album views (Chronological/By Person/By Family/By
+ * Event) + Stories, all thin layers over the one .wall/.gallery-wall photo
+ * grid and .panel/.section-title vocabulary already established.
+ * --------------------------------------------------------------------------*/
+
+/* A single search-as-you-type picker (By Person/By Family pages, Stories'
+ * "who/what it's about," Search's quick box) — same shape as person.js's
+ * .person-picker__results, generalized under fh-common.js's subjectPicker(). */
+.subject-picker__results, .person-picker__results { max-height: 260px; overflow-y: auto; margin-top: 0.4rem; }
+.picker-panel { max-width: 420px; }
+
+/* Chronological/By Person/By Family grids reuse .wall.gallery-wall verbatim
+ * (chronicle-components.css + the auto-fill modifier already shipped for
+ * the Person Page's Photos tab) — no new grid CSS needed here.
+ * .cell__cap already shows title + capture date; when a tile falls back to
+ * upload date (no capture_date on file) it's labeled so, via .cell__cap .u. */
+.cell__cap .u { font-family: var(--font-mono); font-size: 0.66rem; opacity: 0.7; font-style: italic; }
+
+/* By Event: one heading + gallery per event that has photos. */
+.event-group { margin-bottom: var(--space-5); }
+.event-group__head { margin-bottom: var(--space-2); }
+.event-group__title { font-size: clamp(1.2rem, 2.4vw, 1.5rem); margin: 0; }
+.event-group__meta { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
+
+/* PHOTO DETAIL — the richer Memories lightbox (extends FE-2's simple
+ * .lightbox pattern: same fixed-overlay/CSP-safe idea, a fuller layout since
+ * this page's photo detail needs metadata + navigable links + edit/manage-
+ * link/delete actions, not just a caption + one unlink button). */
+.photo-detail {
+  position: fixed; inset: 0; z-index: 960; display: flex; flex-direction: row;
+  align-items: stretch; justify-content: center; gap: 0;
+  background: rgba(20, 14, 8, 0.88); opacity: 0; pointer-events: none; transition: opacity var(--dur) var(--ease);
+  padding: var(--space-4);
+}
+.photo-detail.is-on { opacity: 1; pointer-events: auto; }
+.photo-detail__stage { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-width: 0; }
+.photo-detail__img { max-width: 100%; max-height: 82vh; border: 1px solid var(--line-frame); border-radius: var(--radius); }
+.photo-detail__panel {
+  flex: 0 0 340px; max-width: 90vw; background: var(--card); color: var(--ink);
+  border-radius: var(--radius); padding: var(--space-3) var(--space-4); overflow-y: auto;
+  max-height: 100%;
+}
+/* The edit-metadata form's fuzzy-date row (fh-common.js's fuzzyDateFieldsHtml)
+ * uses Bootstrap's col-md-3 breakpoint columns, which key off VIEWPORT width,
+ * not this panel's actual (340px) width — on a desktop-wide viewport that
+ * rule still computes 25% each, squeezing all four fields unreadably into
+ * one row regardless of how narrow the sidebar itself is. Force every grid
+ * column inside this panel to stack full-width instead — a real bug found
+ * in the browser (a "container query" gap Bootstrap's grid doesn't cover). */
+.photo-detail__panel .row > [class*="col-"] { flex: 0 0 100%; max-width: 100%; }
+.photo-detail__title { font-size: clamp(1.2rem, 2.6vw, 1.6rem); margin-bottom: 0.3rem; }
+.photo-detail__meta { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-soft); margin-bottom: var(--space-2); }
+.photo-detail__desc { color: var(--ink-soft); margin-bottom: var(--space-2); }
+.photo-detail__links { margin-bottom: var(--space-3); }
+.photo-detail__link-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
+.photo-detail__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.photo-detail__close {
+  position: absolute; top: 1.2rem; right: 1.5rem; background: none; border: none;
+  color: var(--on-frame); font-size: 2rem; line-height: 1; cursor: pointer; z-index: 1;
+}
+@media (max-width: 760px) {
+  .photo-detail { flex-direction: column; overflow-y: auto; padding: var(--space-2); }
+  .photo-detail__panel { flex: none; max-width: 100%; }
+}
+
+/* STORIES — a list row (Bootstrap list-group, repainted like .person-row)
+ * and the read view's prose card (reuses .panel/.story-card verbatim from
+ * the Person Page's Story tab). */
+.story-row { display: flex; flex-direction: column; padding: 0.85rem 1.1rem; font-family: var(--font-body); }
+.story-row__title { font-family: var(--font-display); font-weight: 700; font-size: 1.12rem; color: var(--ink); }
+.story-row__snippet { color: var(--ink-soft); margin-top: 0.2rem; }
+.story-row__meta { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-faint); margin-top: 0.3rem; }
+.story-form__preview { background: var(--paper-2); padding: var(--space-2); min-height: 8rem; }
+
+/* Rendered Note.content prose (renderNoteContent's paragraphs/headings/
+ * lists) — chronicle-main.css's global reset zeroes every margin and turns
+ * off list bullets, so long-form story content needs its own spacing rule
+ * here, same as any other prose block this app renders. */
+.story-content { margin-top: var(--space-2); }
+.story-content p { margin-bottom: 1rem; color: var(--ink-soft); }
+.story-content h3, .story-content h4, .story-content h5 { margin-top: var(--space-3); margin-bottom: 0.5rem; }
+.story-content ul { list-style: disc; padding-left: 1.4rem; margin-bottom: 1rem; }
+.story-content li { margin-bottom: 0.3rem; }
+.story-content code { font-family: var(--font-mono); background: var(--paper-2); padding: 0.1rem 0.35rem; border-radius: 2px; }
+
+/* ----------------------------------------------------------------------------
+ * 13) SEARCH (FE-4) — the header quick-search overlay + the /search page
+ * (Quick + Advanced tabs, reusing .person-tabs/.person-tabs__link verbatim).
+ * --------------------------------------------------------------------------*/
+.header-search-btn {
+  background: none; border: none; color: var(--ink-soft); font-size: 1.15rem;
+  width: 44px; height: 44px; border-radius: var(--radius-sm); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.header-search-btn:hover, .header-search-btn:focus-visible { background: var(--paper-2); color: var(--ink); }
+.search-overlay {
+  position: fixed; top: var(--nav-h); left: 0; right: 0; z-index: 500;
+  background: rgba(20, 14, 8, 0.4); display: none; padding-top: var(--space-3);
+}
+.search-overlay.is-on { display: block; }
+.search-overlay__panel {
+  max-width: 640px; margin: 0 auto; background: var(--card); border: 1px solid var(--line-hi);
+  border-radius: var(--radius); padding: var(--space-3) var(--space-4);
+  box-shadow: 0 24px 48px -24px rgba(20, 14, 8, 0.6);
+}
+.search-result-row.is-active-option { background: var(--paper-2); }
+.search-result-row__type { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.advanced-search__actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }

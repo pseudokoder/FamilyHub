@@ -486,6 +486,46 @@ paths:
         - {name: a, in: query, schema: {type: integer}, description: "pre-fill person A (defaults to GET /api/me/person when omitted)"}
         - {name: b, in: query, schema: {type: integer}, description: pre-fill person B}
       responses: {"200": {description: HTML page}}
+  /memories:
+    get:
+      tags: [Views]
+      summary: "Memories (FE-4): Chronological album — every photo by capture date (falls back to upload date), client-rendered against GET /api/media?order_by=capture. Also the section's photo-upload entry point."
+      responses: {"200": {description: HTML page}}
+  /memories/person:
+    get:
+      tags: [Views]
+      summary: "By Person album (FE-4): pick a person, see every photo linked to them — GET /api/media?subject_type=individual&subject_id="
+      parameters: [{name: person, in: query, schema: {type: integer}, description: "pre-fill the picker; shareable/bookmarkable"}]
+      responses: {"200": {description: HTML page}}
+  /memories/family:
+    get:
+      tags: [Views]
+      summary: "By Family album (FE-4): pick a family, see photos linked to the family, its own events, and its members' events — a client-side aggregation over GET /api/media's subject filters"
+      parameters: [{name: family, in: query, schema: {type: integer}, description: "pre-fill the picker; shareable/bookmarkable"}]
+      responses: {"200": {description: HTML page}}
+  /memories/event:
+    get:
+      tags: [Views]
+      summary: "By Event album (FE-4): every event with at least one linked photo, grouped — a whole-archive view over GET /api/events + GET /api/media?subject_type=event"
+      responses: {"200": {description: HTML page}}
+  /memories/stories:
+    get:
+      tags: [Views]
+      summary: "Stories (FE-4): the memory-blog lane — every note, newest first, client-rendered against GET /api/notes"
+      responses: {"200": {description: HTML page}}
+  /memories/stories/new:
+    get:
+      tags: [Views]
+      summary: "Write a Story (FE-4, Contributor+): title/content/format/shared-note + an optional who-it's-about link picker, submits via JS to POST /api/notes"
+      responses: {"200": {description: HTML page}}
+  /memories/stories/{note_id}:
+    parameters: [{name: note_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Views], summary: "One story's read view (FE-4): rendered Markdown + navigable links, client-rendered against GET /api/notes/{note_id}", responses: {"200": {description: HTML page}}}
+  /search:
+    get:
+      tags: [Views]
+      summary: "Quick + Advanced search (FE-4, Master Plan §12): one page, hash-switched (#quick/#advanced), client-rendered against GET /api/search (+ GET /api/families for the quick search's family matches)"
+      responses: {"200": {description: HTML page}}
 
 components:
   responses:
