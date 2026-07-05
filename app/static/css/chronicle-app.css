@@ -370,6 +370,109 @@ fieldset legend, legend.h4 {
 }
 
 /* ----------------------------------------------------------------------------
+ * 11) TREE SECTION (FE-3) — Pedigree, Family Group, Relationship Finder.
+ * --------------------------------------------------------------------------*/
+
+.tree-subnav { display: flex; gap: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--line-hi); }
+.tree-subnav__link {
+  font-family: var(--font-mono); font-size: 0.86rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-soft); padding: 0.6rem 0.1rem; border-bottom: 2px solid transparent;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.tree-subnav__link:hover, .tree-subnav__link:focus-visible { color: var(--ink); }
+.tree-subnav__link.is-active { color: var(--rust); border-bottom-color: var(--rust); }
+.tree-header { margin-bottom: var(--space-3); }
+
+/* PEDIGREE — a pure-CSS nested-list "org chart," upside down: the ROOT is
+ * the lone node at the TOP, and each <ul> nested inside a <li> holds that
+ * person's own parents, so the tree widens generation by generation as it
+ * grows DOWNWARD. No JS position math anywhere — flexbox plus these
+ * ::before/::after border-drawn connectors do 100% of the layout, which is
+ * why the Pedigree view needs none of chronicle.js's data-x/data-y trick.
+ *
+ * ORIENTATION SEAM (a v2-reserved toggle — the FE-3 brief says not to build
+ * it yet): every rule here keys off .pedigree-canvas--vertical. A future
+ * --horizontal sibling class would flip the flex axis and the connectors'
+ * left/top logic in one block, with zero changes to tree.js — the renderer
+ * never computes a pixel position itself. */
+.pedigree-scroller { overflow-x: auto; padding: var(--space-2) 0 var(--space-6); }
+.pedigree-canvas--vertical .pedigree-tree,
+.pedigree-canvas--vertical .pedigree-tree ul {
+  display: flex; flex-direction: row; justify-content: center;
+  padding-top: var(--space-4); position: relative; list-style: none; margin: 0;
+}
+.pedigree-tree li {
+  display: flex; flex-direction: column; align-items: center; position: relative;
+  padding: var(--space-4) var(--space-1) 0;
+}
+.pedigree-tree li::before, .pedigree-tree li::after {
+  content: ''; position: absolute; top: 0; width: 50%; height: var(--space-4); border-top: 1px solid var(--line-hi);
+}
+.pedigree-tree li::before { left: 0; border-right: 1px solid var(--line-hi); }
+.pedigree-tree li::after { right: 0; }
+.pedigree-tree li:only-child { padding-top: 0; }
+.pedigree-tree li:only-child::before, .pedigree-tree li:only-child::after { display: none; }
+.pedigree-tree li:first-child::before, .pedigree-tree li:last-child::after { border-top: none; }
+.pedigree-tree ul::before {
+  content: ''; position: absolute; top: calc(-1 * var(--space-4)); left: 50%; width: 0; height: var(--space-4);
+  border-left: 1px solid var(--line-hi);
+}
+
+.pedigree-node {
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem; width: 136px;
+  background: var(--card); border: 1px solid var(--line-hi); border-radius: var(--radius); padding: 0.6rem 0.5rem;
+}
+.pedigree-node__photo { width: 52px; }
+.pedigree-node__cameo { aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; }
+.pedigree-node__body { text-align: center; }
+.pedigree-node__name {
+  display: block; font-family: var(--font-body); font-weight: 600; font-size: 0.92rem; color: var(--ink); text-decoration: none;
+}
+.pedigree-node__name:hover, .pedigree-node__name:focus-visible { color: var(--rust); }
+.pedigree-node__life { display: block; font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-soft); }
+.pedigree-node__actions { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: center; }
+.pedigree-node__actions .btn { font-size: 0.66rem; padding: 0.25rem 0.45rem; letter-spacing: 0.03em; }
+
+.pedigree-node--placeholder {
+  width: 136px; background: transparent; border: 1px dashed var(--line-hi); border-radius: var(--radius);
+  padding: 0.6rem 0.5rem; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 3rem;
+}
+.pedigree-node--cycle {
+  width: 136px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-faint); text-align: center;
+}
+.pedigree-expand-btn, .pedigree-invite-link {
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.02em; color: var(--ink-soft);
+  background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;
+}
+.pedigree-expand-btn:hover, .pedigree-invite-link:hover { color: var(--rust); }
+.pedigree-expand-btn:disabled { color: var(--ink-faint); cursor: default; text-decoration: none; }
+
+/* FAMILY GROUP SHEET — partner cards reuse .rel-card/.rel-cards verbatim
+ * (Person Page Relationships tab) so a family reads the same everywhere. */
+.family-sheet__partners { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.family-sheet__amp { font-family: var(--font-display); font-size: 1.4rem; color: var(--ink-faint); }
+
+/* RELATIONSHIP FINDER */
+.relationship-pickers { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.relationship-picker { flex: 1 1 240px; min-width: 220px; }
+.relationship-summary { text-align: center; margin-bottom: var(--space-3); }
+.relationship-label { font-family: var(--font-display); font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 700; color: var(--rust); margin: 0; }
+.relationship-chain { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.relationship-chain__node {
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem; width: 120px; text-align: center;
+}
+.relationship-chain__photo { width: 52px; }
+.relationship-chain__cameo { aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden; }
+.relationship-chain__name { font-family: var(--font-body); font-weight: 600; font-size: 0.9rem; color: var(--ink); text-decoration: none; }
+.relationship-chain__name:hover, .relationship-chain__name:focus-visible { color: var(--rust); }
+.relationship-chain__life { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-soft); }
+.relationship-chain__hop {
+  display: flex; flex-direction: column; align-items: center; font-family: var(--font-mono);
+  font-size: 0.72rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint);
+}
+.relationship-chain__hop span:first-child { font-size: 1.1rem; color: var(--sepia); }
+
+/* ----------------------------------------------------------------------------
  * 10) RESPONSIVE
  * --------------------------------------------------------------------------*/
 @media (max-width: 900px) {
@@ -381,4 +484,36 @@ fieldset legend, legend.h4 {
   .user-menu > .dropdown-toggle span.user-menu__full { display: none; }
   .person-header { flex-wrap: wrap; }
   .rel-card { width: 100%; }
+}
+
+/* Pedigree's vertical org-chart degrades to a scrollable, indented OUTLINE
+ * below this breakpoint: a wide, ever-widening chart stops being usable on a
+ * phone, but an indented list (one ancestor per line, deeper generations
+ * indented further) reads fine at any width — same information, no
+ * horizontal scrolling required. */
+@media (max-width: 640px) {
+  .pedigree-canvas--vertical .pedigree-tree,
+  .pedigree-canvas--vertical .pedigree-tree ul { display: block; padding-top: 0; }
+  .pedigree-tree li {
+    display: block; padding: var(--space-2) 0 var(--space-2) var(--space-3);
+    margin-left: var(--space-2); border-left: 2px solid var(--line-hi);
+  }
+  .pedigree-tree li::before, .pedigree-tree li::after, .pedigree-tree ul::before { display: none; }
+  .pedigree-tree > li { border-left: none; margin-left: 0; padding-left: 0; }
+  /* flex-wrap is the other half of the fix above: .pedigree-node__actions'
+   * flex: 0 0 100% only drops to its own line if the row is allowed to wrap
+   * — without it the actions block a name that's now wrapping to 2-3 lines
+   * (nowrap keeps everything on one baseline-centered row, so the buttons
+   * land on top of the later name lines instead of below them). */
+  .pedigree-node { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; text-align: left; }
+  .pedigree-node__photo { width: 44px; flex: none; }
+  /* min-width: 0 overrides a flex item's default auto minimum size (its
+   * unwrapped content width) — without it, long names push this box wider
+   * than the card has room for instead of wrapping, the same overflow
+   * FRONTEND_DESIGN.md's FE-2 entry already found and fixed once on
+   * .rel-card__body. */
+  .pedigree-node__body { text-align: left; flex: 1 1 auto; min-width: 0; }
+  .pedigree-node__badge { margin-left: auto; }
+  .pedigree-node__actions { flex: 0 0 100%; justify-content: flex-start; margin-top: 0.3rem; }
+  .relationship-chain { flex-direction: column; }
 }

@@ -1,0 +1,42 @@
+{# tree/relationship.html — the Relationship Finder (FE-3, Master Plan §4):
+   two search-as-you-type person pickers over GET /api/search, then the
+   plain-English label + person-by-person chain from GET
+   /api/individuals/{a}/relationship/{b}. Person A defaults to the member's
+   own linked person (GET /api/me/person) when one exists. #}
+{% extends "base.html" %}
+
+{% block title %}Relationship Finder{% endblock %}
+
+{% block content %}
+<div class="tree-page" id="relationshipPage">
+
+    <div class="tree-subnav" aria-label="Tree views">
+        <a href="{{ url_for('tree.pedigree') }}" class="tree-subnav__link">Pedigree</a>
+        <a href="{{ url_for('tree.relationship') }}" class="tree-subnav__link is-active">Relationship Finder</a>
+    </div>
+
+    <header class="tree-header">
+        <h1 class="mb-0">Relationship Finder</h1>
+        <p class="text-muted mb-0">Pick two people to see how they're related.</p>
+    </header>
+
+    <div class="panel relationship-pickers">
+        <div class="relationship-picker">
+            <label class="form-label" id="personALabel">Person A</label>
+            <div class="person-picker" id="personAPicker"></div>
+        </div>
+        <div class="relationship-picker">
+            <label class="form-label" id="personBLabel">Person B</label>
+            <div class="person-picker" id="personBPicker"></div>
+        </div>
+    </div>
+
+    <div id="relationshipResult"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tree.js') }}"></script>
+{% endblock %}

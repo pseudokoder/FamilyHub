@@ -311,6 +311,17 @@ function getFamilyEvents(famId) {
 function getAllCitations() {
   return once('allCitations', function() { return apiFetch('/api/citations').then(function(d) { return d.citations || []; }); });
 }
+/* getOwnActivity — the Story tab's "Latest Changes" card. GET /api/activity/feed
+ * now takes an optional subject_type+subject_id scope (BLOCKERS.md, resolved
+ * 2026-07-04) on top of the friendly, ALL-MEMBERS feed home.js already uses —
+ * same safe-creates-only filter (never deletes/reverts/account actions),
+ * just narrowed to this one person. */
+function getOwnActivity() {
+  return once('ownActivity', function() {
+    return apiFetch('/api/activity/feed?subject_type=individual&subject_id=' + personId + '&limit=5')
+      .then(function(d) { return d.activity || []; });
+  });
+}
 function getAllSources() {
   return once('allSources', function() { return apiFetch('/api/sources').then(function(d) { return d.sources || []; }); });
 }
@@ -484,13 +495,8 @@ function renderHeader() {
         '<h1 class="person-header__name">' + escapeHtml(ind.primary_name || 'Unnamed person') + '</h1>' +
         '<p class="person-header__meta">' + escapeHtml(FamilyHubFmt.joinDot([life, '#' + ind.id])) + '</p>' +
         '<div class="person-header__actions">' +
-          '<a class="btn btn-outline-secondary" href="/coming-soon?feature=' + encodeURIComponent('View Tree') + '">View Tree</a>' +
-          '<a class="btn btn-outline-secondary" href="/coming-soon?feature=' + encodeURIComponent('View Relationship') + '">View Relationship</a>' +
-          /* No /api/follow endpoint exists yet — BLOCKERS.md (FE-2, OPEN) asks
-           * the BE whether this lands in v1 or is cut. Rendered disabled, not
-           * faked, per §5A. */
-          '<button type="button" class="btn btn-outline-secondary" disabled ' +
-            'title="Coming soon — following a person isn’t available yet">Follow</button>' +
+          '<a class="btn btn-outline-secondary" href="/tree?root=' + ind.id + '">View Tree</a>' +
+          '<a class="btn btn-outline-secondary" href="/tree/relationship?a=' + ind.id + '">View Relationship</a>' +
         '</div>' +
       '</div>';
     applyTones(el); // chronicle.js global
@@ -569,10 +575,10 @@ function loadStoryTab() {
   var railEl = document.getElementById('storyRailBody');
 
   Promise.all([
-    getIndividual(), getOwnEvents(), getOwnNotes(), getOwnMedia(), getRelationships(), getAllCitations(),
+    getIndividual(), getOwnEvents(), getOwnNotes(), getOwnMedia(), getRelationships(), getAllCitations(), getOwnActivity(),
   ]).then(function(results) {
     var ind = results[0], events = results[1], notes = results[2], media = results[3],
-        rel = results[4], citations = results[5];
+        rel = results[4], citations = results[5], activity = results[6];
     var cards = [];
 
     // Life Sketch: the primary attached note. Note has no is_primary flag
@@ -616,6 +622,17 @@ function loadStoryTab() {
       cards.push(panelCard('Sources',
         '<p>' + ownCitations.length + ' citation' + (ownCitations.length === 1 ? '' : 's') + ' — <a href="#sources">see all</a></p>' +
         '<ul class="mb-0">' + top + '</ul>'));
+    }
+
+    // Latest Changes: the friendly, all-members feed (BLOCKERS.md, resolved
+    // 2026-07-04), scoped to this person. Omitted entirely when empty — no
+    // hollow "nothing here" card, per §5A.
+    if (activity.length) {
+      var activityRows = activity.map(function(entry) {
+        return '<div class="story-rail__row"><span class="story-rail__label">' + escapeHtml(entry.text) +
+          '<span class="text-muted small d-block">' + escapeHtml(new Date(entry.created_at).toLocaleDateString()) + '</span></span></div>';
+      }).join('');
+      cards.push(panelCard('Latest Changes', activityRows));
     }
 
     mainEl.innerHTML = cards.join('');

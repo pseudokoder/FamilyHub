@@ -1,0 +1,30 @@
+{# tree/family.html — the Family Group sheet (FE-3, Master Plan §4): one
+   family per page, both partners, marriage/divorce events, children in
+   child_order. Read view only — editing a family's membership stays on the
+   Person Page's Relationships tab (docs/FRONTEND_DESIGN.md's FE-2 pattern);
+   this page just links there for Contributor+. #}
+{% extends "base.html" %}
+
+{% block title %}Family Group{% endblock %}
+
+{% block content %}
+<div class="tree-page" id="familyPage"
+     data-family-id="{{ family_id }}"
+     data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+
+    <div class="tree-subnav" aria-label="Tree views">
+        <a href="{{ url_for('tree.pedigree') }}" class="tree-subnav__link">Pedigree</a>
+        <a href="{{ url_for('tree.relationship') }}" class="tree-subnav__link">Relationship Finder</a>
+    </div>
+
+    <div class="panel" id="familySheet">
+        <p class="text-muted mb-0">Loading this family…</p>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tree.js') }}"></script>
+{% endblock %}

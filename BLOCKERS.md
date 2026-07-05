@@ -37,6 +37,20 @@ Entry format:
 
 ## Open items
 
+### [OPEN] FE-3 added `app/routes/tree.py` + `docs/openapi.yaml` Views entries — BE review at merge
+- Date: 2026-07-05
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE must): review the new `tree_bp` blueprint (`app/routes/tree.py` —
+  three thin view routes: `GET /tree`, `GET /tree/family/<int:family_id>`,
+  `GET /tree/relationship`, each just rendering a shell template, same
+  pattern as `app/routes/people.py`) and its registration in `app/__init__.py`,
+  plus the three matching `docs/openapi.yaml` Views-tag entries the FE-3 brief
+  authorized FE to add on-branch. View-routing only — no business logic,
+  schema, or `/api/*` endpoints changed. Confirm it doesn't break any existing
+  BE tests (it doesn't — 239/239 green) and sign off at merge time.
+- Status: OPEN.
+
 ### [RESOLVED] Person Page "Follow" action has no backend endpoint
 - Date: 2026-07-04
 - Raised by: FE
