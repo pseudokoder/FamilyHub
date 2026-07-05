@@ -917,3 +917,68 @@ grep returns only the allowed exceptions; Revision History reads 2.4.0 → v1.0
 with no gaps; `docs/FRONTEND_DESIGN.md` untouched (FE-owned). Committed on
 `docs-plan-rev240`, pushed, and PR opened per Wes's updated instruction this
 session (push + open PR now allowed; merge still Wes-only).
+
+---
+
+## Post-FE-2 Gaps: feed subject filter, PUT child link, blocker resolutions (2026-07-04)
+
+**Goal:** clear the three items FE-2's Person Page work left in `BLOCKERS.md`,
+plus a doc-only workflow correction to `CLAUDE.md`.
+
+### 1. `GET /api/activity/feed` gains an optional subject filter
+
+Same shape as every other polymorphic-filter endpoint (`/api/events`,
+`/api/notes`, `/api/media`): `?subject_type=&subject_id=`. The twist versus
+those siblings is validation strictness — `write_control.member_feed` is the
+Story tab's ONLY way to see "recent activity about this person" (the full
+Curator+ trail is deliberately off-limits to a Contributor/Viewer), so a
+silently-ignored malformed filter would look like "no activity" instead of a
+usage error. New `_subject_args()` in `app/routes/api/activity.py` requires
+**both params together** and rejects an unknown `subject_type` with 400 —
+stricter than `event_service.list_all`'s "ignore it if only one is given,"
+which is fine there because getting the *unfiltered* list back is harmless,
+not misleading. `write_control.member_feed` takes the pair straight through to
+the query, staying inside the same safe-creates-only filter.
+
+### 2. `PUT /api/families/{family_id}/children/{child_id}`
+
+The forward note: FE's edit flow did DELETE + re-POST, which `add_child`
+already treats as a restore-with-new-values (a real code path, not a
+workaround) — but it wrote a `delete` + `create` audit pair for what's a single
+edit from the member's point of view. `family_service.update_child` snapshots
+the link, applies `pedigree_type`/`child_order`, and logs ONE `update` row.
+
+The one wrinkle: `write_control.log_update` assumed `obj.id`, but
+`FamilyChild` has a **composite** primary key (`family_id`, `child_id`) — no
+single id column. Rather than special-case this one caller, `log_update` grew
+an optional `subject_id=` override (falls back to `obj.id` when omitted), so
+any future composite-key row needing an update-audit can reuse it instead of
+reinventing this. 404 on a missing or already-soft-deleted link, same
+`get_or_404`-the-family-first pattern `remove_child` already used.
+
+### 3. "Follow a person" — parked, not built
+
+Wes's call: it pairs with the v2 notification-email system and isn't useful
+standalone, so it's out of v1 scope. Captured in the Master Plan §11 parking
+lot (Revision 2.5.0, MINOR — parking-lot capture only, no scope/schema change).
+No table, no endpoint, this session.
+
+### 4. `CLAUDE.md` push rule caught up to actual practice
+
+The rule still read "Do NOT push — Wes reviews and pushes" from when pushing
+hung on credentials; that stopped being true (see the `docs-plan-rev240` entry
+above, where Wes had already explicitly allowed push + PR). Updated the one
+rule to say builders may push their branch and open the PR once green, but
+never merge — matching what's actually been happening for at least one prior
+session. Text-only; nothing else in the file touched.
+
+### Manual Testing Checklist (be-gaps-fe2)
+
+Nothing browser-only — pure API + docs. `pytest` clean, 239 passed, including
+`tests/test_openapi.py`'s route-map sync check.
+New coverage: `tests/test_wp5_member_feed.py` (filtered vs. unfiltered counts,
+excluded actions stay excluded when filtered, both 400 cases) and
+`tests/test_api_families.py` (PUT happy path + single-audit-row shape, 404 on
+missing/deleted link, RBAC 403 for a Viewer). Committed on `be-gaps-fe2`,
+pushed, PR opened per the (now-documented) push/PR-allowed workflow — merge
+left to Wes.

@@ -59,13 +59,37 @@ def activity_feed():
     ))
 
 
+def _subject_args():
+    """Validate an optional subject_type/subject_id filter pair: both or
+    neither — never one alone — and subject_type must be a real, known type.
+    Mirrors genealogy_service.require_subject's "one gate" pattern, but for a
+    read-side filter rather than a polymorphic write."""
+    subject_type = request.args.get("subject_type") or None
+    subject_id = _int_arg("subject_id")
+    if (subject_type is None) != (subject_id is None):
+        raise ApiError("subject_type and subject_id must be supplied together.",
+                       400, fields={"subject_type": "required with subject_id"})
+    if subject_type is not None and subject_type not in write_control.SUBJECT_MODELS:
+        raise ApiError(
+            f"subject_type must be one of: {', '.join(sorted(write_control.SUBJECT_MODELS))}.",
+            400, fields={"subject_type": "invalid"})
+    return subject_type, subject_id
+
+
 @api_bp.route("/activity/feed", methods=["GET"])
 @permission_required(permissions.VIEW)  # any logged-in member — deliberately NOT Curator+
 def activity_member_feed():
     """The Home page's "recent activity" — friendly sentences over safe creates
     only (new people/photos/stories). Never deletes, reverts, or account/security
-    actions — see write_control.member_feed for the exact filter."""
-    return jsonify(activity=write_control.member_feed(limit=_int_arg("limit") or 20))
+    actions — see write_control.member_feed for the exact filter. Optional
+    ?subject_type=&subject_id= scopes it to one subject (e.g. a Person Page's
+    Story tab wanting "recent activity about THIS person") — same pair-required
+    pattern as /api/events, /api/notes, /api/media."""
+    subject_type, subject_id = _subject_args()
+    return jsonify(activity=write_control.member_feed(
+        limit=_int_arg("limit") or 20,
+        subject_type=subject_type, subject_id=subject_id,
+    ))
 
 
 @api_bp.route("/restore", methods=["POST"])

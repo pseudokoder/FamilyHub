@@ -61,3 +61,55 @@ def test_feed_respects_limit(member_client):
         member_client.post("/api/individuals", json={"name": {"given": f"P{i}"}})
     feed = member_client.get("/api/activity/feed?limit=2").get_json()["activity"]
     assert len(feed) == 2
+
+
+def test_feed_filtered_to_one_subject(member_client):
+    """?subject_type=&subject_id= scopes the feed to one person (the Person
+    Page Story tab's "recent changes about THIS person" card, BLOCKERS.md
+    2026-07-04) — other members' unrelated creates stay out."""
+    jo = member_client.post(
+        "/api/individuals", json={"name": {"given": "Jo", "surname": "Hartwell"}}
+    ).get_json()
+    member_client.post(
+        "/api/individuals", json={"name": {"given": "Someone", "surname": "Else"}}
+    )
+    member_client.post("/api/notes", json={
+        "title": "The crossing", "content": "## Story",
+        "subject_type": "individual", "subject_id": jo["id"],
+    })
+
+    filtered = member_client.get(
+        f"/api/activity/feed?subject_type=individual&subject_id={jo['id']}"
+    ).get_json()["activity"]
+    assert len(filtered) == 1
+    assert filtered[0]["subject_id"] == jo["id"]
+    assert filtered[0]["subject_type"] == "individual"
+
+    unfiltered = member_client.get("/api/activity/feed").get_json()["activity"]
+    assert len(unfiltered) >= 3  # Jo, Someone Else, and the note all show up
+
+
+def test_feed_filter_excludes_actions_that_are_always_excluded(member_client):
+    """Filtering to a subject doesn't loosen the safe-creates-only rule — a
+    delete on the filtered subject still never appears."""
+    person = member_client.post("/api/individuals", json={"sex": "F"}).get_json()
+    member_client.delete(f"/api/individuals/{person['id']}")
+
+    filtered = member_client.get(
+        f"/api/activity/feed?subject_type=individual&subject_id={person['id']}"
+    ).get_json()["activity"]
+    assert filtered == []
+
+
+def test_feed_subject_filter_requires_both_params(member_client):
+    only_type = member_client.get("/api/activity/feed?subject_type=individual")
+    assert only_type.status_code == 400
+
+    only_id = member_client.get("/api/activity/feed?subject_id=1")
+    assert only_id.status_code == 400
+
+
+def test_feed_subject_filter_rejects_unknown_type(member_client):
+    bad = member_client.get("/api/activity/feed?subject_type=bogus&subject_id=1")
+    assert bad.status_code == 400
+    assert "subject_type" in bad.get_json()["fields"]

@@ -71,8 +71,9 @@ sibling Cowork project).
 - **Verify your own work with pytest** — never pause to ask Wes to manually test.
   Browser-only checks go in the **Manual Testing Checklist** in `DEVDIARY_BE.md`,
   cleared once at each WP boundary.
-- **Commit** logically grouped changes with clear messages. **Do NOT push —
-  Wes reviews and pushes** (pushing hangs on credentials here anyway).
+- **Commit** logically grouped changes with clear messages. Builders MAY push
+  their work branch and open the pull request into `master` when the
+  full suite is green. Builders NEVER merge — the owner reviews and merges every PR.
 
 ## About the Developer
 - Wes Leiter — WGU B.S. Software Engineering (expected Fall 2027).
