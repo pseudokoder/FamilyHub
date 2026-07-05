@@ -83,14 +83,14 @@
         </a>
 
         {% if current_user.is_authenticated %}
-        {# WP4/WP5: the global app shell nav (Master Plan §4/§7 — Cowork's
-           piece). Every item here either renders a real page (Home, People)
-           or a friendly "coming soon" placeholder for a LATER FE prompt
-           (Tree, Memories, Search) — see main.coming_soon. Nothing here is a
-           dead link. #}
+        {# WP4/WP5/FE-3: the global app shell nav (Master Plan §4/§7 —
+           Cowork's piece). Every item here either renders a real page (Home,
+           Tree, People) or a friendly "coming soon" placeholder for a LATER
+           FE prompt (Memories, Search) — see main.coming_soon. Nothing here
+           is a dead link. #}
         <nav class="nav__links" id="navLinks" aria-label="Primary">
             <a href="{{ url_for('main.home') }}">Home</a>
-            <a href="{{ url_for('main.coming_soon', feature='Tree') }}">Tree</a>
+            <a href="{{ url_for('tree.pedigree') }}">Tree</a>
             <a href="{{ url_for('people.index') }}">People</a>
             <a href="{{ url_for('main.coming_soon', feature='Memories') }}">Memories</a>
             <a href="{{ url_for('main.coming_soon', feature='Search') }}">Search</a>

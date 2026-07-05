@@ -426,6 +426,118 @@ per-subject activity filter, the family-children PUT).
 
 ---
 
+### 2026-07-05 — FE-3: Tree (vertical Pedigree, Family Group, Relationship Finder)
+
+**What changed:** the nav's Tree `coming-soon` link is now three real pages
+— Pedigree (default, `/tree`), Family Group (`/tree/family/<id>`), and
+Relationship Finder (`/tree/relationship`) — a new `app/routes/tree.py`
+blueprint + `app/static/js/tree.js`. Person Page carry-overs from the prior
+BE gap-fill run landed too: the disabled "Follow" button is gone, the header's
+View Tree/View Relationship buttons point at these real pages, and the Story
+tab has its "Latest Changes" card back.
+
+**Pedigree layout system: a pure-CSS nested-list "org chart," upside down.**
+The classic org-chart CSS recipe (`<ul>`/`<li>` nesting, flexbox rows,
+`::before`/`::after` border-drawn connectors) normally grows an org chart
+DOWNWARD from one root into more nodes — CEO at top, reports below. That's
+*exactly* the shape a genealogy pedigree wants for the "ancestors" direction:
+root person at the top (one node), parents below (two), grandparents below
+that (four), doubling each generation. Zero JS position math anywhere —
+unlike `chronicle.js`'s absolutely-positioned hero tree (which needs the
+data-x/data-y + `el.style` trick to place nodes under the strict CSP), this
+layout is 100% flexbox + CSS pseudo-elements. `tree.js` never computes a
+pixel position; it only ever asks "does this person have parents in the
+loaded slice, more beyond it, or none on record" and emits plain nested
+markup.
+
+**Node design:** a toned cameo (chronicle.js's `photo()`/`applyTones()`
+globals, same as every other page), name (links to the Person Page — the
+*navigate* affordance), lifespan, and a `pedigree_type` badge when a branch
+is adopted/foster/step. A separate **Center** button is the *recenter*
+affordance — deliberately a different control from the name link, per the
+brief's "make both obvious." Recentering updates `?root=` via
+`history.pushState` (and a `popstate` listener restores it on back/forward),
+so every view is shareable and bookmarkable without a server round trip.
+
+**The graph-not-linked-list requirement, concretely:** `PedigreeGraph.edges`
+can name MORE than one parent-family for the same child (a live birth-family
+link and a live adoptive-family link can coexist — `tree_service._parent_
+families` returns every live family where a person is a child, not just one).
+Rather than inventing a UI to group "birth branch" vs. "adoptive branch"
+separately, every parent from every parent-family becomes a sibling `<li>` in
+the same nested `<ul>`, each individually badged with ITS OWN family's
+`pedigree_type` — simpler than a dual-branch UI and correct for the data
+model without a special case.
+
+**ORIENTATION SEAM — the v2 pan/zoom-canvas reserved toggle, not built here.**
+Every rule keys off `.pedigree-canvas--vertical`, and the graph-merge/render
+logic in `tree.js` has no concept of "vertical" at all — it only emits nested
+markup. A future `--horizontal` sibling class is a single CSS block (flip the
+flex axis, flip the connector pseudo-elements' left/top math) with zero JS
+changes. The brief asked for the seam to exist, not for the toggle itself, so
+that's where this stops.
+
+**Mobile degrade (≤640px): the org chart becomes an indented, scrollable
+outline**, not a shrunk version of the same layout — an ever-widening chart
+genuinely doesn't work on a phone (by 4 generations there can be up to 16
+great-great-grandparent cards in one row), but "one ancestor per line, each
+generation indented further, connected by a plain left border" carries the
+same information at any width with no horizontal scrolling. Same markup,
+different CSS at one breakpoint; nothing computed differently in JS.
+
+**Two real flexbox bugs found in the browser** (not caught by pytest, which
+never lays out CSS): a long name at deep mobile indentation overflowed its
+own card because the flex body child had no `min-width: 0` (its default auto
+minimum size is its unwrapped content width) — the identical class of bug
+FE-2's decision log already found once on `.rel-card__body`, now fixed the
+same way on `.pedigree-node__body`. Once names could wrap to multiple lines,
+the Center/Family action buttons (given `flex: 0 0 100%` to force them onto
+their own row) still rendered on top of the wrapped name, because the mobile
+`.pedigree-node` row itself was `flex-wrap: nowrap` — added `flex-wrap: wrap`
+so the 100%-basis child actually gets to drop to a new line.
+
+**Family Group sheet reuses `.rel-card`/`.rel-cards` verbatim** (FE-2's
+Relationships-tab component) for both partners and children — a family sheet
+and a person's own relationship cards should look like the same product, and
+there was nothing about a family-scoped read view that needed different
+markup.
+
+**Relationship Finder's hop-by-hop chain is a client-side re-derivation**,
+not new backend data: `RelationshipResult` gives `distance_a`/`distance_b`
+(generations from each person to the nearest common ancestor) and `path`
+(individual ids from A through the NCA to B), but no per-hop type. Since
+`path`'s first `distance_a + 1` entries are the ascent from A to the NCA and
+the rest are the descent to B, a hop's type is simply "parent" before that
+boundary index and "child" after — mirroring the same ascent/descent split
+`tree_service.py`'s own `_relationship_label` already computes server-side
+for the English label. Self, no-known-relationship (or in-law, which the
+service also returns an empty `path` for), and "this member has no linked
+person" each render their own plain-language message instead of a fake or
+partial chain.
+
+**A real, non-bug finding: the PWA service worker's cache-first `/static/`
+strategy (`app/static/js/sw.js`) meant manual verification kept showing
+stale JS/CSS even from fetches that bypassed the browser's own HTTP cache** —
+the service worker intercepts the request before the browser's cache is even
+consulted, and its own Cache Storage entry for a given URL persists
+indefinitely until `sw.js`'s own `CACHE` constant changes (its documented
+"refresh lever"). Confirmed the served bytes were correct all along via a
+cache-busting query string; then bumped `CACHE` to `"familyhub-shell-v2"` so
+real returning members actually receive this branch's changed static files
+instead of an indefinitely-stale shell.
+
+**Files created/changed:** `app/routes/tree.py` (new blueprint); `app/
+__init__.py` (registered it); `app/templates/tree/{pedigree,family,
+relationship}.html` (new, thin shells); `app/templates/base.html` (Tree nav
+link); `app/static/js/tree.js` (new — all three views); `app/static/js/
+person.js` (Task 0 carry-overs); `app/static/css/chronicle-app.css` (new §11
+Tree section: `.tree-subnav`, `.pedigree-tree`/`.pedigree-node`, `.family-
+sheet__partners`, `.relationship-chain`, plus the mobile outline degrade);
+`app/static/js/sw.js` (cache version bump); `docs/openapi.yaml` (three new
+Views-tag paths).
+
+---
+
 ## Design Parking Lot
 
 Future constraints and ideas — captured here, not yet scheduled or enforced.

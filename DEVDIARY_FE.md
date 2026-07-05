@@ -619,3 +619,185 @@ would want as a `shareReplay(1)`-backed observable per data key; the
 lazy-tab-load pattern maps directly to Angular's lazy-loaded feature modules
 or a `*ngIf`-gated child component that only calls its own API on first
 activation.
+
+---
+
+## FE-3 — Tree: Vertical Pedigree, Family Group, Relationship Finder
+
+**Branch:** `fe3-tree`
+**Date:** 2026-07-05
+**Status:** Implementation complete; full suite green; pending owner review + merge.
+
+### What FE-3 Delivered
+
+The nav's Tree `coming-soon` link is now a real section: three pages, one new
+`app/routes/tree.py` blueprint (`GET /tree`, `GET /tree/family/<id>`,
+`GET /tree/relationship`), all client-rendered by the new `app/static/js/
+tree.js` against the WP2 JSON API. `docs/openapi.yaml`'s Views tag grew the
+three paths (the one on-branch cross-lane edit this run needed — logged in
+`BLOCKERS.md` for BE's merge-time review per the branch-per-WP protocol).
+
+- **Pedigree** (the default) — a vertical ancestor tree from
+  `GET /api/tree/root` / `?root=` recentering, rendered as a pure-CSS nested
+  `<ul>/<li>` "org chart" (flexbox + `::before`/`::after` border connectors —
+  zero JS position math, unlike `chronicle.js`'s absolutely-positioned hero
+  tree). Each node: toned cameo, name (links to the Person Page), lifespan, a
+  `pedigree_type` badge when a branch is adopted/foster/step, a **Center**
+  button (recenter, `history.pushState` + `popstate`, distinct from the name
+  link's **navigate**), and lazy-fetches 4 more generations from any leaf via
+  `GET /api/individuals/{id}/pedigree?direction=ancestors&depth=4`. Empty
+  parent slots render an honest "+ Add parent" invite into the Person Page's
+  Relationships tab for Contributor+, or nothing at all otherwise (§5A: never
+  a hollow shell).
+- **Family Group sheet** — one family, read-only: both partners (reusing
+  `.rel-card` verbatim from FE-2), marriage/divorce events, children in
+  `child_order` with pedigree badges. Reachable from any pedigree node's
+  "Family" link or a direct `/tree/family/<id>` URL; "Edit this family" links
+  to the Person Page's Relationships tab for Contributor+ — no CRUD
+  duplicated here, same rule as the pedigree invite.
+- **Relationship Finder** — two search-as-you-type person pickers
+  (`/api/search`, person A defaults from `GET /api/me/person` when linked);
+  `GET /api/individuals/{a}/relationship/{b}`'s plain-English label plus a
+  person-by-person chain (portrait + name + the parent/child/spouse hop
+  between each pair), derived from `distance_a`/`distance_b`/`path` client-
+  side (the contract gives the path's node ids, not a per-hop type). Self,
+  no-known-relationship, and unlinked-member states each render their own
+  honest message — never a fake chain.
+
+Full decision log (the org-chart layout system, the orientation seam, the
+mobile outline degrade, and two real bugs found in the browser) is in
+`docs/FRONTEND_DESIGN.md`'s 2026-07-05 entry — not duplicated here.
+
+### Depth-Bar / Design Decisions Worth Recording
+
+- **Three resource-oriented routes, not one hash-switched page.** Pedigree
+  recenters via a query string (`?root=`); Family Group and Relationship each
+  get their own path so a family sheet and a specific relationship query are
+  both directly linkable/bookmarkable, matching the brief's "no rule against
+  separate routes."
+- **`pedigree_type` isn't on a pedigree edge** (`PedigreeGraph.edges` only
+  names the family id linking parent to child) — it lives on that family's
+  `children[]` row. `tree.js` fetches each newly-seen family once
+  (`ensurePedigreeTypes`) and patches the real badge value in before the first
+  paint, so there's never a flash of the wrong badge.
+- **Portraits across many tree nodes are one `GET /api/media` call, filtered
+  client-side by scanning each item's `links[]`** — `Media` has no direct
+  `subject_id` (one photo can attach to more than one subject), so this is
+  the tree-section equivalent of FE-2's "fetch it all, filter client-side"
+  call for family-scale data.
+- **The relationship chain's hop type is computed, not returned.** The API
+  gives `distance_a`/`distance_b` (A's/B's generations to the nearest common
+  ancestor) and `path` (ids from A through the NCA to B); a hop is "parent" if
+  its index is before `distance_a` in the path, "child" after — the same
+  ascent/descent split `tree_service.py`'s `_relationship_label` already
+  computes server-side for the English label, just re-derived client-side for
+  the per-hop chain.
+
+### Files Created or Modified
+
+| File | Status | Notes |
+|---|---|---|
+| `app/routes/tree.py` | Created | `tree_bp`: pedigree/family/relationship view routes |
+| `app/__init__.py` | Modified | Registered `tree_bp` |
+| `app/templates/tree/{pedigree,family,relationship}.html` | Created | Thin shells; all rendering is client-side |
+| `app/templates/base.html` | Modified | Tree nav link now points at `tree.pedigree` |
+| `app/static/js/tree.js` | Created | All three views, sectioned and commented |
+| `app/static/js/person.js` | Modified | Task 0: dropped Follow; real View Tree/Relationship links; Story's Latest Changes card |
+| `app/static/css/chronicle-app.css` | Modified | New Tree section component classes (§11 of that file) |
+| `app/static/js/sw.js` | Modified | Bumped the PWA shell cache version — see below |
+| `docs/openapi.yaml` | Modified | Three new Views-tag paths (`/tree`, `/tree/family/{family_id}`, `/tree/relationship`) |
+| `docs/FRONTEND_DESIGN.md` | Modified | 2026-07-05 decision-log entry |
+
+### Manual Testing Checklist
+
+> Clear this section once the owner has done a browser pass and confirmed green.
+
+- [x] Logged in as the seeded Contributor (`jo@example.com`): Pedigree from
+      Maya Jane Hartwell (4 generations of real Hartwell seed data) —
+      recenter on an ancestor updates the URL and re-renders; back/forward
+      (`popstate`) restores the prior root; leaf nodes with no recorded
+      parents show "+ Add parent" linking into `#relationships`.
+- [x] Family Group sheet (`/tree/family/3`) — both partners, children,
+      "Edit this family" link, all correct for Contributor.
+- [x] Relationship Finder — blood relationship (grandparent, 2-hop chain),
+      spouse (1-hop), self-to-self, and two unrelated people (seed data's
+      separate Hartwell/Vega lines) — each rendered its own honest message;
+      no fake chain when `path` was empty.
+- [x] Logged in as the seeded Viewer (`pat@example.com`) — zero "+ Add
+      parent" invites and no "Edit this family" link anywhere; read/navigate
+      still works everywhere.
+- [x] 375px viewport: Pedigree's org chart degrades to an indented, scrollable
+      outline (no horizontal page overflow); Family Group and Relationship
+      Finder stack full-width, same as FE-2's existing mobile rules.
+- [x] Zero browser console errors / CSP violations across all three views and
+      both roles tested.
+- [x] 239/239 tests green before and after (three new routes; the
+      `test_openapi.py` route-map sync test needed the matching
+      `docs/openapi.yaml` entries, added on this branch).
+
+### Two Bugs Found and Fixed in the Browser
+
+1. **Mobile name-text overflow.** At the ≤640px indented-outline breakpoint, a
+   flex child (`.pedigree-node__body`) has no `min-width: 0`, so its default
+   auto minimum size (its unwrapped content width) let long names push past
+   the card's right edge instead of wrapping — the exact same flexbox gotcha
+   FE-2's decision log already found once on `.rel-card__body`. Fixed by
+   adding `min-width: 0`.
+2. **Mobile action buttons overlapping a wrapped name.** Once names could wrap
+   to 2-3 lines, `.pedigree-node__actions`' `flex: 0 0 100%` (meant to push
+   Center/Family onto their own row) had no effect because the mobile
+   `.pedigree-node` row was still `flex-wrap: nowrap` — added `flex-wrap:
+   wrap` so the actions block actually drops below a multi-line name instead
+   of rendering on top of it.
+
+### A Non-Bug Worth Recording: the PWA Service Worker Cache
+
+Manual verification kept showing stale JS/CSS (an already-removed "Follow"
+button, unstyled Pedigree cards) even after confirming the served **files**
+were correct byte-for-byte. Root cause: `app/static/js/sw.js`'s fetch handler
+is cache-first for everything under `/static/` — once a browser has fetched
+`/static/js/person.js` even once, it's served from the Cache Storage
+indefinitely, regardless of the server's `Cache-Control` headers, until the
+`CACHE` constant's version bumps (the file's own documented "refresh lever").
+This isn't a bug in this branch's code, but it IS a real consequence of it:
+any returning member's browser would keep serving the pre-FE-3 shell after
+this ships. Fixed by bumping `CACHE` to `"familyhub-shell-v2"` in `sw.js` —
+the one-line, already-documented fix for exactly this situation.
+
+### Cross-Boundary Touches
+
+`docs/openapi.yaml`'s Views tag gained three paths (`/tree`,
+`/tree/family/{family_id}`, `/tree/relationship`) — no other section of the
+spec changed, and no Flask routes/models/services outside `app/routes/
+tree.py` (a new, FE-owned file) were touched. Per the branch-per-WP protocol,
+this is a doc-only cross-lane edit for BE to spot-check at merge, not logged
+as a `BLOCKERS.md` item (no dependency on BE, nothing blocked).
+
+### WGU Connections
+
+- **D286 Discrete Mathematics II** — the Pedigree/Relationship views are a
+  hands-on rendering of the same BFS-over-a-graph structure `tree_service.py`
+  implements server-side: nodes + edges, bounded depth, nearest-common-
+  ancestor path reconstruction.
+- **D280 JavaScript Programming** — a client-side graph merge (`mergeGraph`)
+  that accumulates state across multiple lazy-fetches without ever re-fetching
+  data already in hand; `history.pushState`/`popstate` for shareable,
+  back-navigable client-side state that never round-trips the server.
+- **D278/D279 Front-End, D281 UI Design** — a pure-CSS nested-list layout
+  (no JS position math) that degrades from a widening org chart to a
+  scrollable indented outline at one breakpoint; a real flexbox debugging
+  session (`min-width: 0` and `flex-wrap` both needed for a wrapped multi-line
+  flex child to lay out correctly).
+- **D315 Security** — same `escapeHtml()`-before-`innerHTML` discipline as
+  every other page; CSP-strict throughout (SVG was an allowed option for the
+  connector lines but wasn't needed — pure CSS did the whole job).
+
+### v2 Spring Boot Migration Notes
+
+The pedigree graph traversal (`mergeGraph`/`renderAncestor`) has no notion of
+"vertical" anywhere in its logic — only the CSS class controls layout
+direction, which is exactly the seam a v2 Angular pan/zoom canvas component
+would want: swap the rendering layer, keep the same graph-slice consumption
+contract (`GET /api/individuals/{id}/pedigree`, lazy-fetched per node). The
+Relationship Finder's two independent picker components are a natural mapping
+to two instances of one Angular `PersonPickerComponent`.

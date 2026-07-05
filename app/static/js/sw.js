@@ -17,7 +17,7 @@
  * CACHE versioning: bump the name to ship changes; activate() deletes
  * old caches so stale shells can't linger.
  */
-var CACHE = "familyhub-shell-v1";
+var CACHE = "familyhub-shell-v2"; // FE-3: bumped — Tree section ships new/changed static JS+CSS
 var SHELL = [
     "/offline",
     "/static/css/style.css",

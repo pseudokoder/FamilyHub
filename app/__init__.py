@@ -190,12 +190,15 @@ def create_app(config_class=Config):
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.people import people_bp
+    from app.routes.tree import tree_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     # WP4 (Cowork): the People find/register/browse pages — see routes/people.py.
     app.register_blueprint(people_bp)
+    # FE-3 (Cowork): Pedigree/Family Group/Relationship pages — see routes/tree.py.
+    app.register_blueprint(tree_bp)
     # The WP2 JSON API (Master Plan §6/§7) — the contract Cowork builds WP3 on.
     app.register_blueprint(api_bp)
 

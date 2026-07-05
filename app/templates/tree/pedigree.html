@@ -1,0 +1,35 @@
+{# tree/pedigree.html — the Tree section's default view (FE-3, Master Plan §4).
+   A vertical ancestor pedigree, entirely client-rendered by app/static/js/
+   tree.js against docs/openapi.yaml's Tree tag (GET /api/tree/root,
+   GET /api/individuals/{id}/pedigree). This template stays a thin shell —
+   the root person is a CLIENT-side concern (the ?root= query string), so a
+   recenter never round-trips the server. #}
+{% extends "base.html" %}
+
+{% block title %}Family Tree{% endblock %}
+
+{% block content %}
+<div class="tree-page" id="pedigreePage"
+     data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+
+    <div class="tree-subnav" aria-label="Tree views">
+        <a href="{{ url_for('tree.pedigree') }}" class="tree-subnav__link is-active">Pedigree</a>
+        <a href="{{ url_for('tree.relationship') }}" class="tree-subnav__link">Relationship Finder</a>
+    </div>
+
+    <header class="tree-header" id="pedigreeHeader">
+        <h1 class="mb-0">Family Tree</h1>
+        <p class="text-muted mb-0">Loading the tree…</p>
+    </header>
+
+    <div class="pedigree-scroller">
+        <div class="pedigree-canvas pedigree-canvas--vertical" id="pedigreeCanvas" aria-live="polite"></div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tree.js') }}"></script>
+{% endblock %}

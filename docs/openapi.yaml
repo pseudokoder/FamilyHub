@@ -469,6 +469,23 @@ paths:
   /people/{individual_id}:
     parameters: [{name: individual_id, in: path, required: true, schema: {type: integer}}]
     get: {tags: [Views], summary: "The Person Page (FE-2): 6 client-rendered tabs — Story/Relationships/Timeline/Photos/Details/Sources — over the JSON API above", responses: {"200": {description: HTML page}}}
+  /tree:
+    get:
+      tags: [Views]
+      summary: "The Pedigree view (FE-3): vertical ancestor tree, client-rendered against GET /api/tree/root + GET /api/individuals/{id}/pedigree"
+      parameters: [{name: root, in: query, schema: {type: integer}, description: "recenter on this individual instead of the default tree root; shareable/back-navigable"}]
+      responses: {"200": {description: HTML page}}
+  /tree/family/{family_id}:
+    parameters: [{name: family_id, in: path, required: true, schema: {type: integer}}]
+    get: {tags: [Views], summary: "The Family Group sheet (FE-3): both partners, marriage/divorce events, children — client-rendered against GET /api/families/{family_id}", responses: {"200": {description: HTML page}}}
+  /tree/relationship:
+    get:
+      tags: [Views]
+      summary: "The Relationship view (FE-3): two person pickers + the shortest blood path, client-rendered against GET /api/individuals/{a_id}/relationship/{b_id}"
+      parameters:
+        - {name: a, in: query, schema: {type: integer}, description: "pre-fill person A (defaults to GET /api/me/person when omitted)"}
+        - {name: b, in: query, schema: {type: integer}, description: pre-fill person B}
+      responses: {"200": {description: HTML page}}
 
 components:
   responses:
