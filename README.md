@@ -20,11 +20,23 @@ real family and a learning project for a future Java/Spring Boot rewrite (v2).
 spec (architecture, schema, roadmap); [`DEVDIARY.md`](DEVDIARY.md) is the guided,
 textbook-style tour of how it was built. Contributors: [CONTRIBUTING.md](CONTRIBUTING.md).
 
-**Fork-friendly by design.** No specific family's data ships with this project — site
-branding (name, family name) is admin-configurable at runtime, and the app's own voice
-stays generic ("contact your family administrator") rather than naming an individual.
-Author credit and this project's origin story are welcome in docs like this one; the app
-itself just never assumes it's *your* family until you make it so ([ADR-0003](docs/adr/0003-white-label-neutral-language.md)).
+## Development approach
+
+FamilyHub v1 is deliberately built AI-assisted, under human direction. The author
+drives the project as product owner, architect, and integrator: requirements,
+schema, scope, and process are defined in the [Master Plan](docs/MASTER_PLAN.md);
+implementation is executed by two AI builder roles — a Backend Builder and a
+Frontend Builder — working from curated, task-scoped briefs against a published
+API contract ([`docs/openapi.yaml`](docs/openapi.yaml)). Every change lands
+through a pull request into a protected `master` with required CI checks, each
+work package is verified against the plan at its phase gate, and architecture
+decisions are recorded as [ADRs](docs/adr/README.md).
+
+This is a methodology choice, made openly. It accelerates delivery of a working
+product while exercising the professional practices this project exists to
+practice — API-first design, change control, code review, trunk protection. The
+v2 "Enterprise" edition (Java / Spring Boot) will be hand-built by the author on
+this foundation as a senior capstone project.
 
 ## What's built today
 

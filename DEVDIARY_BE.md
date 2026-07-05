@@ -982,3 +982,29 @@ excluded actions stay excluded when filtered, both 400 cases) and
 missing/deleted link, RBAC 403 for a Viewer). Committed on `be-gaps-fe2`,
 pushed, PR opened per the (now-documented) push/PR-allowed workflow — merge
 left to Wes.
+
+## README repair + ADR-0003 rewrite (2026-07-05, docs-only, `be-readme-adr3`)
+
+A README paragraph ("Fork-friendly by design…") had drifted into addressing an
+AI builder directly (author-credit rules, what's "welcome in docs like this
+one") rather than presenting the project to a reader — removed, and replaced
+with a straightforward **Development approach** section that states the
+AI-assisted, human-directed methodology openly instead of leaving it implicit.
+
+ADR-0003 had the same problem at the record level: its original text (title
+"White-Label — Neutral Language, No Personal Data in the App") mixed one real
+architecture decision — deployment values are runtime config, not source — with
+builder-process enforcement language ("every builder prompt … carries the
+neutral-language rule," phase-gate greps). Per Wes's direction, rewrote it in
+place as the terse decision record it should have been: **"Branding and Family
+Data Are Runtime Configuration."** The ADR number is unchanged (0003 stays the
+durable reference — nothing in code comments needed updating), only the prose.
+Master Plan §8 decision 11 and the header ADR callout reworded to match;
+`docs/adr/README.md`'s index row updated; Revision bumped to **2.5.1 (PATCH)** —
+clarification only, no decision changed.
+
+### Manual Testing Checklist (be-readme-adr3)
+
+Docs-only — no app code touched. `pytest` clean (all suites, no count change
+expected since nothing under `app/` or `tests/` changed). No browser check
+applicable.
