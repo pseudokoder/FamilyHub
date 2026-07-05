@@ -3,7 +3,7 @@
 > The single source of truth for the project's architecture, schema, scope, and
 > roadmap. Build one piece at a time; review each piece before starting the next.
 
-**Revision 2.4.0** · Last updated 2026-07-04 · Status: v1 build in progress — WP3 (frontend) underway.
+**Revision 2.5.0** · Last updated 2026-07-04 · Status: v1 build in progress — WP3 (frontend) underway.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version (SemVer) and add a line to the Revision History
 (bottom).*
@@ -854,6 +854,10 @@ not carry a Master Plan revision bump.
     Schedule as a focused WP after WP4 (front-end shell + core CRUD UI) is complete.
     (Approved by Wes 2026-06-29; carried forward from the `wp3-frontend-crud` branch
     at merge into `wp4-fe-shell`, 2026-07-03.)
+- **Follow a person** — a member subscribes to updates on one individual (surfaced
+  on the Person Page header). Parked from the FE-2 wireframe (2026-07-04): needs a
+  `follows` join table + endpoints and only becomes truly useful alongside the v2
+  notification-email system (§11 v2 captures). Target: v1.x at the earliest.
 
 **v2 / future captures (reserved seams, do NOT build now):**
 - **MFA (TOTP)** — authenticator-app second factor, **no SMS/phone dependency** (§9 Tier-3).
@@ -894,6 +898,10 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- **2.5.0 — 2026-07-04 — MINOR.** Parking-lot capture: **Follow a person** (from the
+  FE-2 Person Page wireframe) parked to v1.x — no v1 scope change; pairs with the v2
+  notification-email system. Decision recorded from FE-2's BLOCKERS item. (Raised by FE;
+  decided by Wes.)
 - **2.4.0 — 2026-07-04 — MINOR.** Restored content lost in the 2026-07-03 merge-conflict
   resolution that kept the 2.0.0 rewrite over revisions v1.3–v1.6.0: implementer-agnostic
   builder roles (Backend Builder (BE) / Frontend Builder (FE)) across §1/§6/§7 (v1.5.0);

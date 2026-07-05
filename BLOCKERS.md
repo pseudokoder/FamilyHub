@@ -37,25 +37,32 @@ Entry format:
 
 ## Open items
 
-### [OPEN] Person Page "Follow" action has no backend endpoint
+### [RESOLVED] Person Page "Follow" action has no backend endpoint
 - Date: 2026-07-04
 - Raised by: FE
-- Blocks: nothing critical — the Person Page header's "Follow" button (wireframed
-  and approved per the FE-2 brief) renders **disabled**, with a "coming soon"
-  title attribute, per §5A's "never fake a control" rule. It is not wired to
-  anything.
+- Was blocking: nothing critical — the Person Page header's "Follow" button
+  (wireframed and approved per the FE-2 brief) renders **disabled**, with a
+  "coming soon" title attribute, per §5A's "never fake a control" rule. It is
+  not wired to anything.
 - Needs (BE should): decide whether "Follow a person" (a per-member subscription
   to updates on one individual) is in scope for v1 or deferred/cut. If it's in:
   a `POST/DELETE /api/individuals/{id}/follow` (or similar) endpoint + a
   `follows` join table (user_id, individual_id). If it's out: say so and FE will
   drop the button and its BLOCKERS reference instead of leaving it disabled
   forever.
-- Status: OPEN.
+- Decision (Wes, 2026-07-04): **park to v1.x.** Follow-a-person pairs naturally
+  with the v2 notification-email system (Master Plan §11 v2 captures) and isn't
+  useful on its own without it — out of v1 scope. No endpoint, no `follows`
+  table, this session. Captured in the Master Plan §11 parking lot (Revision
+  2.5.0).
+- Status: **RESOLVED 2026-07-04** — parked, not built. Needs (FE, next
+  session): remove the disabled "Follow" button and this BLOCKERS reference
+  from the Person Page header.
 
-### [OPEN] Home's "Latest Changes" needs a per-subject activity filter
+### [RESOLVED] Home's "Latest Changes" needs a per-subject activity filter
 - Date: 2026-07-04
 - Raised by: FE
-- Blocks: nothing critical — the Person Page's Story tab has no "Latest
+- Was blocking: nothing critical — the Person Page's Story tab has no "Latest
   Changes" card. `GET /api/activity/feed` (the friendly, all-members feed
   BE built for Home, BLOCKERS.md 2026-07-03) only accepts `?limit=`; it has no
   `subject_type`/`subject_id` filter, so there is no way to ask "recent
@@ -68,7 +75,15 @@ Entry format:
   endpoint already uses (`/api/events`, `/api/notes`, `/api/media`,
   `/api/citations`). Once it exists, FE adds the Story-tab card back — no other
   change needed.
-- Status: OPEN.
+- Status: **RESOLVED 2026-07-04** — `GET /api/activity/feed` now accepts
+  optional `subject_type`+`subject_id` (both or neither; 400 if only one is
+  given or the type is unknown), additionally scoping `write_control.member_feed`
+  to one subject while keeping the same safe-creates-only filter. Documented in
+  `docs/openapi.yaml`; covered in `tests/test_wp5_member_feed.py` (filtered vs.
+  unfiltered counts, excluded actions stay excluded when filtered, both
+  validation-error cases). Needs (FE, next session): add the Story-tab "Latest
+  Changes" card pointed at `?subject_type=individual&subject_id={id}` — no
+  further backend work needed.
 
 ### [RESOLVED] WP4 nav brief says "Admin" is Curator+; the backend admin surface is Admin-only
 - Date: 2026-07-03 (raised) → 2026-07-03 (resolved)
@@ -204,23 +219,26 @@ Entry format:
 
 ## Forward notes (not blocking today, but the next builder must know)
 
-### [OPEN] No PUT for an active `family_children` row — editing pedigree_type/child_order works, but leaves a two-entry audit trail
+### [RESOLVED] No PUT for an active `family_children` row — editing pedigree_type/child_order works, but leaves a two-entry audit trail
 - Date: 2026-07-04
 - Raised by: FE
-- Not blocking: the Relationships tab's "Edit" action on a child link (change
-  pedigree_type or birth order) works correctly today — `docs/openapi.yaml`
-  only offers `POST /api/families/{family_id}/children` (create-or-restore) and
-  `DELETE .../children/{child_id}`, no `PUT`. FE's edit flow calls DELETE then
-  immediately re-POSTs with the new values, which `family_service.add_child`
-  already handles as "restore a just-soft-deleted link with updated fields" —
-  a real, intended code path (see its own comment), not a stub or faked data.
+- Was blocking: nothing — the Relationships tab's "Edit" action on a child link
+  (change pedigree_type or birth order) worked correctly, just via DELETE +
+  re-POST (a real, intended `family_service.add_child` restore path, not a
+  stub), leaving a two-entry audit trail for what is, from the member's point
+  of view, a single edit.
 - Needs (BE, whenever convenient): a `PUT /api/families/{family_id}/children/{child_id}`
   that updates `pedigree_type`/`child_order` on an active link directly, so the
-  audit trail records one `update` instead of a `delete` + `create` pair for
-  what is, from the member's point of view, a single edit. Pure clean-up — no
-  user-facing behavior changes when this lands; FE just swaps which endpoint(s)
-  it calls.
-- Status: OPEN.
+  audit trail records one `update` instead of a `delete` + `create` pair.
+- Status: **RESOLVED 2026-07-04** — added `PUT /api/families/{family_id}/children/{child_id}`
+  (`family_service.update_child`, Contributor+): updates an ACTIVE link in
+  place, producing exactly one `update` audit row with a real before -> after
+  snapshot (`write_control.log_update` gained an optional `subject_id` override
+  for composite-key rows like this one, which have no single `.id` column).
+  404 on a link that's missing or already soft-deleted. Documented in
+  `docs/openapi.yaml`; covered in `tests/test_api_families.py` (happy path +
+  audit-row shape, 404 missing/deleted, RBAC deny). Needs (FE, next session):
+  swap the Relationships tab's edit flow from DELETE+POST to this one PUT call.
 
 ### [RESOLVED] `users` table aligned to Master Plan §3.5 + §10 RBAC
 - Date: 2026-06-16 (raised) → 2026-06-17 (resolved)

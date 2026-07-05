@@ -46,6 +46,12 @@ def add_child(family_id):
     return jsonify(svc.add_child(family_id, json_body())), 201
 
 
+@api_bp.route("/families/<int:family_id>/children/<int:child_id>", methods=["PUT"])
+@role_required(Role.CONTRIBUTOR)
+def update_child(family_id, child_id):
+    return jsonify(svc.update_child(family_id, child_id, json_body()))
+
+
 @api_bp.route("/families/<int:family_id>/children/<int:child_id>", methods=["DELETE"])
 @role_required(Role.CONTRIBUTOR)
 def remove_child(family_id, child_id):

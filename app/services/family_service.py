@@ -170,3 +170,27 @@ def remove_child(family_id, child_id):
     write_control.log_action("delete", "family_child", family_id,
                              detail=f"child #{child_id}")
     db.session.commit()
+
+
+def update_child(family_id, child_id, data):
+    """Update ``pedigree_type``/``child_order`` on an ACTIVE child link in
+    place — one ``update`` audit entry (before -> after), instead of the
+    delete + re-POST dance the front end used before this endpoint existed
+    (BLOCKERS.md forward note, 2026-07-04). ``add_child`` still owns the
+    create-or-restore path; this is only for editing a link that's already
+    there."""
+    from app.routes.api import get_or_404, one_of
+    link = db.session.get(FamilyChild, (family_id, child_id))
+    if link is None or link.is_deleted:
+        get_or_404(Family, family_id, "family")  # 404 the family if THAT's wrong
+        raise ApiError("That child isn't in this family.", 404)
+
+    before = write_control.snapshot(link)
+    if "pedigree_type" in data:
+        link.pedigree_type = one_of(data, "pedigree_type", PEDIGREE_TYPES, required=True)
+    if "child_order" in data:
+        link.child_order = int(data.get("child_order") or 0)
+    write_control.log_update("family_child", link, before,
+                             detail=f"child #{child_id}", subject_id=family_id)
+    db.session.commit()
+    return serialize_child(link)

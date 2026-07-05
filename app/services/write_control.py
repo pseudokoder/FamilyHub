@@ -92,10 +92,14 @@ def log_create(subject_type, obj, detail=""):
                                 before=None, after=snapshot(obj), detail=detail)
 
 
-def log_update(subject_type, obj, before, detail=""):
-    """Record an update. ``before`` is a snapshot taken BEFORE the mutation."""
-    audit_service.record_change(_actor(), "update", subject_type, obj.id,
-                                before=before, after=snapshot(obj), detail=detail)
+def log_update(subject_type, obj, before, detail="", subject_id=None):
+    """Record an update. ``before`` is a snapshot taken BEFORE the mutation.
+    ``subject_id`` overrides ``obj.id`` for a composite-key row (e.g.
+    ``family_children``) that has no single id column to fall back on."""
+    audit_service.record_change(
+        _actor(), "update", subject_type,
+        subject_id if subject_id is not None else obj.id,
+        before=before, after=snapshot(obj), detail=detail)
 
 
 def log_action(action, subject_type, subject_id=None, detail=""):
@@ -304,17 +308,28 @@ def _member_friendly_entry(entry):
     }
 
 
-def member_feed(limit=20):
+def member_feed(limit=20, subject_type=None, subject_id=None):
     """Friendly, ALL-MEMBERS recent-activity feed for Home. Only ``create``
     events on new genealogy content (people/photos/stories) — never deletes,
     reverts, edits, or account/security actions. Over-fetches a little so
-    since-deleted subjects (silently skipped) don't shrink the visible feed."""
+    since-deleted subjects (silently skipped) don't shrink the visible feed.
+
+    ``subject_type``/``subject_id`` (both or neither — the route validates the
+    pair) additionally scope the feed to one subject, e.g. a Person Page's
+    Story tab asking "recent activity about THIS person." Filtering here (not
+    just in the caller) keeps the "over-fetch, then skip deleted" trick correct
+    for the scoped case too."""
     from app.models import AuditLog
 
     limit = max(1, min(int(limit), 100))
-    entries = (AuditLog.query
-               .filter(AuditLog.action == "create",
-                       AuditLog.subject_type.in_(MEMBER_SAFE_SUBJECTS))
+    query = AuditLog.query.filter(
+        AuditLog.action == "create",
+        AuditLog.subject_type.in_(MEMBER_SAFE_SUBJECTS),
+    )
+    if subject_type is not None and subject_id is not None:
+        query = query.filter(AuditLog.subject_type == subject_type,
+                             AuditLog.subject_id == subject_id)
+    entries = (query
                .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
                .limit(limit * 2)
                .all())
