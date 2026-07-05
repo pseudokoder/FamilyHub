@@ -3,7 +3,7 @@
 > The single source of truth for the project's architecture, schema, scope, and
 > roadmap. Build one piece at a time; review each piece before starting the next.
 
-**Revision 2.5.0** · Last updated 2026-07-04 · Status: v1 build in progress — WP3 (frontend) underway.
+**Revision 2.5.1** · Last updated 2026-07-05 · Status: v1 build in progress — WP3 (frontend) underway.
 *Git is the source of truth — repo HEAD is always current. Per §11 change control, when
 a change is approved, bump this version (SemVer) and add a line to the Revision History
 (bottom).*
@@ -16,7 +16,7 @@ change control). It is independent of the product versions — v1 "Full" (Flask)
 > **Design decisions live in ADRs.** Point-in-time architecture decisions are recorded
 > under [`docs/adr/`](adr/README.md): **ADR-0001** (write-control model — post-moderation:
 > RBAC + audit + soft-delete + revert), **ADR-0002** (Account↔Person link), **ADR-0003**
-> (white-label — neutral language, no personal data in the app itself), and **ADR-0004**
+> (branding and family data are runtime configuration), and **ADR-0004**
 > (defer all FE design constraints until the front end is stable). The Master Plan
 > cites them where they bite; the ADRs hold the full rationale.
 
@@ -709,14 +709,11 @@ wrong endpoint; the BE finds the front-end needs a different data shape). Protoc
 10. **Transactional email (Option A)** — configurable SMTP/provider powers self-serve
     password reset + email verification (§9). A separate *notification* email stream is
     v2 (§11).
-11. **Neutral language, no personal data in the app itself** (**ADR-0003**): white-label
-    means no specific family's name/contact info appears in the app's own UI copy, config
-    defaults, or the technical/build-detail language describing the schema and
-    architecture — that's what makes the codebase genuinely forkable and keeps a public
-    repo PII-clean. Author credit and the project's origin story remain fine in docs
-    (README, this plan's own narrative) — the line is between *attribution* (allowed) and
-    *the app's operative voice* (must stay generic, e.g. "contact your family
-    administrator").
+11. **Branding and family data are runtime configuration** (**ADR-0003**):
+    deployment-specific values — site/family name, admin contact — live in
+    `site_settings` or instance configuration, never in source, and UI copy stays
+    deployment-neutral. This is what makes the codebase genuinely white-label and
+    keeps the public repository free of any one family's data.
 
 [↑ Back to Contents](#contents)
 
@@ -898,6 +895,13 @@ strong version ships in v1 — easy here because the dataset is family-sized.
 ---
 
 ## Revision History
+- **2.5.1 — 2026-07-05 — PATCH.** Clarification only: ADR-0003 rewritten in place as
+  the terse architecture decision it records ("branding and family data are runtime
+  configuration"), removing builder-process prose that didn't belong in an ADR; §8
+  decision 11 and the header ADR callout reworded to match. A related README
+  paragraph of builder-facing compliance language was removed and replaced with a
+  professional "Development approach" section (AI-assisted methodology, stated
+  openly). No decision changed. (Raised by Wes.)
 - **2.5.0 — 2026-07-04 — MINOR.** Parking-lot capture: **Follow a person** (from the
   FE-2 Person Page wireframe) parked to v1.x — no v1 scope change; pairs with the v2
   notification-email system. Decision recorded from FE-2's BLOCKERS item. (Raised by FE;
