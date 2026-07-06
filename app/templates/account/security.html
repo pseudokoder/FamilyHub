@@ -1,0 +1,56 @@
+{# account/security.html — Account & Security (FE-5): one page, five calm
+   sections (progressive disclosure, not a settings dump) — Profile, Role,
+   Email, Password, Delete account. Every value on this page is the caller's
+   OWN account (GET /api/me + friends); nothing here ever takes another
+   member's id. Entirely client-rendered by account.js, same "Flask renders a
+   shell, JS calls the JSON API" split as every other FE-4/FE-5 page. #}
+{% extends "base.html" %}
+
+{% block title %}Account &amp; Security{% endblock %}
+
+{% block content %}
+<div id="accountSecurityPage">
+    {% set active = 'security' %}
+    {% include "account/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">Account &amp; Security</h1>
+        <p class="text-muted mb-0">Your own profile, role, email, and password — nobody else's.</p>
+    </header>
+
+    {# PROFILE — display name + timezone. #}
+    <section class="panel mb-3" aria-labelledby="acctProfileTitle">
+        <h2 class="section-title" id="acctProfileTitle">Profile</h2>
+        <div id="acctProfileBody"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+
+    {# ROLE — badge + request-a-change. #}
+    <section class="panel mb-3" aria-labelledby="acctRoleTitle">
+        <h2 class="section-title" id="acctRoleTitle">Role</h2>
+        <div id="acctRoleBody"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+
+    {# EMAIL — address, verified state, resend, change-email. #}
+    <section class="panel mb-3" aria-labelledby="acctEmailTitle">
+        <h2 class="section-title" id="acctEmailTitle">Email</h2>
+        <div id="acctEmailBody"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+
+    {# PASSWORD — links out to the existing /auth/change-password flow. #}
+    <section class="panel mb-3" aria-labelledby="acctPasswordTitle">
+        <h2 class="section-title" id="acctPasswordTitle">Password</h2>
+        <p class="mb-2">Change the password you use to sign in.</p>
+        <a class="btn btn-outline-secondary" href="{{ url_for('auth.change_password') }}">Change My Password</a>
+    </section>
+
+    {# DELETE ACCOUNT — "delete" = anonymize, never erase. #}
+    <section class="panel panel--danger mb-3" aria-labelledby="acctDeleteTitle">
+        <h2 class="section-title" id="acctDeleteTitle">Delete Account</h2>
+        <div id="acctDeleteBody"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/account.js') }}"></script>
+{% endblock %}

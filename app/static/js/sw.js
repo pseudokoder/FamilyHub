@@ -17,7 +17,7 @@
  * CACHE versioning: bump the name to ship changes; activate() deletes
  * old caches so stale shells can't linger.
  */
-var CACHE = "familyhub-shell-v4"; // BE gaps: style.css deleted, folded into chronicle-app.css (BLOCKERS.md 2026-07-05)
+var CACHE = "familyhub-shell-v5"; // FE-5: account.js + Account & Security/My Contributions pages
 var SHELL = [
     "/offline",
     "/static/css/chronicle-app.css",

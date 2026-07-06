@@ -1015,3 +1015,232 @@ and `SearchController` map directly to the two new blueprints, and
 fuzzy-date group) are natural candidates for shared Angular components/
 pipes rather than page-specific code, since v1 already proved they're needed
 in more than one place.
+
+## FE-5 — User area: My Contributions + Account & Security
+
+**Branch:** `fe5-user-area`
+**Date:** 2026-07-06
+**Status:** Implementation complete; full suite green; pending owner review + merge.
+
+### What FE-5 Delivered
+
+Two new pages under a new `app/routes/account.py` blueprint (`GET /account`,
+`GET /account/contributions`), both client-rendered by one new script,
+`app/static/js/account.js`, against the Account tag the backend shipped in
+`ffe6cb1`. The user menu's "Account & Security" entry now points here instead
+of straight at `/auth/change-password`, and gained a new "My Contributions"
+entry (`app/templates/base.html`).
+
+**My Contributions** (`/account/contributions`) — a member's own audit rows,
+never anyone else's (`GET /api/me/contributions` takes no `actor_id`
+parameter anywhere in this file, by construction — that side door is the
+Curator-only `/api/activity`):
+
+- **Summary cards** (`.stat-strip`) — Total contributions, then People/
+  Families/Events/Photos/Sources groups, each a straight sum of real
+  `summary.by_subject_type` buckets (no per-cell action×type fetch, no
+  invented numbers — the brief's "every count must come from the real
+  summary" read literally). Cards hide entirely for a member who's never
+  contributed; the list shows an honest "You haven't added anything yet" +
+  Quick Add invite instead, rather than a wall of zeroes.
+- **The list** — paginated (`page`/`per_page`, Prev/Next, same shape as
+  `people.js`'s pager) and filterable by action and subject type
+  (`.chip-group`, same idiom as People's living-status filter). Each row
+  resolves its subject by fetching the real record — `GET /api/individuals`,
+  `/api/families`, `/api/media`, `/api/notes`, `/api/events` all already
+  soft-delete-aware (`get_or_404` 404s a deleted row) — so a link only ever
+  appears for a subject that's still there, and a since-deleted one renders
+  unlinked with "(since removed)" instead of a dead link or a 404. An event
+  has no page of its own, so it resolves to ITS OWN subject (person or
+  family), the same idea `fh-common.js`'s `resolveLinkTarget` already uses
+  for a photo's "linked to" chips. Subject types with no page at all
+  (source/citation/name/user/backup/family_child) get a friendly label and
+  no link — named, not faked.
+- **Media rows needed a real "Memories detail" destination that didn't quite
+  exist yet** — `memories.js`'s Photo Detail overlay only ever opened from a
+  click inside an already-loaded album grid, no shareable URL. Added a small,
+  additive `?photo=` query param to `/memories` (`app/static/js/memories.js`'s
+  `DOMContentLoaded` handler) that calls the SAME `openPhotoDetail(id)` the
+  grid's own click handler uses — it fetches by id directly, so it works
+  regardless of which album view is the page default. Documented as a
+  parameter on the existing `/memories` Views entry, not a new route.
+
+**Account & Security** (`/account`) — five independently-rendered sections
+over one `GET /api/me` snapshot (progressive disclosure, not a settings
+dump):
+
+- **Profile** — display name + a searchable timezone picker. The picker uses
+  `Intl.supportedValuesOf('timeZone')` — the BROWSER's own IANA database,
+  the same source `zoneinfo.available_timezones()` validates against
+  server-side (`account_service.update_me`) — so there's no bundled zone
+  list to keep in sync; a short hand-picked fallback list covers browsers
+  without that API (Safari <15.4). "Site default" is a real chip, not a
+  blank field. Saves via `PUT /api/me`.
+- **Role** — a badge (same admin/curator/contributor/viewer → color mapping
+  as the admin Users tab) + "Request a role change," a picker that excludes
+  the member's OWN current role (avoids a guaranteed 400) and renders the
+  409 "already have a pending request" state as calm text, not a form error.
+- **Email** — address + verified/unverified badge, resend-verification,
+  and change-email (new address + current password). `GET /api/me` has no
+  persistent "pending change" field — only the change-email POST response
+  carries `pending_email` — so rather than fake one, the pending address is
+  remembered client-side (`localStorage`, keyed by user id) and cleared the
+  moment a later `/api/me` snapshot shows `email` actually caught up to it
+  (the verification link was clicked). An honest derivation from data the
+  API really returns, not a guessed field.
+- **Password** — links to the existing `/auth/change-password` flow rather
+  than rebuilding it. That form had NO `autocomplete` attributes on any of
+  its three password fields — a password manager can't tell "current" from
+  "new" without them. Fixed via WTForms `render_kw` on `ChangePasswordForm`
+  (`app/forms/auth_forms.py`) — the brief's "template-only fix, allowed"
+  covers this: the only observable effect is the rendered HTML attribute,
+  same as any other Jinja-side tweak.
+- **Delete account** — "delete = anonymize," stated plainly before the
+  password field, not after. Success replaces the confirm form with a brief
+  "signing you out…" message before redirecting to `/` (which renders fine
+  logged-out) — no page ever tries to render as an authenticated user with
+  no session.
+
+### Depth-Bar / Design Decisions Worth Recording
+
+- **Family gets a real link too, not just person/media/note.** The brief's
+  examples only named those three, but `/tree/family/{id}` (the FE-3 Family
+  Group sheet) is exactly the same kind of real, already-shipped page — "a
+  page exists" is the actual rule, and family clears it. No family-subject
+  audit row existed in seed data to click through in the browser, but the
+  resolver is the identical fetch-then-catch shape already proven for
+  individual/media/note.
+- **`window.alert()` / blocking dialogs, deliberately avoided on this page.**
+  Several existing pages (`memories.js`'s unlink/delete-photo failures) use
+  `window.alert()` for button-triggered errors, and it would have been the
+  path of least resistance here too. Found in the browser, not in review: an
+  alert for the resend-verification 503 blocked the automated preview tool
+  completely (a real modal, same as it would a real user mid-task) on a page
+  the brief explicitly wants to "feel calm, not like a settings dump." Every
+  error path on this page now uses the SAME inline `.alert-danger`
+  (`showInlineError`/`alertFormError`, both already in `fh-common.js`) the
+  form-submit paths already used — one consistent error idiom for the whole
+  page instead of two. `window.confirm()` for the final delete gate is kept
+  (a deliberate blocking yes/no, not a dismissable notice, and matches the
+  existing delete-photo precedent).
+- **`.chip-group` needed `flex-wrap: wrap`.** The existing rule (People's
+  3-chip living-status filter) never needed to wrap at any real width. My
+  Contributions' subject-type group has 6 chips, which overflowed off a
+  375px viewport instead of dropping to a second row — a real bug the
+  browser pass caught that a wider desktop check wouldn't have. Fixed in the
+  shared class (`chronicle-app.css`), verified People's own filter still
+  renders on one line afterward (no regression).
+- **A `label` immediately before a `.chip-group` sits on the same line.**
+  Bootstrap's `.form-label` is `display: inline-block`; `.chip-group` is
+  `inline-flex` — nothing forces a line break between them unless something
+  else in the pair is block-level. Every other `.chip-group` in the app is
+  preceded by a plain `<div>`, not a `<label>`, so this never surfaced
+  before the Timezone field. Fixed with `d-block` on that one label rather
+  than changing `.form-label` globally (Bootstrap fields elsewhere may rely
+  on the inline-block default).
+
+### Files Created or Modified
+
+| File | Status | Notes |
+|---|---|---|
+| `app/routes/account.py` | Created | New blueprint, two thin view routes |
+| `app/__init__.py` | Modified | Registered the blueprint |
+| `app/templates/account/{security,contributions,_subnav}.html` | Created | Thin shells; all rendering is client-side |
+| `app/static/js/account.js` | Created | Both pages' logic (DOM-guarded, one file) |
+| `app/templates/base.html` | Modified | User menu: "Account & Security" repointed, "My Contributions" added |
+| `app/forms/auth_forms.py` | Modified | `ChangePasswordForm` render_kw autocomplete attributes |
+| `app/static/js/memories.js` | Modified | `?photo=` deep-link support (DOMContentLoaded) |
+| `app/static/css/chronicle-app.css` | Modified | New Account & Security section; `.chip-group` flex-wrap fix |
+| `app/static/js/sw.js` | Modified | Bumped the PWA shell cache version |
+| `docs/openapi.yaml` | Modified | Two new Views-tag paths; `?photo=` param on the existing `/memories` entry |
+| `docs/FRONTEND_DESIGN.md` | Modified | 2026-07-06 decision-log entry |
+| `BLOCKERS.md` | Modified | Style.css entry header label fixed (`[OPEN]` → `[RESOLVED]`, body already said resolved); new FE-5 cross-lane entry |
+
+### Manual Testing Checklist
+
+> Clear this section once the owner has done a browser pass and confirmed green.
+
+- [x] Profile: changed display name + timezone (searched "chicago" → picked
+      `America/Chicago`) as a throwaway seeded user; `GET /api/me` confirmed
+      the save persisted.
+- [x] Role: requested a role change, saw the success state; requested again
+      without reloading — the 409 "already have a pending request" state
+      rendered correctly.
+- [x] Email: resend-verification against a dev server with no mail
+      configured rendered the 503 as an inline error, not a crash or an
+      alert; change-email likewise. Simulated the pending → verified
+      transition directly against the dev DB (set `pending_email`
+      client-side, then flipped `email` server-side to match) — the pending
+      banner appeared, then correctly cleared itself on the next load once
+      `email` caught up.
+- [x] Delete account: on a disposable seeded user (not `jo`/`robert`/`pat`,
+      never the admin) — wrong password showed an inline 403, correct
+      password anonymized the row (verified in the DB: display_name "Former
+      member", email `deleted-user-<id>@familyhub.invalid`, `is_active`
+      false), the session ended (`GET /api/me` → 401 after), and the browser
+      landed on the public `/` without error.
+- [x] My Contributions: real seeded audit rows for three different accounts
+      exercised every resolver branch — a live photo (linked, opened via the
+      new `?photo=` deep link and confirmed the Photo Detail overlay opens),
+      a live person + a `Birth: <name>` event (both linked to the Person
+      Page), a citation (named, unlinked — no page exists), and a
+      create-then-delete note pair (BOTH rows rendered "(since removed)",
+      including the original "Added" row for the now-gone story). Filters
+      (action + subject type) and pagination (24 rows, default 20/page)
+      confirmed against real data; the true empty state (a Viewer with zero
+      rows) showed the honest "haven't added anything yet" + Quick Add
+      invite with no summary cards, not a wall of zeroes.
+- [x] 375px viewport: both pages checked full-page (a taller-than-viewport
+      resize, since this environment's page scroll didn't respond to
+      `window.scrollTo`/`body.scrollTop` from injected script — a tooling
+      quirk, not an app bug). Found and fixed the `.chip-group` wrap bug and
+      the Timezone label/chip collision above during this pass.
+- [x] Zero browser console errors across every page/role tested. The only
+      failed network requests observed were the EXPECTED ones — soft-deleted
+      subjects' `GET /api/notes/{id}` 404s (caught, rendered "(since
+      removed)") and two seeded media rows with no real file on disk
+      (`/file`/`/thumb` 404s, a pre-existing seed-data gap, not something
+      this branch touched).
+- [x] 260/260 tests green (no backend logic touched; the two new Views-tag
+      paths keep `test_openapi.py`'s route↔spec sync test passing).
+
+### Cross-Boundary Touches
+
+`docs/openapi.yaml` gained two Views-tag paths (`/account`,
+`/account/contributions`) plus a `photo` query param on the existing
+`/memories` entry — no Flask routes/models/services outside the one new,
+FE-owned blueprint file were touched. Logged in `BLOCKERS.md` for BE to
+spot-check at merge, same protocol as FE-3/FE-4.
+
+### WGU Connections
+
+- **D315 Security** — the `autocomplete` fix on `ChangePasswordForm` is a
+  concrete password-manager-interoperability lesson: browsers/managers key
+  "which field is the NEW password" off this attribute, not label text,
+  field name, or field order.
+- **D278/D279 Front-End, D281 UI Design** — the `.chip-group` wrap bug and
+  the label/chip collision are both instances of the same lesson FE-3/FE-4
+  already logged once each: a component that's only ever been tested with a
+  short list of items, or a specific preceding sibling, can hide a layout
+  assumption that a wider real-world case (more chips, a `<label>` instead
+  of a `<div>`) breaks.
+- **D287 Database / ADR-0001** — the "since removed" resolution leans
+  directly on `get_or_404`'s soft-delete filtering being applied uniformly
+  across every resource GET-by-id endpoint; the front end never has to know
+  a row is soft-deleted vs. hard-gone, it just gets the same 404 either way.
+- **D286 Back-End (client/server contract)** — the pending-email
+  client-side derivation is a small case study in working WITH an API
+  contract's actual shape instead of wishing for a field it doesn't have:
+  `pending_email` only ever appears on the POST response, so the client
+  remembers it and reconciles against the next GET rather than inventing a
+  GET-side field the backend was never asked to add.
+
+### v2 Spring Boot Migration Notes
+
+Same split as every prior WP: `AccountController.java`, two `@GetMapping`s
+returning view names for Angular's router. The one piece worth flagging for
+the rewrite is the pending-email client-side reconciliation — a v2 built on
+a real notification/event system (Master Plan §11) would likely push a
+server-driven "email changed" event instead, making this localStorage trick
+unnecessary. Not a lock-in either way: v1's approach only reads
+already-public fields (`email`) and writes to no server state.

@@ -1,0 +1,47 @@
+{# account/contributions.html — My Contributions (FE-5): a member's own
+   FamilySearch-style dashboard of their own work. Summary cards, then a
+   paginated, filterable list of their own audit rows — newest first.
+   Entirely client-rendered by account.js against GET /api/me/contributions
+   (MY OWN rows only; there is no actor_id parameter anywhere in this page —
+   that's the Curator-only /api/activity trail, a separate page). #}
+{% extends "base.html" %}
+
+{% block title %}My Contributions{% endblock %}
+
+{% block content %}
+<div id="myContributionsPage">
+    {% set active = 'contributions' %}
+    {% include "account/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">My Contributions</h1>
+        <p class="text-muted mb-0">Everything you've added or changed in the family archive.</p>
+    </header>
+
+    <div id="contribSummary" class="stat-strip mb-3"><p class="text-muted mb-0">Loading…</p></div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3" id="contribFilters">
+        <div class="chip-group" role="group" aria-label="Filter by action" data-chip-group="action">
+            <button type="button" class="filter-chip is-active" data-value="">Any action</button>
+            <button type="button" class="filter-chip" data-value="create">Added</button>
+            <button type="button" class="filter-chip" data-value="update">Edited</button>
+            <button type="button" class="filter-chip" data-value="delete">Deleted</button>
+        </div>
+        <div class="chip-group" role="group" aria-label="Filter by subject type" data-chip-group="subject_type">
+            <button type="button" class="filter-chip is-active" data-value="">Anything</button>
+            <button type="button" class="filter-chip" data-value="individual">People</button>
+            <button type="button" class="filter-chip" data-value="family">Families</button>
+            <button type="button" class="filter-chip" data-value="event">Events</button>
+            <button type="button" class="filter-chip" data-value="media">Photos</button>
+            <button type="button" class="filter-chip" data-value="note">Stories</button>
+        </div>
+    </div>
+
+    <div id="contribList" class="list-group mb-2"><p class="text-muted">Loading…</p></div>
+    <div class="d-flex justify-content-between align-items-center" id="contribPagination"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/account.js') }}"></script>
+{% endblock %}

@@ -509,6 +509,7 @@ paths:
     get:
       tags: [Views]
       summary: "Memories (FE-4): Chronological album — every photo by capture date (falls back to upload date), client-rendered against GET /api/media?order_by=capture. Also the section's photo-upload entry point."
+      parameters: [{name: photo, in: query, schema: {type: integer}, description: "FE-5: deep-link straight to one photo's detail panel (GET /api/media/{id}) — used by My Contributions' photo rows"}]
       responses: {"200": {description: HTML page}}
   /memories/person:
     get:
@@ -544,6 +545,16 @@ paths:
     get:
       tags: [Views]
       summary: "Quick + Advanced search (FE-4, Master Plan §12): one page, hash-switched (#quick/#advanced), client-rendered against GET /api/search (+ GET /api/families for the quick search's family matches)"
+      responses: {"200": {description: HTML page}}
+  /account:
+    get:
+      tags: [Views]
+      summary: "Account & Security (FE-5): Profile/Role/Email/Password/Delete, client-rendered against GET /api/me + the rest of the Account tag. Own account only — no id in the URL."
+      responses: {"200": {description: HTML page}}
+  /account/contributions:
+    get:
+      tags: [Views]
+      summary: "My Contributions (FE-5): summary cards + a paginated, filterable list of the caller's own audit rows, client-rendered against GET /api/me/contributions. Own rows only — no id in the URL."
       responses: {"200": {description: HTML page}}
 
 components:

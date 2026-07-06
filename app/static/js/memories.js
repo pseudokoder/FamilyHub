@@ -441,4 +441,10 @@ document.addEventListener('DOMContentLoaded', function() {
   loadByPerson();
   loadByFamily();
   loadByEvent();
+
+  // Deep link from elsewhere in the app (My Contributions' "photo" rows,
+  // FE-5) straight to one photo's detail panel — openPhotoDetail fetches by
+  // id directly, so this works regardless of which album view is default.
+  var photoParam = new URLSearchParams(window.location.search).get('photo');
+  if (photoParam) openPhotoDetail(parseInt(photoParam, 10));
 });

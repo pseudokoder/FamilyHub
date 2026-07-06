@@ -37,6 +37,31 @@ Entry format:
 
 ## Open items
 
+### [OPEN] FE-5 added `app/routes/account.py` + `docs/openapi.yaml` Views entries — BE review at merge
+- Date: 2026-07-06
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE must): review the new `account_bp` blueprint (`app/routes/
+  account.py`: `GET /account` → Account & Security, `GET /account/
+  contributions` → My Contributions) and its registration in
+  `app/__init__.py`, plus the two matching `docs/openapi.yaml` Views-tag
+  entries (and a third small edit: a `photo` query param added to the
+  *existing* `/memories` Views entry, documenting the new `?photo=` deep-link
+  support in `app/static/js/memories.js`) the FE-5 brief authorized FE to add
+  on-branch. View-routing only — no business logic, schema, or `/api/*`
+  endpoints changed; every field these pages read/write already shipped in
+  the prior backend run (`ffe6cb1`). Two small additional touches, same
+  transparency rule as prior sessions' one-line fixes: `app/forms/
+  auth_forms.py` gained `render_kw` autocomplete attributes on
+  `ChangePasswordForm`'s three password fields (brief-authorized,
+  "template-only fix, allowed" — the only observable effect is the rendered
+  HTML attribute) and `app/static/css/chronicle-app.css`'s shared
+  `.chip-group` rule gained `flex-wrap: wrap` (a real 375px overflow bug this
+  session's own 6-chip filter group exposed; re-verified People's existing
+  3-chip filter still renders on one line). Confirm none of this breaks any
+  existing BE test (it doesn't — 260/260 green) and sign off at merge time.
+- Status: OPEN — awaiting BE review.
+
 ### [RESOLVED] FE-4 added `app/routes/memories.py` + `app/routes/search.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-05
 - Raised by: FE
@@ -59,7 +84,7 @@ Entry format:
   match the routes exactly. Full suite green post-merge. Sign-off complete;
   no follow-up needed.
 
-### [OPEN] FE-4 added `app/static/css/style.css` cleanup — BE decides on deleting the file
+### [RESOLVED] FE-4 added `app/static/css/style.css` cleanup — BE decides on deleting the file
 - Date: 2026-07-05
 - Raised by: FE
 - Blocks: nothing (safe to merge once BE reviews)
