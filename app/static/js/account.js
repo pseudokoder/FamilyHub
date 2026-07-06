@@ -166,28 +166,15 @@ function initSecurityPage() {
   }
 
   /* --- EMAIL -------------------------------------------------------------- *
-   * The API has no persistent "pending change" field on GET /api/me — only
-   * the change-email POST response carries `pending_email` (docs/openapi.yaml).
-   * Rather than fake a field the contract doesn't return, this remembers the
-   * candidate address client-side and clears it the moment a later /api/me
-   * snapshot shows `email` actually caught up to it (the verification link
-   * was clicked) — an honest derivation from data the API really returns,
-   * not a guess. */
-  function pendingEmailKey(userId) { return 'fh_pending_email_' + userId; }
-
+   * The pending (unverified) address, if any, comes straight from
+   * GET /api/me's `pending_email` field. */
   function renderEmail(me) {
-    var key = pendingEmailKey(me.id);
-    var storedPending = localStorage.getItem(key);
-    if (storedPending && storedPending === me.email) {
-      localStorage.removeItem(key);
-      storedPending = null;
-    }
     var verified = !!me.email_verified_at;
     emailBody.innerHTML =
       '<p class="mb-1">' + escapeHtml(me.email) +
         (verified ? ' <span class="badge text-bg-secondary">Verified</span>' : ' <span class="badge text-bg-warning">Unverified</span>') +
       '</p>' +
-      (storedPending ? '<p class="text-muted mb-2">Pending: check your inbox at <strong>' + escapeHtml(storedPending) + '</strong> to confirm your new address.</p>' : '') +
+      (me.pending_email ? '<p class="text-muted mb-2">Pending: check your inbox at <strong>' + escapeHtml(me.pending_email) + '</strong> to confirm your new address.</p>' : '') +
       (verified ? '' : '<div class="mb-2" id="acctResendVerifyWrap"><button type="button" class="btn btn-outline-secondary btn-sm" id="acctResendVerifyBtn">Resend Verification Email</button></div>') +
       '<div><button type="button" class="btn btn-outline-secondary btn-sm" id="acctChangeEmailBtn">Change Email</button></div>' +
       '<div id="acctChangeEmailForm" class="d-none inline-form-slot mt-2"></div>';
@@ -224,11 +211,11 @@ function initSecurityPage() {
         apiFetch('/api/me/change-email', { method: 'POST', body: {
           new_email: form.elements.new_email.value.trim(),
           current_password: form.elements.current_password.value,
-        }}).then(function(res) {
-          localStorage.setItem(key, res.pending_email);
+        }}).then(function() {
           hideForm(slot);
-          renderEmail(me);
-        }).catch(function(err) { alertFormError(form, err); });
+          return apiFetch('/api/me');
+        }).then(function(freshMe) { renderEmail(freshMe); })
+          .catch(function(err) { alertFormError(form, err); });
       });
     });
   }
