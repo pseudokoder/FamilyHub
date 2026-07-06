@@ -1,0 +1,62 @@
+{# admin/dashboard.html — the Admin Console landing view (FE-6). Aggregate
+   counts + storage, backup health at a glance, and the two queues that need
+   an admin's eyes (suggestions, role requests) with a one-click jump to each
+   section. Entirely client-rendered by admin.js against GET /api/stats +
+   GET /api/admin/backups + GET /api/suggestions + GET /api/role-requests. #}
+{% extends "base.html" %}
+
+{% block title %}Admin Console{% endblock %}
+
+{% block content %}
+<div id="adminDashboardPage">
+    {% set active = 'dashboard' %}
+    {% include "admin/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">Admin Console</h1>
+        <p class="text-muted mb-0">The family archive's health, at a glance.</p>
+    </header>
+
+    <section class="panel mb-3" aria-labelledby="adminStatsTitle">
+        <h2 class="section-title" id="adminStatsTitle">Archive Stats</h2>
+        <div id="adminStats" class="stat-strip"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="adminBackupHealthTitle">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="section-title mb-0" id="adminBackupHealthTitle">Backup Health</h2>
+                    <a class="small" href="{{ url_for('admin.backups') }}">Manage backups &rarr;</a>
+                </div>
+                <div id="adminBackupHealth"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="adminSuggestionsQueueTitle">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="section-title mb-0" id="adminSuggestionsQueueTitle">Suggestions Inbox</h2>
+                    <a class="small" href="{{ url_for('admin.suggestions') }}">Open inbox &rarr;</a>
+                </div>
+                <div id="adminSuggestionsQueue"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="adminRoleQueueTitle">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="section-title mb-0" id="adminRoleQueueTitle">Role Requests</h2>
+                    <a class="small" href="{{ url_for('admin.role_requests') }}">Review requests &rarr;</a>
+                </div>
+                <div id="adminRoleQueue"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

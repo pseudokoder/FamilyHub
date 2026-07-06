@@ -17,7 +17,7 @@
  * CACHE versioning: bump the name to ship changes; activate() deletes
  * old caches so stale shells can't linger.
  */
-var CACHE = "familyhub-shell-v5"; // FE-5: account.js + Account & Security/My Contributions pages
+var CACHE = "familyhub-shell-v6"; // FE-6: admin.js + the native-Chronicle admin console pages
 var SHELL = [
     "/offline",
     "/static/css/chronicle-app.css",

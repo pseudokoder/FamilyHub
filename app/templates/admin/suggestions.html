@@ -1,0 +1,46 @@
+{# admin/suggestions.html — Suggestions Inbox (FE-6): a filterable triage
+   list over GET/PUT /api/suggestions. Status/topic vocabularies come straight
+   from the schema (app/models/suggestion.py's STATUSES/TOPICS —
+   new/in_progress/done/declined, idea/bug/photo_request/other), not the
+   brief's looser prose, per "the contract is docs/openapi.yaml." #}
+{% extends "base.html" %}
+
+{% block title %}Suggestions{% endblock %}
+
+{% block content %}
+<div id="adminSuggestionsPage">
+    {% set active = 'suggestions' %}
+    {% include "admin/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">Suggestions Inbox</h1>
+        <p class="text-muted mb-0">Ideas, bug reports, and photo requests from the family.</p>
+    </header>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div class="chip-group" role="group" aria-label="Filter by status" data-chip-group="status">
+            <button type="button" class="filter-chip is-active" data-value="">Any status</button>
+            <button type="button" class="filter-chip" data-value="new">New</button>
+            <button type="button" class="filter-chip" data-value="in_progress">In Progress</button>
+            <button type="button" class="filter-chip" data-value="done">Done</button>
+            <button type="button" class="filter-chip" data-value="declined">Declined</button>
+        </div>
+        <div class="chip-group" role="group" aria-label="Filter by topic" data-chip-group="topic">
+            <button type="button" class="filter-chip is-active" data-value="">Any topic</button>
+            <button type="button" class="filter-chip" data-value="idea">Idea</button>
+            <button type="button" class="filter-chip" data-value="bug">Bug</button>
+            <button type="button" class="filter-chip" data-value="photo_request">Photo Request</button>
+            <button type="button" class="filter-chip" data-value="other">Other</button>
+        </div>
+        <div class="chip-group" role="group" aria-label="Prioritized queue only">
+            <button type="button" class="filter-chip" id="adminPrioritizedChip">Prioritized queue only</button>
+        </div>
+    </div>
+
+    <div id="adminSuggestionsList" class="list-group"><p class="text-muted">Loading…</p></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

@@ -686,3 +686,24 @@ fieldset legend, legend.h4 {
     flex-wrap: wrap;
     gap: 0.4rem;
 }
+
+/* ----------------------------------------------------------------------------
+ * 16) ADMIN CONSOLE (FE-6) — Dashboard/Users/Suggestions/Role Requests/
+ * Settings/Backups/Activity. Every page otherwise reuses existing vocabulary
+ * verbatim (.subnav, .panel/.section-title, .stat-strip, .chip-group/
+ * .filter-chip, .list-group-item, .vitals-list, .inline-form-slot,
+ * .subject-picker__results, .panel--danger for the guarded restore) — the
+ * only new rules are two badge/button colors Bootstrap's defaults didn't
+ * carry into the Chronicle palette yet (every other admin page used
+ * text-bg-primary/secondary/info/light, already repainted; this is the
+ * first page to need "warning" and "danger" tones too).
+ * --------------------------------------------------------------------------*/
+.btn-danger, .btn-danger:disabled { background: var(--danger); border-color: var(--danger); color: var(--on-frame, #f0e4cf); }
+.btn-danger:hover, .btn-danger:focus { background: #8f2b20; border-color: #8f2b20; color: var(--on-frame, #f0e4cf); }
+.text-bg-warning { background-color: var(--amber) !important; color: var(--frame) !important; }
+.text-bg-danger { background-color: var(--danger) !important; }
+
+/* The Users table's per-row "Manage" detail row (change-email / link-person
+ * inline forms) — a plain <tr> toggled with .d-none, so it needs no new
+ * class of its own; this just keeps its cell from looking bare while empty. */
+tr[data-detail-row] > td { background: var(--paper-2); }

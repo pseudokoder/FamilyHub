@@ -1,0 +1,37 @@
+{# admin/role_requests.html — Role Requests (FE-6): the pending queue
+   (approve/deny) plus already-decided history, over GET /api/role-requests
+   and its approve/deny actions. #}
+{% extends "base.html" %}
+
+{% block title %}Role Requests{% endblock %}
+
+{% block content %}
+<div id="adminRoleRequestsPage">
+    {% set active = 'role_requests' %}
+    {% include "admin/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">Role Requests</h1>
+        <p class="text-muted mb-0">Members asking for a different role — review and decide.</p>
+    </header>
+
+    <section class="panel mb-3" aria-labelledby="adminPendingRoleTitle">
+        <h2 class="section-title" id="adminPendingRoleTitle">Pending Requests</h2>
+        <div id="adminPendingRoleRequests" class="list-group"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+
+    <section class="panel" aria-labelledby="adminRoleHistoryTitle">
+        <h2 class="section-title" id="adminRoleHistoryTitle">Decided History</h2>
+        <div class="chip-group mb-2" role="group" aria-label="Filter decided history" data-chip-group="history-status">
+            <button type="button" class="filter-chip is-active" data-value="">All decided</button>
+            <button type="button" class="filter-chip" data-value="approved">Approved</button>
+            <button type="button" class="filter-chip" data-value="denied">Denied</button>
+        </div>
+        <div id="adminRoleHistory" class="list-group"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

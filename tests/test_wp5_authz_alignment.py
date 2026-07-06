@@ -20,13 +20,17 @@ ADMIN_ONLY_GET_ENDPOINTS = [
     "/api/permissions/matrix",
     "/api/suggestions",
     "/api/role-requests",
-    "/admin/users",       # the preserved HTML admin panel
-    "/admin/activity",
+    "/admin/users",       # the native Chronicle admin console (FE-6)
 ]
 
 # Curator+ (but not Contributor/Viewer) endpoints — the `revert` permission.
+# FE-6 (BLOCKERS.md, 2026-07-03 RESOLVED): /admin/activity moved from
+# Admin-only to Curator+ here too, matching its API (/api/activity) exactly —
+# Curator holds `revert`, and the brief explicitly asks for the HTML page to
+# grant the same access the endpoint it calls already does.
 CURATOR_PLUS_GET_ENDPOINTS = [
     "/api/activity",
+    "/admin/activity",
 ]
 
 

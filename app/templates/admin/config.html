@@ -1,0 +1,60 @@
+{# admin/config.html — Settings (FE-6): the grouped config-as-data settings
+   (branding/defaults/security/email) over GET/PUT /api/settings. A SEPARATE
+   page from the legacy tagline/About/banner form (admin.site_settings) —
+   two independent settings surfaces already existed in the backend
+   (settings_service.KNOWN_KEYS vs. SETTING_GROUPS); see this page's link to
+   the other one below, and docs/FRONTEND_DESIGN.md's FE-6 entry for why. #}
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div id="adminConfigPage">
+    {% set active = 'settings' %}
+    {% include "admin/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">Settings</h1>
+        <p class="text-muted mb-0">Branding, defaults, security, and email — grouped, admin-editable configuration.</p>
+        <p class="text-muted small mb-0">
+            Looking for the tagline, About page text, or dashboard banner photo?
+            That's the <a href="{{ url_for('admin.site_settings') }}">Site Text &amp; Banner</a> page.
+        </p>
+    </header>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="cfgBrandingTitle">
+                <h2 class="section-title" id="cfgBrandingTitle">Branding</h2>
+                <div id="cfgBranding"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="cfgDefaultsTitle">
+                <h2 class="section-title" id="cfgDefaultsTitle">Defaults</h2>
+                <div id="cfgDefaults"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="cfgSecurityTitle">
+                <h2 class="section-title" id="cfgSecurityTitle">Security</h2>
+                <div id="cfgSecurity"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="cfgEmailTitle">
+                <h2 class="section-title" id="cfgEmailTitle">Email</h2>
+                <p class="text-muted small mb-2">
+                    The SMTP password is set via the server's <code>MAIL_PASSWORD</code>
+                    environment variable, never here.
+                </p>
+                <div id="cfgEmail"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

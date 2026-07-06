@@ -1,0 +1,23 @@
+{# admin/_subnav.html — the shared tab strip across the admin console. Set
+   `active` before including. Same .subnav pattern Account/Tree/Memories
+   already established (FE-3/FE-4/FE-5), generalized in chronicle-app.css.
+
+   ROLE-GATED, not just decoration: every non-Activity tab is Admin-only,
+   matching each route's real `administer` gate exactly (§10). Activity is
+   the one Curator+ exception (BLOCKERS.md, 2026-07-03 RESOLVED — Curator
+   holds `revert`), so a Curator who isn't also an Admin sees ONE tab here,
+   not a menu of links that would 403 the moment they're clicked. #}
+<nav class="subnav" aria-label="Admin console views">
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('admin.dashboard') }}" class="subnav__link{{ ' is-active' if active == 'dashboard' else '' }}">Dashboard</a>
+    <a href="{{ url_for('admin.list_users') }}" class="subnav__link{{ ' is-active' if active == 'users' else '' }}">Users</a>
+    <a href="{{ url_for('admin.suggestions') }}" class="subnav__link{{ ' is-active' if active == 'suggestions' else '' }}">Suggestions</a>
+    <a href="{{ url_for('admin.role_requests') }}" class="subnav__link{{ ' is-active' if active == 'role_requests' else '' }}">Role Requests</a>
+    <a href="{{ url_for('admin.settings_console') }}" class="subnav__link{{ ' is-active' if active == 'settings' else '' }}">Settings</a>
+    <a href="{{ url_for('admin.site_settings') }}" class="subnav__link{{ ' is-active' if active == 'site_text' else '' }}">Site Text</a>
+    <a href="{{ url_for('admin.backups') }}" class="subnav__link{{ ' is-active' if active == 'backups' else '' }}">Backups</a>
+    {% endif %}
+    {% if current_user.has_role('curator') %}
+    <a href="{{ url_for('admin.activity') }}" class="subnav__link{{ ' is-active' if active == 'activity' else '' }}">Activity</a>
+    {% endif %}
+</nav>

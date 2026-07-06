@@ -773,6 +773,100 @@ query param on `/memories`).
 
 ---
 
+### 2026-07-06 — FE-6: Admin Console (native Chronicle rebuild)
+
+**What changed:** every `/admin/*` page rebuilt as a client-rendered,
+native-Chronicle console (`app/static/js/admin.js`, one file, seven
+DOM-guarded page inits — the established pattern) over the AdminApi/Inbox/
+WriteControl tags, plus a new shared `admin/_subnav.html` tab strip.
+
+**"Restyle or rebuild, per section" — the calls made, and why.** The brief
+explicitly left this choice to FE, naming `/admin/users/new` as the
+exemplar case. Rebuilt (old template replaced with a client-rendered shell):
+Users list, Backups, Activity — all three had a JSON endpoint that already
+returned strictly more than the old server-rendered page showed. Kept
+verbatim, restyled only (the shared Chronicle stylesheet cascade repaints
+any page using Bootstrap's own classes for free, the same mechanism WP5
+used app-wide): account-create/edit, the direct-set-password form, and the
+tagline/About/banner form — none of these have a JSON equivalent in the
+contract at all (account create/edit/reset-password because there's no
+"admin sets an arbitrary role/display-name/password" API endpoint, only the
+role-request-approval and secure-change-email paths; the tagline/About/
+banner form because it's a completely different settings surface — see
+next).
+
+**Two settings pages, not one, because the backend already has two settings
+systems.** `settings_service.py` has carried two independent, non-overlapping
+mechanisms since WP3: `KNOWN_KEYS`/`get_all()` (tagline/about_text/
+contact_text/the hero image — HTML-form-only, no `/api/settings` exposure)
+and `SETTING_GROUPS`/`editable_settings()` (branding/defaults/security/email
+— the JSON-only surface this brief's "Settings" section describes). Rather
+than relocate the legacy form (which would have orphaned two passing tests
+in `tests/test_admin.py` that POST to its exact URL) or bury the new grouped
+console as a sub-section of the old page, the new console lives at
+`/admin/config` and links to the legacy page (`/admin/settings`, relabeled
+"Site Text" in the subnav) with one sentence — two clearly-labeled,
+independently-reachable pages instead of a forced merger of two things the
+backend itself keeps apart. Not filed as a `BLOCKERS.md` gap: nothing here
+needs a NEW backend capability, it's a UI decision about how to present two
+capabilities that already exist.
+
+**Restore vs. Revert, one action per Activity row, not two.** Both
+`POST /api/restore` and `POST /api/audit/{id}/revert` can undo a delete, but
+they're semantically different (restore: "this subject is currently
+soft-deleted, bring it back"; revert: "undo whatever THIS specific audit
+entry changed") and showing both on every row would be confusing, redundant
+UI for little real benefit. The row's OWN action (`delete` vs. anything
+else) picks which one single button applies, matching the more intuitive
+verb to the more common case (a delete row says "Restore"; every other
+revertible row says "Revert").
+
+**The Activity page's actor filter is Admin-only, INSIDE a Curator+ page.**
+`GET /api/admin/users` (the only way to turn "user id 4" into a name for a
+dropdown) is `administer`-gated, so a Curator viewing this Curator+ page
+would get a 403 fetching it. Rather than show a broken control or a raw
+numeric-id input to a Curator, `admin/activity.html` passes
+`data-is-admin="{{ 'true' if current_user.is_admin else 'false' }}'` and
+`admin.js` only builds the actor dropdown when that's true — an Admin gets
+full filtering, a Curator gets everything else (action/subject-type/date)
+with no half-working affordance.
+
+**Two real bugs found only by scripting the live pages, not by reading the
+code (see `DEVDIARY_FE.md`'s FE-6 entry for full repro detail):** the
+guarded restore's own success message was invisible (a `load()` call
+immediately after setting it silently overwrote it in the same synchronous
+callback — fixed with a `{ skipRestoreArea: true }` option); and the
+Activity page's per-subject resolution cache never invalidated, so a row's
+subject kept reading "(since removed)" immediately after the very Restore/
+Revert action that un-deleted it, until a full reload (fixed by deleting the
+specific cache entry right after a successful action). Both are the same
+underlying lesson: a UI that "refreshes everything" or "caches the result"
+needs the refresh/cache-invalidation half designed WITH the action, not
+assumed to be free.
+
+**A real, necessary test update — not incidental scope creep.** The brief's
+own Activity requirement (Curator+, not Admin-only — BLOCKERS.md, 2026-07-03
+RESOLVED) directly contradicted one assertion in a pre-existing BE-authored
+test, `tests/test_wp5_authz_alignment.py`, which listed `/admin/activity` as
+admin-only (written before this page existed in its Curator+ form). Moved it
+into that file's existing `CURATOR_PLUS_GET_ENDPOINTS` list, right alongside
+its own API (`/api/activity`), which the same file already tests the
+identical way — logged in `BLOCKERS.md` for BE review, not silently changed.
+
+**Files created/changed:** `app/routes/admin.py` (rewritten — thin views
+only); `app/templates/admin/_subnav.html`, `admin/{dashboard,suggestions,
+role_requests,config}.html` (new); `admin/{users,backups,activity}.html`
+(rebuilt); `admin/{new_user,edit_user,reset_password,settings}.html` (subnav
+include only); `app/static/js/admin.js` (new); `app/static/css/
+chronicle-app.css` (new §16 — `.btn-danger`/`.text-bg-warning`/
+`.text-bg-danger` repaints); `app/templates/base.html` (Admin nav link
+repointed, new Curator-only Activity entry); `app/static/js/sw.js` (cache
+bump); `tests/test_wp5_authz_alignment.py` (`/admin/activity` re-listed as
+Curator+); `docs/openapi.yaml` (Admin tag trimmed to the four kept legacy
+flows, seven Views-tag entries new/moved).
+
+---
+
 ## Design Parking Lot
 
 Future constraints and ideas — captured here, not yet scheduled or enforced.
