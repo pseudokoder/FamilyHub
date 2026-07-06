@@ -74,7 +74,26 @@ Entry format:
   No schema, migration, or `/api/*` endpoint changed — every JSON call this
   console makes was already in the WP2 contract. Confirm none of this breaks
   any existing BE test (it doesn't — 260/260 green) and sign off at merge.
-- Status: OPEN — awaiting BE review.
+- Status: **RESOLVED 2026-07-06** — verified all three on `be-signoffs-pending-
+  email` (off master, post-merge). (1) `app/routes/admin.py`: every mutating
+  view (`create_user`, `edit_user`, `reset_password`, `site_settings`,
+  `run_backup`) still calls only `user_service`/`backup_service`/
+  `settings_service`/`audit_service`; the seven console views (`dashboard`,
+  `list_users`, `suggestions`, `role_requests`, `settings_console`, `backups`,
+  `activity`) are thin `render_template` shells with no direct DB access; the
+  one behavior change, `activity()` gated by `role_required(Role.CURATOR)`
+  instead of `admin_required`, matches the 2026-07-03 RESOLVED entry's
+  pre-authorization. (2) `tests/test_wp5_authz_alignment.py`: `/admin/activity`
+  is in `CURATOR_PLUS_GET_ENDPOINTS` alongside `/api/activity`, both covered by
+  the same allow/deny parametrized tests. (3) `docs/openapi.yaml`: the `Admin`
+  tag (lines 133-154) documents exactly the four kept legacy flows
+  (`/admin/users/new`, `/admin/users/{user_id}/edit`,
+  `/admin/users/{user_id}/reset-password`, `/admin/settings`,
+  `/admin/backups/run`, `/admin/backups/{filename}/download`), each noting
+  where it's superseded; the `Views` tag (lines 564-598) has the seven new/
+  moved `/admin*` entries, `/admin/activity`'s response noting `403: Logged in
+  below Curator`. Full suite green (260/260, confirmed this session). No
+  follow-up needed.
 
 ### [OPEN] FE-5 added `app/routes/account.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-06
@@ -99,7 +118,19 @@ Entry format:
   session's own 6-chip filter group exposed; re-verified People's existing
   3-chip filter still renders on one line). Confirm none of this breaks any
   existing BE test (it doesn't — 260/260 green) and sign off at merge time.
-- Status: OPEN — awaiting BE review.
+- Status: **RESOLVED 2026-07-06** — verified on `be-signoffs-pending-email`
+  (off master, post-merge). `app/routes/account.py`'s `account_bp` (`GET
+  /account`, `GET /account/contributions`) is view-routing only — both routes
+  just `render_template` a shell, `@login_required`, no id in either URL;
+  registered correctly in `app/__init__.py`. `docs/openapi.yaml`'s `/account`
+  and `/account/contributions` Views entries match the routes exactly, and
+  the `/memories` entry's `photo` query param documents the `?photo=` deep
+  link `app/static/js/memories.js` supports. `app/forms/auth_forms.py`'s
+  `ChangePasswordForm` has `render_kw={"autocomplete": ...}` on all three
+  password fields (current-password/new-password x2) — template-only, no
+  business-logic change. `app/static/css/chronicle-app.css`'s `.chip-group`
+  rule has `flex-wrap: wrap` — layout-only. Full suite green (260/260,
+  confirmed this session). No follow-up needed.
 
 ### [RESOLVED] FE-4 added `app/routes/memories.py` + `app/routes/search.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-05

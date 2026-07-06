@@ -1128,3 +1128,53 @@ the full change-email pending→verify→applied round trip via a real
 `/auth/verify-email/<token>` hit, the 503-when-unconfigured case, and
 delete/anonymize including the last-active-admin 409. Full suite: **260
 passed** (up from 239 pre-session).
+
+## BE Sign-offs (FE-5/FE-6) + `pending_email` on `GET /api/me` (2026-07-06, `be-signoffs-pending-email`)
+
+### BLOCKERS.md sign-offs
+
+Reviewed and resolved both outstanding cross-builder items on this branch
+(off master, so both PRs were already merged):
+
+- **FE-6** (`app/routes/admin.py` rewrite): confirmed every mutation still
+  routes through the existing `user_service`/`backup_service`/
+  `settings_service`/`audit_service` calls — the rewrite is thin-controller
+  only, no business logic moved. The one behavior change (`activity()` moved
+  from `admin_required` to `role_required(Role.CURATOR)`) was already
+  pre-authorized by the 2026-07-03 Curator/`revert` decision.
+  `tests/test_wp5_authz_alignment.py`'s `/admin/activity` move into
+  `CURATOR_PLUS_GET_ENDPOINTS` is the direct, necessary consequence. The
+  `docs/openapi.yaml` Admin/Views reshuffle matches the routes exactly.
+- **FE-5** (`app/routes/account.py` + `docs/openapi.yaml` Views entries):
+  confirmed `account_bp`'s two routes act only on the session's own account
+  (no id in either URL), are registered correctly, and the OpenAPI entries
+  (plus the `/memories?photo=` param and the `render_kw`/`.chip-group`
+  touch-ups) match what's on disk.
+
+Both marked **RESOLVED** in `BLOCKERS.md` with the specific evidence checked.
+
+### `pending_email` on `GET /api/me`
+
+FE's Account & Security page needed the pending (unverified) email
+server-side instead of the documented per-browser `localStorage` fallback.
+The column already existed and was already being set/cleared by
+`account_service.request_email_change`/`user_service.confirm_email_token` —
+this was a read-surface-only change, no migration:
+
+- `account_service.me_snapshot()` now includes `"pending_email":
+  user.pending_email` in its returned dict.
+- `docs/openapi.yaml`'s `MeAccount` schema gained the matching `pending_email`
+  property (nullable, read-only).
+- Extended `test_change_email_does_not_apply_until_verified` in
+  `tests/test_api_account_self_service.py` to assert `GET /api/me` reflects
+  the pending address right after `POST /api/me/change-email` and reads back
+  `null` once the verification link is hit; extended
+  `test_me_snapshot_shape` to assert `pending_email` is `null` on a fresh
+  account.
+
+Full suite: **260 passed** (same count — no new test functions, existing
+tests extended with the new field's assertions).
+
+FE's own follow-up (not this session): swap the `localStorage` fallback in
+`app/static/js/account.js` for reading `pending_email` straight off `GET
+/api/me`.

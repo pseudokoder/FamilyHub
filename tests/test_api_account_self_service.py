@@ -34,6 +34,7 @@ def test_me_snapshot_shape(member_client, member):
     assert data["email_verified_at"] is None
     assert data["timezone"] is None
     assert data["individual_id"] is None
+    assert data["pending_email"] is None
 
 
 def test_me_requires_login(client):
@@ -159,6 +160,11 @@ def test_change_email_does_not_apply_until_verified(member_client, member):
     assert fresh.pending_email == "moved@test.invalid"
     assert len(outbox) == 1
 
+    # GET /api/me surfaces the pending address server-side (FE-5/FE-6 sign-off
+    # run: replaces FE's per-browser localStorage fallback).
+    snapshot = member_client.get("/api/me").get_json()
+    assert snapshot["pending_email"] == "moved@test.invalid"
+
     verify_path = _verify_url_from(outbox)
     member_client.get(verify_path)
 
@@ -166,6 +172,8 @@ def test_change_email_does_not_apply_until_verified(member_client, member):
     assert confirmed.email == "moved@test.invalid"
     assert confirmed.pending_email is None
     assert confirmed.email_verified is True
+
+    assert member_client.get("/api/me").get_json()["pending_email"] is None
 
 
 def test_change_email_requires_mail_configured(tmp_path):
