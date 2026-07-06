@@ -1509,3 +1509,41 @@ v1 intentionally ships the READ half only, per the brief. Nothing about the
 place for the Java rewrite to unify `site_settings` into one coherent
 schema, since v2 has no legacy HTML form dragging a naming/shape convention
 forward from WP1.
+
+---
+
+## FE — Punch-list fix run (404 heading, pending_email swap, BLOCKERS labels)
+
+**Branch:** `fe-fix-punchlist`
+**Date:** 2026-07-06
+**Status:** Complete; full suite green.
+
+Three small items from the 2026-07-05 punch list plus the backend's new
+`GET /api/me` field:
+
+1. `app/templates/errors/404.html` — removed the leftover `display-6` class
+   from the `<h1>`, matching 403/429/500 (stripped from those three on FE-4,
+   404 just wasn't on that run's list).
+2. `app/static/js/account.js` — `GET /api/me` now returns `pending_email`
+   (set by `POST /api/me/change-email`, cleared on verification), so the
+   FE-5 localStorage stopgap (`pendingEmailKey`, the per-browser cache) is
+   gone. `renderEmail(me)` reads `me.pending_email` directly; the change-
+   email submit handler re-fetches `GET /api/me` after a successful POST and
+   re-renders from that fresh snapshot instead of hand-patching local state.
+   Same user-visible behavior, except the pending notice now survives
+   across browsers/devices instead of living in one browser's localStorage.
+   Any orphaned `fh_pending_email_*` keys in existing browsers are harmless
+   dead weight — not worth a migration.
+3. `BLOCKERS.md` — two entries (FE-6's and FE-5's BE-review items) had
+   Status lines already saying RESOLVED 2026-07-06 but the `###` header
+   still said `[OPEN]`; fixed both header labels only, no other line
+   touched.
+4. `app/static/js/sw.js` — cache bump (`familyhub-shell-v6` → `v7`) for the
+   `account.js` change.
+
+### v2 Spring Boot Migration Notes
+
+The FE-5 diary entry above already flagged the localStorage reconciliation
+as the one piece not worth carrying into v2 — this session removes it a
+build early, once the backend field existed, rather than waiting for a v2
+rewrite to make it obsolete. Nothing else new here.

@@ -865,6 +865,17 @@ bump); `tests/test_wp5_authz_alignment.py` (`/admin/activity` re-listed as
 Curator+); `docs/openapi.yaml` (Admin tag trimmed to the four kept legacy
 flows, seven Views-tag entries new/moved).
 
+### 2026-07-06 — Punch-list fix: `pending_email` from `GET /api/me` replaces the FE-5 localStorage stopgap
+
+**What changed:** `app/static/js/account.js`'s `renderEmail` now reads the
+pending (unverified) address straight from `GET /api/me`'s `pending_email`
+field instead of the per-browser `localStorage` cache the FE-5 diary
+flagged as a stopgap; the change-email submit handler re-fetches
+`GET /api/me` after a successful POST rather than hand-patching local
+state. Purely a data-source swap — the rendered notice text and behavior
+are unchanged, except the pending state now survives across browsers/
+devices.
+
 ---
 
 ## Design Parking Lot

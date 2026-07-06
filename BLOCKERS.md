@@ -37,7 +37,7 @@ Entry format:
 
 ## Open items
 
-### [OPEN] FE-6 rewrote `app/routes/admin.py` + touched a BE test file + `docs/openapi.yaml` — BE review at merge
+### [RESOLVED] FE-6 rewrote `app/routes/admin.py` + touched a BE test file + `docs/openapi.yaml` — BE review at merge
 - Date: 2026-07-06
 - Raised by: FE
 - Blocks: nothing (safe to merge once BE reviews)
@@ -95,7 +95,7 @@ Entry format:
   below Curator`. Full suite green (260/260, confirmed this session). No
   follow-up needed.
 
-### [OPEN] FE-5 added `app/routes/account.py` + `docs/openapi.yaml` Views entries — BE review at merge
+### [RESOLVED] FE-5 added `app/routes/account.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-06
 - Raised by: FE
 - Blocks: nothing (safe to merge once BE reviews)
