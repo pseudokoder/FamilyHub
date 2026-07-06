@@ -222,18 +222,45 @@ def generate_email_verify_token(user, email=None):
 
 
 def confirm_email_token(token):
-    """Mark the address verified if the token is valid AND still matches the
-    account's CURRENT email. Returns the User, or None. Idempotent-ish: clicking
-    twice just re-stamps the same verified time."""
+    """Confirm an email-verification link. Returns the User, or None if the
+    token is forged/expired/stale. Two cases, both driven by the same token
+    shape ({uid, email}):
+
+      1. The token's email matches the account's CURRENT email (a re-verify
+         request, or the tail end of the admin change-email dance) — just
+         stamp verified. Idempotent-ish: clicking twice re-stamps the same
+         verified time.
+      2. The token's email matches ``pending_email`` (the self-serve
+         change-email flow, FE-5) — THIS is the moment the address actually
+         changes: clicking the link is what makes it real, not the original
+         request. Clears ``pending_email`` and audits the change.
+
+    Anything else (stale pending_email from an abandoned request, tampered
+    uid) is rejected."""
     try:
         data = _verify_serializer().loads(
             token, max_age=VERIFY_TOKEN_MAX_AGE_SECONDS)
     except (BadSignature, SignatureExpired):
         return None
     user = db.session.get(User, data.get("uid", -1))
-    if user is None or user.email != data.get("email"):
+    if user is None:
         return None
-    user.email_verified_at = datetime.now(timezone.utc)
-    audit_service.log_event(user, "verify email", "user", user.id, user.email)
-    db.session.commit()
-    return user
+    token_email = data.get("email")
+
+    if token_email == user.email:
+        user.email_verified_at = datetime.now(timezone.utc)
+        audit_service.log_event(user, "verify email", "user", user.id, user.email)
+        db.session.commit()
+        return user
+
+    if token_email is not None and token_email == user.pending_email:
+        old_email = user.email
+        user.email = user.pending_email
+        user.pending_email = None
+        user.email_verified_at = datetime.now(timezone.utc)
+        audit_service.log_event(user, "change email", "user", user.id,
+                                f"{old_email} -> {user.email} (self-serve, verified)")
+        db.session.commit()
+        return user
+
+    return None

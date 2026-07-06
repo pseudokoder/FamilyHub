@@ -95,6 +95,14 @@ class User(UserMixin, db.Model):
     # signed link; NULL until then, and cleared whenever the address changes.
     email_verified_at = db.Column(db.DateTime, nullable=True)
 
+    # SELF-SERVE CHANGE-EMAIL, in flight (FE-5 Account page). Unlike the admin
+    # change-email dance (which applies immediately + forces a reset), a
+    # member's own change is store-then-verify: this column holds the NEW
+    # address until its verification link is clicked, so a stolen session
+    # can't silently take over login before the real owner notices. NULL means
+    # no change is pending.
+    pending_email = db.Column(db.String(255), nullable=True)
+
     # LOGIN LOCKOUT (§9). Consecutive failed sign-ins (reset to 0 on success); once
     # the settings-driven threshold is hit, locked_until parks a timestamp the
     # login check honors. Complements the IP-based rate limiter with per-account
