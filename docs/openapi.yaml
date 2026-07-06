@@ -650,6 +650,7 @@ components:
         email_verified_at: {type: string, format: date-time, nullable: true}
         timezone: {type: string, nullable: true, description: "IANA zone name, or null for the site default"}
         individual_id: {type: integer, nullable: true}
+        pending_email: {type: string, nullable: true, readOnly: true, description: unverified address from a pending change-email request, or null — set via /api/me/change-email, cleared when verification completes}
     MyContributionsPage:
       type: object
       description: The My Contributions dashboard — one member's own audit rows, paginated, plus header-card summary counts.

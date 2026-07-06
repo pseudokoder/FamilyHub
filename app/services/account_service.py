@@ -186,6 +186,7 @@ def me_snapshot(user):
                               if user.email_verified_at else None),
         "timezone": user.timezone,
         "individual_id": user.individual_id,
+        "pending_email": user.pending_email,
     }
 
 
