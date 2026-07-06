@@ -646,6 +646,18 @@ fieldset legend, legend.h4 {
 .advanced-search__actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 
 /* ----------------------------------------------------------------------------
+ * 15) ACCOUNT & SECURITY (FE-5) — My Contributions + Account & Security. Both
+ * pages otherwise reuse existing vocabulary verbatim (.panel/.section-title,
+ * .stat-strip, .chip-group/.filter-chip, .list-group-item, .subnav,
+ * .inline-form-slot, .subject-picker__results for the timezone picker) — the
+ * ONLY new rule this section needs is the Delete Account panel's distinct,
+ * slightly alarming treatment so it doesn't read as just another settings
+ * card next to Profile/Role/Email.
+ * --------------------------------------------------------------------------*/
+.panel--danger { border-color: var(--danger); }
+.panel--danger .section-title { color: var(--danger); }
+
+/* ----------------------------------------------------------------------------
  * 14) RESIDUAL RULES (BLOCKERS.md, 2026-07-05) — migrated verbatim from the
  * now-deleted app/static/css/style.css, the last 4 rules that survived FE-4's
  * removal of the pre-Chronicle "elderly-first sizing" layer. Consolidated
@@ -665,8 +677,12 @@ fieldset legend, legend.h4 {
     outline: none;
 }
 /* .chip-group — a layout-only wrapper (no colors/fonts), used by
-   app/templates/people/index.html. */
+   app/templates/people/index.html. flex-wrap (FE-5): people/index.html's
+   3-chip living-status group always fit one row, so the missing wrap never
+   showed — My Contributions' 6-chip subject-type group overflowed off a
+   375px viewport instead of wrapping, a real bug found in the browser. */
 .chip-group {
     display: inline-flex;
+    flex-wrap: wrap;
     gap: 0.4rem;
 }

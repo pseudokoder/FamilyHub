@@ -128,13 +128,21 @@ class ChangePasswordForm(FlaskForm):
     walk-away-from-the-laptop attack: a stranger at an unlocked, logged-in screen
     still can't lock the real owner out (D315)."""
 
+    # render_kw sets the HTML `autocomplete` attribute (FE-5, BLOCKERS.md):
+    # password managers key their "current password" vs. "new password" offer
+    # off this exact attribute, not the field's label text or name.
     current_password = PasswordField(
         "Your current password",
         validators=[DataRequired(message="Please type your current password.")],
+        render_kw={"autocomplete": "current-password"},
     )
-    password = PasswordField("New password", validators=PASSWORD_RULES)
+    password = PasswordField(
+        "New password", validators=PASSWORD_RULES,
+        render_kw={"autocomplete": "new-password"},
+    )
     confirm = PasswordField(
         "Type the new one again to be sure",
         validators=[EqualTo("password", message="Those two don't match — try again.")],
+        render_kw={"autocomplete": "new-password"},
     )
     submit = SubmitField("Change My Password")

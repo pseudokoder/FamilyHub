@@ -117,8 +117,15 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
-                        <a class="dropdown-item" href="{{ url_for('auth.change_password') }}">
+                        <a class="dropdown-item" href="{{ url_for('account.security') }}">
                             Account &amp; Security
+                        </a>
+                    </li>
+                    <li>
+                        {# FE-5: a member's own audit rows (My Contributions
+                           dashboard) — any authenticated member, own data only. #}
+                        <a class="dropdown-item" href="{{ url_for('account.contributions') }}">
+                            My Contributions
                         </a>
                     </li>
                     <li>

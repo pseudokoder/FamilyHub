@@ -185,6 +185,7 @@ def create_app(config_class=Config):
     # layer"). What's left is the preserved infrastructure — auth, the admin
     # panel, and the public/plumbing routes in `main`. WP2 rebuilds the feature
     # routes against the new GEDCOM-7 schema, registering them right here.
+    from app.routes.account import account_bp
     from app.routes.admin import admin_bp
     from app.routes.api import api_bp
     from app.routes.auth import auth_bp
@@ -205,6 +206,8 @@ def create_app(config_class=Config):
     app.register_blueprint(memories_bp)
     # FE-4 (Cowork): Quick + Advanced search — see routes/search.py.
     app.register_blueprint(search_bp)
+    # FE-5 (Cowork): My Contributions + Account & Security — see routes/account.py.
+    app.register_blueprint(account_bp)
     # The WP2 JSON API (Master Plan §6/§7) — the contract Cowork builds WP3 on.
     app.register_blueprint(api_bp)
 

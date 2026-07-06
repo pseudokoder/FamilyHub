@@ -1,0 +1,8 @@
+{# account/_subnav.html — the shared tab strip across the Account area.
+   Set `active` ('security'|'contributions') before including. Same .subnav
+   pattern Tree/Memories already established (FE-3/FE-4), generalized in
+   chronicle-app.css so every section shares one CSS rule. #}
+<nav class="subnav" aria-label="Account views">
+    <a href="{{ url_for('account.security') }}" class="subnav__link{{ ' is-active' if active == 'security' else '' }}">Account &amp; Security</a>
+    <a href="{{ url_for('account.contributions') }}" class="subnav__link{{ ' is-active' if active == 'contributions' else '' }}">My Contributions</a>
+</nav>

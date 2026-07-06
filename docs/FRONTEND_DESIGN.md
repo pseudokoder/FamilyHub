@@ -677,6 +677,100 @@ strip, see above); `app/static/css/chronicle-app.css` (generalized
 Stories/Search sections; the two browser-bug fixes above); `app/static/js/
 sw.js` (cache version bump); `docs/openapi.yaml` (nine new Views-tag paths).
 
+### 2026-07-06 — FE-5: User area (My Contributions + Account & Security)
+
+**Family gets a real link too, not just person/media/note.** The brief's own
+examples named only those three subject types for My Contributions' row
+linking, but `/tree/family/{id}` (FE-3's Family Group sheet) is exactly the
+same kind of already-shipped, real page — "links to it where a page exists"
+is the actual rule, and family clears it just as cleanly. Implemented with
+the identical fetch-then-catch shape already proven for individual/media/
+note (`GET /api/families/{id}`, partner names joined with "&", falls back to
+"a family" if both are missing).
+
+**Media rows needed a real "Memories detail" destination that didn't quite
+exist.** `memories.js`'s Photo Detail overlay only ever opened from a click
+inside an already-loaded album grid — no shareable URL to link a contribution
+row at. Rather than file a blocker (nothing backend is missing; `GET
+/api/media/{id}` already returns everything the overlay needs), added a
+small, additive `?photo=` query param to `/memories` that calls the exact
+same `openPhotoDetail(id)` the grid's own click handler already uses — it
+fetches by id directly, so it's independent of which album view happens to
+be the page default. One line in `memories.js`'s `DOMContentLoaded`, one new
+query param documented on the existing `/memories` Views entry.
+
+**Summary cards are grouped labels over real numbers, not a richer query.**
+`GET /api/me/contributions`'s `summary` object gives two independent
+breakdowns — counts by action, counts by subject type — but no
+action×subject_type cross-tab (e.g., no single number for "photos I
+personally added" vs. "photos I edited"). Rather than issue N extra filtered
+fetches per card just to get an exact cross-tab (a real but needless
+N+1 for a personal dashboard), the cards sum real `by_subject_type` buckets
+into friendlier groups (People = individual+name, Sources = source+citation,
+etc.) and a Total card sums `by_action`. Every number is still a straight sum
+of real API-returned counts — grouping/relabeling, not estimation — which is
+what the brief's "your grouping call, but every count must come from the
+real summary" actually asks for.
+
+**The pending-email state is a client-side reconciliation, not a faked
+field.** `GET /api/me` (`MeAccount`) has no persistent "pending change"
+column — only the change-email POST response carries `pending_email`. Rather
+than leave the "pending: check your inbox" state disappearing on next page
+load (technically honest, but a worse experience than the brief's wording
+implies), it's remembered in `localStorage` keyed by user id and cleared the
+moment a LATER `/api/me` snapshot shows `email` actually equals the
+remembered candidate — i.e., the verification link was clicked. Every value
+compared is real data the API actually returned at some point; nothing is
+invented client-side that the server never said.
+
+**`window.alert()`/blocking dialogs, deliberately avoided on this page even
+though existing code uses them.** `memories.js`'s unlink/delete-photo error
+paths use `window.alert()`, and copying that would have been the path of
+least resistance. Found in the browser, not in review: an alert on the
+resend-verification 503 path fully blocked the automated preview tool (a
+real native modal — exactly what it would do to a real user mid-task) on a
+page the brief explicitly wants to "feel calm, not like a settings dump."
+Reworked every error path on this page to the SAME inline `.alert-danger`
+(`showInlineError`/`alertFormError`, both pre-existing in `fh-common.js`)
+the form-submit paths already used, so the whole page has one consistent,
+non-blocking error idiom instead of two competing ones. `window.confirm()`
+is kept for the final delete gate — a deliberate, answerable yes/no the user
+must actively dismiss, not a one-way notice, and it matches the existing
+delete-photo precedent exactly.
+
+**Two real layout bugs found only at 375px, not caught by pytest or a
+desktop check:**
+1. **`.chip-group` never had `flex-wrap`.** People's living-status filter (3
+   chips) always fit one row at any real width, so the missing wrap never
+   showed. My Contributions' subject-type filter (6 chips) overflowed off a
+   375px viewport instead of dropping to a second row. Fixed in the shared
+   rule (`chronicle-app.css`) rather than a page-local override, since the
+   fix is correct for any future chip-group with more items than fits one
+   line; re-verified People's own filter still renders on one line
+   afterward.
+2. **A `<label>` immediately before a `.chip-group` sits on the same visual
+   line as the chip.** Bootstrap's `.form-label` is `display: inline-block`;
+   `.chip-group` is `inline-flex` — with nothing block-level between them,
+   "TIMEZONE" and the "Site default" chip rendered side by side instead of
+   label-then-control. Every other `.chip-group` usage in the app is
+   preceded by a plain `<div>`, not a `<label>`, so this pairing never
+   existed before the Timezone field. Fixed with `d-block` on that one
+   label rather than changing `.form-label`'s default globally (other
+   Bootstrap-rendered fields elsewhere may depend on the inline-block
+   behavior for their own layout).
+
+**Files created/changed:** `app/routes/account.py` (new blueprint, two thin
+view routes); `app/__init__.py` (registered it); `app/templates/account/
+{security,contributions,_subnav}.html` (new); `app/static/js/account.js`
+(new — both pages, DOM-guarded); `app/templates/base.html` (user menu:
+Account & Security repointed, My Contributions added); `app/forms/
+auth_forms.py` (`ChangePasswordForm` render_kw autocomplete attributes —
+template-adjacent fix, brief-authorized); `app/static/js/memories.js`
+(`?photo=` deep link); `app/static/css/chronicle-app.css` (new Account &
+Security section; `.chip-group` flex-wrap fix); `app/static/js/sw.js`
+(cache version bump); `docs/openapi.yaml` (two new Views-tag paths + one new
+query param on `/memories`).
+
 ---
 
 ## Design Parking Lot
