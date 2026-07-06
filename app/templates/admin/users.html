@@ -1,60 +1,50 @@
-{# Admin: list of every account, with per-user actions. #}
+{# admin/users.html — Users (FE-6): every account (role, linked person,
+   active/verified state), plus email-a-reset-link / secure change-email /
+   link-unlink-person actions and the read-only role→permission matrix.
+   Entirely client-rendered by admin.js against GET /api/admin/users +
+   GET /api/permissions/matrix + the AdminApi/Account actions. Creating a new
+   account and editing display-name/role stay the existing, already-working
+   server-rendered forms (admin.create_user / admin.edit_user) — linked from
+   here, not rebuilt (docs/FRONTEND_DESIGN.md's FE-6 entry). #}
 {% extends "base.html" %}
 
-{% block title %}Manage Users{% endblock %}
+{% block title %}Users{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Family Accounts</h1>
-    <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
-        ➕ New Account
-    </a>
-</div>
+<div id="adminUsersPage">
+    {% set active = 'users' %}
+    {% include "admin/_subnav.html" %}
 
-<div class="table-responsive">
-    <table class="table table-striped align-middle">
-        <thead>
-            <tr>
-                <th>Display name</th>
-                <th>Email (login)</th>
-                <th>Role</th>
-                <th>Member since</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr>
-                <td>{{ user.display_name }}{% if not user.is_active %}
-                    <span class="badge text-bg-warning ms-1">inactive</span>{% endif %}</td>
-                <td><code>{{ user.email }}</code></td>
-                <td>
-                    {% if user.is_admin %}
-                        <span class="badge text-bg-primary">Admin</span>
-                    {% elif user.role == "curator" %}
-                        <span class="badge text-bg-info">Curator</span>
-                    {% elif user.role == "viewer" %}
-                        <span class="badge text-bg-light border">Viewer</span>
-                    {% else %}
-                        <span class="badge text-bg-secondary">Contributor</span>
-                    {% endif %}
-                </td>
-                {# strftime formats the timestamp for humans —
-                   "June 11, 2026" beats an ISO timestamp on an admin page. #}
-                <td>{{ user.created_at.strftime("%B %d, %Y") }}</td>
-                <td class="text-end">
-                    <a class="btn btn-outline-secondary btn-sm"
-                       href="{{ url_for('admin.edit_user', user_id=user.id) }}">
-                        Edit
-                    </a>
-                    <a class="btn btn-outline-secondary btn-sm"
-                       href="{{ url_for('admin.reset_password', user_id=user.id) }}">
-                        Reset password
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <header class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="mb-0">Family Accounts</h1>
+            <p class="text-muted mb-0">Every account — role, linked person, active/verified state.</p>
+        </div>
+        <a class="btn btn-primary" href="{{ url_for('admin.create_user') }}">+ New Account</a>
+    </header>
+
+    <div class="table-responsive mb-4">
+        <table class="table table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Display name</th><th>Email</th><th>Role</th>
+                    <th>Linked person</th><th>Status</th><th>Member since</th><th></th>
+                </tr>
+            </thead>
+            <tbody id="adminUsersBody">
+                <tr><td colspan="7" class="text-muted">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <section class="panel" aria-labelledby="adminMatrixTitle">
+        <h2 class="section-title" id="adminMatrixTitle">Role &rarr; Permission Matrix</h2>
+        <p class="text-muted small mb-2">Read-only in v1 — editable roles are a v2 feature.</p>
+        <div id="adminPermMatrix" class="table-responsive"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 {% endblock %}

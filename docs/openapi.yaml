@@ -130,32 +130,28 @@ paths:
     parameters: [{name: token, in: path, required: true, schema: {type: string}, description: Signed email-verification token (24h)}]
     get: {tags: [Auth], summary: Confirm an email address from the emailed link (§9), responses: {"302": {description: Verified (or invalid) — redirected home with a flash}}}
 
-  # --- Admin -------------------------------------------------------------------
-  /admin/users:
-    get: {tags: [Admin], summary: Every account, responses: {"200": {description: HTML page}, "403": {description: Admins only}}}
+  # --- Admin (legacy server-rendered flows, kept as-is by FE-6 — see the
+  # Views tag's /admin* entries below for the rebuilt native-Chronicle pages)
+  # -------------------------------------------------------------------------
   /admin/users/new:
     get: {tags: [Admin], summary: New-account form (no self-registration exists), responses: {"200": {description: HTML form}}}
     post: {tags: [Admin], summary: Create an account, responses: {"302": {description: Created}}}
   /admin/users/{user_id}/edit:
     parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
-    get: {tags: [Admin], summary: Edit display name / reset email, responses: {"200": {description: HTML form}}}
+    get: {tags: [Admin], summary: Edit display name / role / login email, responses: {"200": {description: HTML form}}}
     post: {tags: [Admin], summary: Save account changes, responses: {"302": {description: Saved}}}
   /admin/users/{user_id}/reset-password:
     parameters: [{name: user_id, in: path, required: true, schema: {type: integer}}]
-    get: {tags: [Admin], summary: Reset-password form, responses: {"200": {description: HTML form}}}
+    get: {tags: [Admin], summary: "Reset-password form (set a new password directly, by hand) — superseded in the FE-6 Users console by the emailed reset-link action (POST /api/admin/users/{user_id}/reset-password); kept reachable, not deleted", responses: {"200": {description: HTML form}}}
     post: {tags: [Admin], summary: Set a new password for the user, responses: {"302": {description: Set}}}
   /admin/settings:
-    get: {tags: [Admin], summary: Site text + hero image form, responses: {"200": {description: HTML form}}}
+    get: {tags: [Admin], summary: "Site text + hero image form (tagline/about/contact/banner) — a real, separate settings surface from the FE-6 grouped console (GET /admin/config); see docs/FRONTEND_DESIGN.md's FE-6 entry", responses: {"200": {description: HTML form}}}
     post: {tags: [Admin], summary: Save settings / upload hero, responses: {"302": {description: Saved}}}
-  /admin/backups:
-    get: {tags: [Admin], summary: List local backups, responses: {"200": {description: HTML page}}}
   /admin/backups/run:
-    post: {tags: [Admin], summary: Create, verify, and (if configured) upload a backup, responses: {"302": {description: Report via flash messages}}}
+    post: {tags: [Admin], summary: "Create, verify, and (if configured) upload a backup via a plain form POST + flash messages — superseded in the FE-6 Backups console by POST /api/admin/backups/run (shows the report inline); kept reachable, not deleted", responses: {"302": {description: Report via flash messages}}}
   /admin/backups/{filename}/download:
     parameters: [{name: filename, in: path, required: true, schema: {type: string}, description: Must match a known backup name — no path tricks}]
     get: {tags: [Admin], summary: Download a backup zip, responses: {"200": {description: zip bytes}, "404": {description: Unknown filename}}}
-  /admin/activity:
-    get: {tags: [Admin], summary: The audit trail — who did what, newest first, responses: {"200": {description: HTML page}}}
 
   # ============================================================================
   # GENEALOGY JSON API (WP2) — the contract Cowork builds WP3 against.
@@ -556,6 +552,50 @@ paths:
       tags: [Views]
       summary: "My Contributions (FE-5): summary cards + a paginated, filterable list of the caller's own audit rows, client-rendered against GET /api/me/contributions. Own rows only — no id in the URL."
       responses: {"200": {description: HTML page}}
+
+  # --- Admin Console (FE-6): the native-Chronicle rebuild of the admin
+  # surface. Every page below is a thin shell, client-rendered against the
+  # AdminApi/Inbox/WriteControl/Tree tags above (Admin-only except Activity,
+  # which is Curator+ — see app/routes/admin.py). The legacy server-rendered
+  # flows this rebuild kept as-is (create/edit account, the direct-password-
+  # reset form, the site-text-and-hero form, the flash-redirect backup-run
+  # form) stay documented under the Admin tag, above.
+  # -------------------------------------------------------------------------
+  /admin:
+    get:
+      tags: [Views]
+      summary: "Admin Console dashboard (FE-6): aggregate counts + storage, backup health, and the pending suggestions/role-request queues, each with a jump to its own section — client-rendered against GET /api/stats + GET /api/admin/backups + GET /api/suggestions + GET /api/role-requests."
+      responses: {"200": {description: HTML page}, "403": {description: Admins only}}
+  /admin/users:
+    get:
+      tags: [Views]
+      summary: "Users (FE-6): every account (role, linked person, active/verified state), plus email-a-reset-link / secure change-email / link-unlink-person actions and the read-only role→permission matrix — client-rendered against GET /api/admin/users + GET /api/permissions/matrix + the AdminApi/Account actions. Replaces the old static table at this same URL."
+      responses: {"200": {description: HTML page}, "403": {description: Admins only}}
+  /admin/suggestions:
+    get:
+      tags: [Views]
+      summary: "Suggestions Inbox (FE-6): a filterable triage list (status/topic/prioritized), edits saved inline per row — client-rendered against GET/PUT /api/suggestions."
+      responses: {"200": {description: HTML page}, "403": {description: Admins only}}
+  /admin/role-requests:
+    get:
+      tags: [Views]
+      summary: "Role Requests (FE-6): the pending queue (approve/deny) plus decided history — client-rendered against GET /api/role-requests + its approve/deny actions."
+      responses: {"200": {description: HTML page}, "403": {description: Admins only}}
+  /admin/config:
+    get:
+      tags: [Views]
+      summary: "Settings (FE-6): the grouped config-as-data settings (branding/defaults/security/email) — client-rendered against GET/PUT /api/settings. A separate page from GET /admin/settings (tagline/About/banner) — two independent settings surfaces already existed in the backend; see docs/FRONTEND_DESIGN.md's FE-6 entry."
+      responses: {"200": {description: HTML page}, "403": {description: Admins only}}
+  /admin/backups:
+    get:
+      tags: [Views]
+      summary: "Backups (FE-6): overview, back-up-now with its verification report, the schedule editor, and the guarded restore (the gravest action in the app: step-up + explicit confirm, safety backup taken first) — client-rendered against GET /api/admin/backups + POST /run + PUT /schedule + POST /restore. Replaces the old static list at this same URL."
+      responses: {"200": {description: HTML page}, "403": {description: Admins only}}
+  /admin/activity:
+    get:
+      tags: [Views]
+      summary: "Activity (FE-6): the full audit trail, paginated and filterable, with per-entry revert/restore — client-rendered against GET /api/activity + POST /api/restore + POST /api/audit/{audit_id}/revert. CURATOR+, not Admin-only (§10 — Curator holds `revert`; BLOCKERS.md 2026-07-03 RESOLVED). Replaces the old static table at this same URL."
+      responses: {"200": {description: HTML page}, "403": {description: Logged in below Curator}}
 
 components:
   responses:

@@ -37,6 +37,45 @@ Entry format:
 
 ## Open items
 
+### [OPEN] FE-6 rewrote `app/routes/admin.py` + touched a BE test file + `docs/openapi.yaml` — BE review at merge
+- Date: 2026-07-06
+- Raised by: FE
+- Blocks: nothing (safe to merge once BE reviews)
+- Needs (BE must): review three things this session touched outside its own
+  new files.
+  1. **`app/routes/admin.py` — rewritten, thin-controller only.** No
+     business logic moved: every mutation still goes through the existing
+     `user_service`/`backup_service`/`settings_service`/`audit_service`
+     calls verbatim, same as before. Seven view functions are new or
+     changed (`dashboard`, `list_users`, `suggestions`, `role_requests`,
+     `settings_console`, `backups`, `activity`); four are byte-for-byte the
+     same logic as before, just re-ordered in the file (`create_user`,
+     `edit_user`, `reset_password`, `site_settings`, `run_backup`,
+     `download_backup`). The one BEHAVIOR change: `activity()`'s decorator
+     moved from `admin_required` to `role_required(Role.CURATOR)` — brief-
+     authorized (Curator holds `revert`; see the 2026-07-03 RESOLVED entry
+     below that already pre-authorized this).
+  2. **`tests/test_wp5_authz_alignment.py` — one BE-authored test file,
+     touched, not a new FE file.** `/admin/activity` moved out of
+     `ADMIN_ONLY_GET_ENDPOINTS` and into `CURATOR_PLUS_GET_ENDPOINTS`
+     (alongside `/api/activity`, which that same list already tests
+     identically) — a direct, necessary consequence of the Activity access
+     change above, not incidental scope creep. Full suite re-run green
+     (260/260) after the change.
+  3. **`docs/openapi.yaml`** — the `Admin` tag block trimmed to the four
+     legacy flows this session kept verbatim (`/admin/users/new`,
+     `/admin/users/{user_id}/edit`, `/admin/users/{user_id}/reset-password`,
+     `/admin/settings`, `/admin/backups/run`, `/admin/backups/{filename}/
+     download`), each re-worded to note where it's superseded-but-still-
+     reachable; seven `Views`-tag entries added/moved (`/admin`,
+     `/admin/users`, `/admin/suggestions`, `/admin/role-requests`,
+     `/admin/config`, `/admin/backups`, `/admin/activity`) — the brief-
+     authorized "new/changed view routes → Views tag" rule.
+  No schema, migration, or `/api/*` endpoint changed — every JSON call this
+  console makes was already in the WP2 contract. Confirm none of this breaks
+  any existing BE test (it doesn't — 260/260 green) and sign off at merge.
+- Status: OPEN — awaiting BE review.
+
 ### [OPEN] FE-5 added `app/routes/account.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-06
 - Raised by: FE

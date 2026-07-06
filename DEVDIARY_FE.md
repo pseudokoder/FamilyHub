@@ -1244,3 +1244,268 @@ a real notification/event system (Master Plan §11) would likely push a
 server-driven "email changed" event instead, making this localStorage trick
 unnecessary. Not a lock-in either way: v1's approach only reads
 already-public fields (`email`) and writes to no server state.
+
+---
+
+## FE-6 — Admin Console (Dashboard, Users, Inboxes, Settings, Backups, Activity)
+
+**Branch:** `fe6-admin-console`
+**Date:** 2026-07-06
+**Status:** Implementation complete; full suite green; pending owner review + merge.
+
+### What FE-6 Delivered
+
+The `/admin/*` surface predates Chronicle — every page was a plain Bootstrap
+template with server-fetched data. This run rebuilds it as a native-Chronicle,
+client-rendered console (one new script, `app/static/js/admin.js`, DOM-guarded
+per page like every prior FE script) over the AdminApi/Inbox/WriteControl
+tags, while keeping four already-working server-rendered forms exactly as they
+were (see "A Deliberate Split," below).
+
+**Seven pages, one shared `admin/_subnav.html`** (role-gated: every tab but
+Activity only renders `{% if current_user.is_admin %}`; Activity renders
+`{% if current_user.has_role('curator') %}` — so a Curator who isn't also an
+Admin sees a ONE-tab subnav, never a menu of links that would 403):
+
+- **Dashboard** (`/admin`) — `GET /api/stats` (all ten counts + storage,
+  formatted with a new `formatBytes` helper), `GET /api/admin/backups`
+  (last/next run, disk-free percentage), and the two queues that need eyes
+  (`GET /api/suggestions?status=new`, `GET /api/role-requests?status=pending`),
+  each showing a count + newest few + a one-click jump link to its own page.
+- **Users** (`/admin/users`) — `GET /api/admin/users` rendered as a table
+  (role/linked-person/status/member-since badges), with three real actions per
+  row: email-a-reset-link (`POST /api/admin/users/{id}/reset-password`),
+  secure change-email with step-up (`POST /api/admin/users/{id}/change-email`,
+  an inline drawer under the row), and link/unlink to a person
+  (`PUT`/`DELETE /api/users/{id}/individual`, `subjectPicker()` reused from
+  `fh-common.js`, a 409 rendered as "already linked to another account," not a
+  generic error). The read-only role→permission matrix
+  (`GET /api/permissions/matrix`) renders below as a small table — legible,
+  not editable, no v2 tease.
+- **Suggestions Inbox** (`/admin/suggestions`) — filterable
+  (`status`/`topic`/`prioritized` chips) over `GET /api/suggestions`; each row
+  is its own inline triage form (`PUT /api/suggestions/{id}`) with a "Saved ✓"
+  flash, not a separate edit page.
+- **Role Requests** (`/admin/role-requests`) — one unfiltered
+  `GET /api/role-requests` fetch, split client-side into a Pending block
+  (Approve/Deny buttons) and a Decided History block (chip-filterable
+  approved/denied) — the brief's "pending queue... show already-decided
+  history" read as two sections, not one filtered list.
+- **Settings** (`/admin/config`) — the grouped, config-as-data settings
+  (branding/defaults/security/email) over `GET`/`PUT /api/settings`, as FOUR
+  independent per-group forms rather than one big form, since
+  `settings_service.update_settings` genuinely supports a partial `{key:
+  value}` patch — a mistake in Security never blocks saving Branding. See "A
+  Deliberate Split" for why this is a new URL, not `/admin/settings`.
+- **Backups** (`/admin/backups`) — overview, back-up-now with its inline
+  verification report, a schedule editor, and the restore flow rendered as
+  the gravest action in the app (`.panel--danger`, step-up password + an
+  explicit confirm checkbox, copy stating a safety backup is taken first).
+  Downloading a zip stays a plain `<a href>` to the existing
+  `admin.download_backup` route — a file download needs no JSON round trip.
+- **Activity** (`/admin/activity`) — the full audit trail, paginated and
+  filterable (action/subject-type chips, an Admin-only actor dropdown, date
+  range), with ONE contextual action per row: `Restore` on a `delete`-action
+  row (`POST /api/restore`), `Revert` on everything else revertible
+  (`POST /api/audit/{id}/revert`) — showing both on the same row would do
+  near-identical things for little benefit. **Curator+, not Admin-only** — see
+  "The Activity Access Change," below.
+
+### A Deliberate Split: Two Settings Pages, Not One
+
+`GET /api/settings` (branding/defaults/security/email) and the PRE-EXISTING
+`/admin/settings` HTML form (tagline/about_text/contact_text/the dashboard
+hero image) are two independent surfaces in the backend today —
+`settings_service.py` has always had two parallel systems (`KNOWN_KEYS` +
+`get_all()` for the legacy one, `SETTING_GROUPS` + `editable_settings()` for
+the new one) that share no keys and no endpoint. Rather than strand the
+legacy form's real, still-used capability (the About page and the dashboard
+banner both read it) by relocating it, or bury the new grouped console
+inside its page, the new console lives at a fresh URL (`/admin/config`,
+labeled "Settings" in the subnav) with a one-line link to the legacy page
+(relabeled "Site Text" in the subnav) — **and the legacy page's URL, form,
+and behavior are completely untouched**, which is also why
+`tests/test_admin.py`'s `test_site_settings_save_and_show` and
+`test_hero_upload_processed_and_walled` (both POST to `/admin/settings`)
+needed no changes at all. The legacy Users forms (`/admin/users/new`,
+`/admin/users/{id}/edit`, `/admin/users/{id}/reset-password`) got the same
+"restyle, don't relocate" treatment — restyled for free by the shared
+Chronicle stylesheet cascade (same mechanism WP5 used app-wide), plus a new
+`{% include "admin/_subnav.html" %}` on each so navigating in and back out
+of them feels like one console, not a detour.
+
+Two legacy routes are now unlinked from the console's nav (superseded by a
+better version, not deleted): `/admin/users/{id}/reset-password` (set a
+password directly, by hand) is superseded by the Users page's emailed
+reset-link action; `/admin/backups/run` (a flash-redirect POST) is superseded
+by the Backups page's `POST /api/admin/backups/run` with an inline report.
+Both routes still work if visited directly — removing a working feature
+nobody asked to remove would be a bigger change than this brief called for.
+
+### The Activity Access Change
+
+`app/routes/admin.py`'s `activity()` route moved from `@admin_required` to
+`@role_required(Role.CURATOR)` — the brief's explicit instruction, backed by
+the 2026-07-03 BLOCKERS resolution that already authorized a Curator-visible
+Activity nav entry once FE built this page. `base.html`'s user menu now shows
+"Activity" (not "Admin") to a Curator who isn't also an Admin. This DID
+require updating one pre-existing test:
+`tests/test_wp5_authz_alignment.py`'s `ADMIN_ONLY_GET_ENDPOINTS` had
+`/admin/activity` listed as admin-only (written before this page existed in
+its Curator+ form) — moved to `CURATOR_PLUS_GET_ENDPOINTS` alongside its own
+API (`/api/activity`), which the same file already tests the exact same way.
+Logged transparently in `BLOCKERS.md`'s review entry, same rule as any other
+touch outside this session's own new files.
+
+### Two Bugs Found and Fixed in the Browser (Not Caught by pytest)
+
+1. **The guarded restore's success message was invisible.** The restore
+   handler set `form.outerHTML` to a "Restored ✓ — safety backup saved as…"
+   confirmation, then immediately called `load()` to refresh the rest of the
+   page — but `load()` unconditionally re-rendered the restore area too,
+   silently overwriting the confirmation with a fresh form in the SAME
+   synchronous callback, so a real admin would never see it. Fixed by giving
+   `load()` a `{ skipRestoreArea: true }` option the restore handler passes,
+   so the overview/schedule/backup-list refresh normally while the
+   confirmation message persists until the next real page load. Caught by
+   scripting the actual restore flow against the dev server, not by reading
+   the code — the bug was invisible in isolation (`renderRestoreArea` looked
+   correct on its own) and only showed up watching the two calls run back to
+   back.
+2. **A restored/reverted subject kept showing "(since removed)" after the
+   very action that un-deleted it.** The Activity page's `resolveSubject()`
+   memoizes each `subject_type:subject_id` lookup in `resolveCache` so a
+   subject referenced by multiple rows is only fetched once — but the cache
+   never expired, so once a subject resolved as `{removed: true}` (its normal
+   deleted state), clicking Restore or Revert on that very row changed the
+   real data but not the cached client-side verdict, and the row (now current)
+   kept reading "since removed" until a full page reload. Fixed by deleting
+   the specific `resolveCache` entry right after a successful restore/revert,
+   which needed the Revert button to also carry `data-subject-type`/
+   `data-subject-id` (previously it only had `data-audit-id`, since the
+   revert endpoint's response doesn't include the subject type). Verified by
+   restoring, then re-deleting, then re-restoring the same test row in one
+   browser session and confirming each state showed correctly without a
+   reload — the bug only shows up on a SECOND action against the same
+   subject in one session, which is exactly the kind of thing pytest's
+   single-request-per-test shape doesn't naturally exercise.
+
+Also re-encountered, not re-caused: the same PWA service-worker cache trap
+FE-3/FE-4 already documented — a fix on disk doesn't reach the running page
+until the Cache Storage entry is cleared or `CACHE` is bumped again, even
+"live-reloading" via `window.location.reload()`. Cleared the cache manually
+mid-session while iterating on the two bugs above; the version bump below
+covers real returning members.
+
+### Files Created or Modified
+
+`app/routes/admin.py` (rewritten — seven new/changed thin views, four legacy
+views kept verbatim); `app/templates/admin/_subnav.html`,
+`admin/{dashboard,suggestions,role_requests,config}.html` (new);
+`admin/{users,backups,activity}.html` (rebuilt); `admin/{new_user,edit_user,
+reset_password,settings}.html` (subnav include added, nothing else changed);
+`app/static/js/admin.js` (new — all seven pages); `app/static/css/
+chronicle-app.css` (new §16: `.btn-danger`/`.text-bg-warning`/
+`.text-bg-danger` repaints, a detail-row background rule); `app/templates/
+base.html` (Admin nav link repointed to the dashboard; new Curator-only
+Activity nav entry); `app/static/js/sw.js` (cache version bump);
+`tests/test_wp5_authz_alignment.py` (`/admin/activity` moved lists — see "The
+Activity Access Change"); `docs/openapi.yaml` (Admin tag trimmed to the four
+kept legacy flows + notes on the two superseded-but-reachable ones; seven
+Views-tag entries, new + moved).
+
+### Manual Testing Checklist
+
+- [x] Dashboard: real stats/backup-health/queues rendered correctly against
+      the dev DB (10 people, a pending role request, an empty suggestions
+      inbox before one was filed).
+- [x] Users: linked a real person via the picker, confirmed the 409 path by
+      trying to link the SAME person to a second account ("already linked to
+      another account"), then unlinked — all three states re-rendered
+      correctly with no page reload.
+- [x] Suggestions: filed a real suggestion via the API, triaged it
+      (status → in_progress, priority → 1) inline, confirmed via a fresh
+      `GET /api/suggestions`.
+- [x] Role Requests: approved the real seeded pending request; it moved from
+      Pending into Decided History with the correct actor/timestamp.
+- [x] Settings: a sub-6 `min_password_length` was actually blocked TWICE —
+      first by the number input's own `min="6"` (native HTML5 validation,
+      never even reaches the server), and, after deliberately removing that
+      attribute to test the fallback, by the server's 400 with the
+      field-highlighting heuristic working correctly (`is-invalid` class +
+      inline message). A valid save showed "Saved ✓".
+- [x] Backups: ran a real backup (report showed table/file counts), edited
+      the schedule, and ran a real guarded restore twice (wrong password path
+      not separately re-tested this session — covered by `admin_service`'s
+      own `_step_up` pytest coverage) — found and fixed the invisible-
+      success-message bug above in the process.
+- [x] Activity: filtered by action/subject-type/date, exercised both Restore
+      and Revert on real rows (a story create → delete → restore → revert →
+      revert chain), confirmed the actor dropdown appears for Admin and is
+      ABSENT for Curator (fetching `/api/admin/users` would 403 for them) —
+      found and fixed the stale-cache bug above in the process.
+- [x] Role matrix: Admin sees Curator holding `revert` but not `administer`,
+      matching `permissions.ROLE_PERMISSIONS` exactly.
+- [x] Role gating, scripted end to end: as Curator, every `/admin/*` path
+      403'd except `/admin/activity` (200); the user menu showed "Activity,"
+      not "Admin." As Contributor, EVERY `/admin/*` path 403'd including
+      `/admin/activity`, and the user menu showed neither link.
+- [x] 375px viewport: the seven-tab subnav wraps to three rows cleanly; the
+      Users table scrolls horizontally with Reset Link/Change Email fully
+      reachable past the fold (`scrollWidth` 1134px vs. `clientWidth` 327px,
+      confirmed reachable by scrolling all the way right); the Backups
+      restore panel's form fields stack full-width with no overflow.
+- [x] Zero browser console errors across every page and role tested.
+- [x] 260/260 tests green, including the one pre-existing test this branch
+      had to update (see "The Activity Access Change").
+
+### Cross-Boundary Touches
+
+`app/routes/admin.py` (rewritten, thin views only — no business logic moved;
+every mutation still goes through the existing `user_service`/
+`backup_service`/`settings_service`/`audit_service` calls verbatim) and
+`docs/openapi.yaml` (Admin tag trimmed + reworded, seven Views-tag entries
+new/moved) are the expected FE-owned route/doc touches, same protocol as
+FE-3/FE-4/FE-5. The one touch outside that pattern —
+`tests/test_wp5_authz_alignment.py`, a BE-authored test file — is logged in
+`BLOCKERS.md`'s review entry in full, since it's a direct, necessary
+consequence of the brief's own explicitly-authorized Activity access change,
+not incidental scope creep: the alternative would have been leaving a stale
+test permanently red or silently wrong.
+
+### WGU Connections
+
+- **D315 Security** — the permission-matrix rendering and the Curator-only
+  Activity nav gate are both `permissions.py`'s "role = a bundle of
+  permission flags" made visible in the UI; the actor filter's admin-only
+  gate is the same principle applied to a UI AFFORDANCE, not just a route
+  (offering a control whose data source would 403 for the viewer is its own
+  small access-control bug class, distinct from gating the page itself).
+- **D276 Web Development Foundations** — the four-form Settings page is a
+  concrete lesson in matching UI granularity to the server's actual
+  transaction boundary: `update_settings` supports a partial patch, so four
+  small forms are MORE correct than one big one, not just a stylistic choice.
+- **D287 Database / ADR-0001** — the Restore-vs-Revert row action split
+  mirrors `write_control.py`'s own two distinct code paths (`restore`: un-
+  delete a currently-soft-deleted row by id; `revert`: replay a specific
+  audit entry's `before_json`) — the UI reflects a real semantic difference
+  in the data model, not an arbitrary UX choice.
+- **D280 JavaScript Programming** — both browser-found bugs this session are
+  the same class of lesson: a synchronous "set success message, then
+  refresh everything" sequence can silently clobber its own output, and a
+  memoization cache is only as correct as its invalidation story — "cache the
+  result" and "the result can become stale" have to be designed together,
+  not the first one alone.
+
+### v2 Spring Boot Migration Notes
+
+`AdminController.java` (dashboard/users/suggestions/role-requests/settings/
+backups/activity — seven thin `@GetMapping`s) plus small sibling
+`@Controller`s for the four kept legacy forms, exactly the same split as
+every prior WP. The permission matrix's read-only rendering is a direct
+preview of v2's `role_permissions` table + an editable admin UI over it —
+v1 intentionally ships the READ half only, per the brief. Nothing about the
+"two settings systems" split needs to survive into v2; that's a natural
+place for the Java rewrite to unify `site_settings` into one coherent
+schema, since v2 has no legacy HTML form dragging a naming/shape convention
+forward from WP1.

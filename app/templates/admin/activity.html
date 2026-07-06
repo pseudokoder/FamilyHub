@@ -1,43 +1,65 @@
-{# The audit trail — newest first. Append-only by design: the app writes
-   these rows and never edits them, so this page is the answer to "who
-   deleted that?" that nobody can argue with. #}
+{# admin/activity.html — Activity (FE-6): the full audit trail, paginated
+   and filterable, with per-entry revert/restore. CURATOR+, not Admin-only —
+   see app/routes/admin.py's activity() route. Client-rendered against
+   GET /api/activity + POST /api/restore + POST /api/audit/{id}/revert.
+
+   The actor filter is Admin-only (GET /api/admin/users is admin-gated, so a
+   Curator who isn't also an Admin gets no actor dropdown at all rather than
+   one that silently 403s — data-is-admin below tells admin.js which to do). #}
 {% extends "base.html" %}
 
-{% block title %}Activity Log{% endblock %}
+{% block title %}Activity{% endblock %}
 
 {% block content %}
-<h1 class="mb-1">📋 Activity Log</h1>
-<p class="fs-5 text-muted mb-4">
-    Every change anyone makes — newest first, last 100 shown.
-</p>
+<div id="adminActivityPage" data-is-admin="{{ 'true' if current_user.is_admin else 'false' }}">
+    {% set active = 'activity' %}
+    {% include "admin/_subnav.html" %}
 
-{% if events %}
-<div class="table-responsive">
-    <table class="table table-striped align-middle">
-        <thead>
-            <tr>
-                <th>When</th>
-                <th>Who</th>
-                <th>Did what</th>
-                <th>To</th>
-                <th>Detail</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for event in events %}
-            <tr>
-                <td class="text-nowrap">{{ event.created_at.strftime("%b %d, %H:%M") }}</td>
-                <td>{{ event.user.display_name if event.user else "CLI / system" }}</td>
-                <td><span class="badge text-bg-secondary">{{ event.action }}</span></td>
-                <td>{{ event.subject_type }}{% if event.subject_id %} #{{ event.subject_id }}{% endif %}</td>
-                <td class="text-muted">{{ event.detail }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <header class="mb-3">
+        <h1 class="mb-0">Activity</h1>
+        <p class="text-muted mb-0">The full audit trail — every change anyone makes, newest first.</p>
+    </header>
+
+    <div class="d-flex flex-wrap align-items-end gap-3 mb-3" id="activityFilters">
+        <div class="chip-group" role="group" aria-label="Filter by action" data-chip-group="action">
+            <button type="button" class="filter-chip is-active" data-value="">Any action</button>
+            <button type="button" class="filter-chip" data-value="create">Added</button>
+            <button type="button" class="filter-chip" data-value="update">Edited</button>
+            <button type="button" class="filter-chip" data-value="delete">Deleted</button>
+            <button type="button" class="filter-chip" data-value="restore">Restored</button>
+            <button type="button" class="filter-chip" data-value="revert">Reverted</button>
+        </div>
+        <div class="chip-group" role="group" aria-label="Filter by subject type" data-chip-group="subject_type">
+            <button type="button" class="filter-chip is-active" data-value="">Anything</button>
+            <button type="button" class="filter-chip" data-value="individual">People</button>
+            <button type="button" class="filter-chip" data-value="family">Families</button>
+            <button type="button" class="filter-chip" data-value="event">Events</button>
+            <button type="button" class="filter-chip" data-value="media">Photos</button>
+            <button type="button" class="filter-chip" data-value="note">Stories</button>
+            <button type="button" class="filter-chip" data-value="source">Sources</button>
+            <button type="button" class="filter-chip" data-value="citation">Citations</button>
+            <button type="button" class="filter-chip" data-value="user">Accounts</button>
+            <button type="button" class="filter-chip" data-value="backup">Backups</button>
+        </div>
+        <div id="activityActorFilterWrap" class="d-none">
+            <label class="form-label" for="activityActorFilter">Who</label>
+            <select class="form-select form-select-sm" id="activityActorFilter"><option value="">Anyone</option></select>
+        </div>
+        <div>
+            <label class="form-label" for="activityDateFrom">From</label>
+            <input type="date" class="form-control form-control-sm" id="activityDateFrom">
+        </div>
+        <div>
+            <label class="form-label" for="activityDateTo">To</label>
+            <input type="date" class="form-control form-control-sm" id="activityDateTo">
+        </div>
+    </div>
+
+    <div id="activityList" class="list-group mb-2"><p class="text-muted">Loading…</p></div>
+    <div class="d-flex justify-content-between align-items-center" id="activityPagination"></div>
 </div>
-{% else %}
-<p class="text-muted fs-5">Nothing logged yet — actions will appear here as
-the family uses the site.</p>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 {% endblock %}

@@ -139,8 +139,17 @@
                        as built — every /admin/* + /api/admin/* route needs the
                        `administer` permission, which Curator does not hold. #}
                     <li>
-                        <a class="dropdown-item" href="{{ url_for('admin.list_users') }}">
+                        <a class="dropdown-item" href="{{ url_for('admin.dashboard') }}">
                             Admin
+                        </a>
+                    </li>
+                    {% elif current_user.has_role('curator') %}
+                    {# FE-6: the one console page a non-Admin Curator CAN reach
+                       — Curator holds `revert` (§10), not `administer`, so the
+                       menu offers just Activity, not the full Admin panel. #}
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('admin.activity') }}">
+                            Activity
                         </a>
                     </li>
                     {% endif %}

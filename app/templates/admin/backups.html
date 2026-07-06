@@ -1,52 +1,76 @@
-{# Admin: trigger a backup, see the ones that exist, download for off-site. #}
+{# admin/backups.html — Backups (FE-6): overview, back-up-now with its
+   verification report, the schedule editor, and the guarded restore — the
+   gravest action in the app. Client-rendered against GET /api/admin/backups
+   + POST /run + PUT /schedule + POST /restore. Downloading an existing
+   backup zip stays the existing, already-working server route
+   (admin.download_backup) — a plain file download needs no JSON round trip. #}
 {% extends "base.html" %}
 
 {% block title %}Backups{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h1>💾 Backups</h1>
-    <form method="post" action="{{ url_for('admin.run_backup') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-primary btn-lg">▶ Back Up Now</button>
-    </form>
-</div>
+<div id="adminBackupsPage">
+    {% set active = 'backups' %}
+    {% include "admin/_subnav.html" %}
 
-<p class="text-muted">
-    Each backup is one zip: the whole database plus every uploaded photo,
-    verified after creation. On the server a nightly job runs this
-    automatically; the button is for "right before I change something big".
-    Restoring is a deliberate terminal operation —
-    <code>flask restore-backup &lt;file&gt;</code> (see DEVDIARY Chapter 8).
-</p>
+    <header class="mb-3">
+        <h1 class="mb-0">Backups</h1>
+        <p class="text-muted mb-0">
+            Each backup is one zip: the whole database plus every uploaded photo,
+            verified after creation.
+        </p>
+    </header>
 
-{% if backups %}
-<div class="table-responsive">
-    <table class="table table-striped align-middle">
-        <thead>
-            <tr><th>Backup</th><th>Created</th><th>Size</th><th></th></tr>
-        </thead>
-        <tbody>
-            {% for backup in backups %}
-            <tr>
-                <td><code>{{ backup.filename }}</code></td>
-                <td>{{ backup.created.strftime("%B %d, %Y at %I:%M %p") }}</td>
-                {# filesizeformat: Jinja built-in, bytes -> "12.3 MB" #}
-                <td>{{ backup.bytes | filesizeformat }}</td>
-                <td class="text-end">
-                    <a class="btn btn-outline-secondary btn-sm"
-                       href="{{ url_for('admin.download_backup', filename=backup.filename) }}">
-                        ⬇ Download
-                    </a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="bkOverviewTitle">
+                <h2 class="section-title" id="bkOverviewTitle">Overview</h2>
+                <div id="bkOverview"><p class="text-muted mb-0">Loading…</p></div>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel h-100" aria-labelledby="bkRunTitle">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="section-title mb-0" id="bkRunTitle">Back Up Now</h2>
+                    <button type="button" class="btn btn-primary" id="bkRunBtn">&#9654; Back Up Now</button>
+                </div>
+                <div id="bkRunReport" class="mt-2"></div>
+            </section>
+        </div>
+    </div>
+
+    <section class="panel mb-3" aria-labelledby="bkScheduleTitle">
+        <h2 class="section-title" id="bkScheduleTitle">Schedule</h2>
+        <div id="bkSchedule"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
+
+    <section class="panel mb-3" aria-labelledby="bkListTitle">
+        <h2 class="section-title" id="bkListTitle">Backups on Disk</h2>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead><tr><th>Backup</th><th>Created</th><th>Size</th><th></th></tr></thead>
+                <tbody id="bkListBody"><tr><td colspan="4" class="text-muted">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+
+    {# RESTORE — the gravest action in the app: step-up (current password) +
+       an explicit confirm checkbox, never just a click. A safety backup of
+       the CURRENT state is always taken first, automatically. #}
+    <section class="panel panel--danger" aria-labelledby="bkRestoreTitle">
+        <h2 class="section-title" id="bkRestoreTitle">Restore From Backup</h2>
+        <p class="mb-2">
+            <strong>This replaces the live database and every uploaded file</strong>
+            with the contents of the backup you choose. A safety backup of the
+            CURRENT state is taken automatically first, so this itself is
+            recoverable — but everything added since the chosen backup was made
+            will be gone from the live site until/unless you restore again.
+        </p>
+        <div id="bkRestoreArea"><p class="text-muted mb-0">Loading…</p></div>
+    </section>
 </div>
-{% else %}
-<p class="lead text-center text-muted py-4">
-    No backups yet — press “Back Up Now” to make the first one.
-</p>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 {% endblock %}
