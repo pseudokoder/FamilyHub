@@ -19,9 +19,14 @@ through write_control's action log so account changes are as traceable as data e
 v2 mapping: an ``AccountService`` with the same nullable FK on the JPA ``User``.
 """
 
+from zoneinfo import available_timezones
+
+from flask import url_for
+
 from app.extensions import db
 from app.models import Event, FamilyChild, Individual, User
-from app.services import audit_service, individual_service
+from app.models.role import Role
+from app.services import audit_service, individual_service, mail_service, user_service
 from app.services.api_errors import ApiError
 
 
@@ -159,3 +164,121 @@ def tree_root(user):
         return {"individual_id": None, "source": "empty", "individual": None}
     return {"individual_id": root.id, "source": "oldest_ancestor",
             "individual": individual_service.serialize(root)}
+
+
+# --- The Account & Security page (FE-5) ----------------------------------------
+#
+# Member self-service: your own snapshot, your own contribution history, your
+# own email/deletion — everything here acts on ``user`` (the session's OWN
+# account), never on an id from the request, so there's no path from these
+# functions into another member's account.
+
+def me_snapshot(user):
+    """The current user's own account snapshot — the Account page header and
+    the My Contributions dashboard. Role and email are shown but NOT editable
+    through ``update_me`` below (an admin-only change elsewhere)."""
+    return {
+        "id": user.id,
+        "display_name": user.display_name,
+        "email": user.email,
+        "role": user.role,
+        "email_verified_at": (user.email_verified_at.isoformat()
+                              if user.email_verified_at else None),
+        "timezone": user.timezone,
+        "individual_id": user.individual_id,
+    }
+
+
+def update_me(user, data):
+    """Self-serve account edits: ONLY ``display_name`` and ``timezone``. Role
+    and email are deliberately absent from this function — role is admin-only
+    (§10) and email has its own guarded, verify-before-applying flow
+    (``request_email_change``, below), not a plain field edit."""
+    if "display_name" in data:
+        name = (data.get("display_name") or "").strip()
+        if not name:
+            raise ApiError("display_name can't be blank.", 400,
+                           fields={"display_name": "required"})
+        user_service.set_display_name(user, name, actor=user)
+
+    if "timezone" in data:
+        tz = data.get("timezone") or None
+        if tz is not None and tz not in available_timezones():
+            raise ApiError("timezone must be a valid IANA zone name (e.g. "
+                           "America/Chicago).", 400, fields={"timezone": "invalid"})
+        user.timezone = tz
+        audit_service.log_event(user, "edit", "user", user.id,
+                                f"timezone -> {tz or '(site default)'}")
+        db.session.commit()
+
+    return me_snapshot(user)
+
+
+def request_email_change(user, new_email, current_password):
+    """Self-serve change-email (the member-facing dual of admin_service's
+    secure dance): requires the CURRENT password, then emails a verification
+    link to the NEW address. The stored ``email`` column does NOT change here
+    — it changes only when that link is clicked (``user_service.
+    confirm_email_token``), so a hijacked session can't silently take over
+    login before the real owner notices."""
+    if not mail_service.is_configured():
+        raise ApiError("Email isn't set up on this server yet.", 503)
+    if user_service.authenticate(user.email, current_password) is None:
+        raise ApiError("Your current password isn't right.", 403,
+                       fields={"current_password": "incorrect"})
+
+    new_email = (new_email or "").strip().lower()
+    if not new_email:
+        raise ApiError("A new email address is required.", 400,
+                       fields={"new_email": "required"})
+    clash = user_service.find_by_email(new_email)
+    if clash is not None and clash.id != user.id:
+        raise ApiError(f'The email "{new_email}" is already in use.', 400,
+                       fields={"new_email": "in use"})
+
+    user.pending_email = new_email
+    verify_token = user_service.generate_email_verify_token(user, email=new_email)
+    verify_url = url_for("auth.verify_email", token=verify_token, _external=True)
+    mail_service.send_email_verification(user, verify_url, email=new_email)
+    audit_service.log_event(user, "request change email", "user", user.id,
+                            f"{user.email} -> {new_email} (pending verification)")
+    db.session.commit()
+    return {"status": "verification_sent", "pending_email": new_email}
+
+
+def delete_my_account(user, current_password):
+    """"Delete my account" = ANONYMIZE the contributor, never erase (§9): every
+    contribution and audit row this member ever made must survive with an
+    intact subject_id, or the provenance trail (ADR-0001) breaks. Requires the
+    current password (this is a one-way door), refuses to strand the family
+    with zero active admins, and writes the audit entry BEFORE scrubbing the
+    row so the trail still names who did it (afterward, ``entry.user`` reads
+    back the neutral placeholder — exactly the "former member" attribution
+    every past row should show too)."""
+    if user_service.authenticate(user.email, current_password) is None:
+        raise ApiError("Your current password isn't right.", 403,
+                       fields={"current_password": "incorrect"})
+
+    if user.is_admin:
+        other_active_admins = (
+            User.query
+            .filter(User.role == Role.ADMIN.value, User.is_active.is_(True),
+                    User.id != user.id)
+            .count())
+        if other_active_admins == 0:
+            raise ApiError(
+                "You're the last active admin — promote someone else before "
+                "deleting this account.", 409, fields={"role": "last active admin"})
+
+    old_email = user.email
+    audit_service.log_event(user, "self-delete", "user", user.id,
+                            f"account anonymized by its own owner ({old_email})")
+
+    user.display_name = "Former member"
+    user.email = f"deleted-user-{user.id}@familyhub.invalid"
+    user.pending_email = None
+    user.email_verified_at = None
+    user.individual_id = None
+    user.is_active = False
+    db.session.commit()
+    return {"status": "anonymized"}

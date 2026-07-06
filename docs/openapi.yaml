@@ -325,6 +325,25 @@ paths:
         - {name: place, in: query, schema: {type: string}}
       responses: {"200": {description: Grouped results, content: {application/json: {schema: {$ref: '#/components/schemas/SearchResults'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
 
+  # --- Account & Security self-service (FE-5) ---------------------------------
+  /api/me:
+    get: {tags: [Account], summary: "My own account snapshot (display_name/email/role/email_verified_at/timezone/individual_id)", responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MeAccount'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+    put: {tags: [Account], summary: "Self-serve edit — display_name/timezone ONLY (role and email are not writable here)", requestBody: {content: {application/json: {schema: {type: object, properties: {display_name: {type: string}, timezone: {type: string, nullable: true, description: "IANA zone name, or null for the site default"}}}}}}, responses: {"200": {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/MeAccount'}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "401": {$ref: '#/components/responses/Unauthorized'}}}
+  /api/me/contributions:
+    get:
+      tags: [Account]
+      summary: "My Contributions dashboard — MY OWN audit rows only (no actor_id parameter exists; that's the Curator-only /api/activity)"
+      parameters:
+        - {name: action, in: query, schema: {type: string}}
+        - {name: subject_type, in: query, schema: {type: string}}
+        - {name: page, in: query, schema: {type: integer, default: 1}}
+        - {name: per_page, in: query, schema: {type: integer, default: 50}}
+      responses: {"200": {description: OK, content: {application/json: {schema: {$ref: '#/components/schemas/MyContributionsPage'}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}
+  /api/me/change-email:
+    post: {tags: [Account], summary: "Self-serve change-email: requires current_password; the address only changes when the emailed verification link is clicked", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [new_email, current_password], properties: {new_email: {type: string}, current_password: {type: string}}}}}}, responses: {"200": {description: "Verification email sent", content: {application/json: {schema: {type: object, properties: {status: {type: string}, pending_email: {type: string}}}}}}, "400": {$ref: '#/components/responses/BadRequest'}, "403": {description: Wrong current password}, "503": {description: Email not configured}}}
+  /api/me/delete:
+    post: {tags: [Account], summary: "\"Delete my account\" = anonymize the contributor, never erase — genealogy data, contributions, and audit rows are untouched", requestBody: {required: true, content: {application/json: {schema: {type: object, required: [current_password], properties: {current_password: {type: string}}}}}}, responses: {"200": {description: "Anonymized and logged out", content: {application/json: {schema: {type: object, properties: {status: {type: string}}}}}}, "403": {description: Wrong current password}, "409": {description: "You're the last active admin"}}}
+
   # --- Account ↔ Person link + tree root (ADR-0002) ---------------------------
   /api/me/person:
     get: {tags: [Account], summary: The current user's linked individual (null if unlinked), responses: {"200": {description: OK, content: {application/json: {schema: {type: object, properties: {individual: {$ref: '#/components/schemas/Individual', nullable: true}}}}}}, "401": {$ref: '#/components/responses/Unauthorized'}}}
@@ -569,6 +588,31 @@ components:
         subject_type: {type: string, enum: [individual, media, note]}
         subject_id: {type: integer}
         created_at: {type: string, format: date-time, readOnly: true}
+    MeAccount:
+      type: object
+      description: The current user's own account snapshot (FE-5 Account & Security page).
+      properties:
+        id: {type: integer, readOnly: true}
+        display_name: {type: string}
+        email: {type: string, readOnly: true, description: not writable via PUT /api/me — see /api/me/change-email}
+        role: {type: string, readOnly: true, description: not writable via PUT /api/me — admin-only}
+        email_verified_at: {type: string, format: date-time, nullable: true}
+        timezone: {type: string, nullable: true, description: "IANA zone name, or null for the site default"}
+        individual_id: {type: integer, nullable: true}
+    MyContributionsPage:
+      type: object
+      description: The My Contributions dashboard — one member's own audit rows, paginated, plus header-card summary counts.
+      properties:
+        activity: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+        page: {type: integer}
+        per_page: {type: integer}
+        total: {type: integer}
+        pages: {type: integer}
+        summary:
+          type: object
+          properties:
+            by_action: {type: object, additionalProperties: {type: integer}}
+            by_subject_type: {type: object, additionalProperties: {type: integer}}
     AccountLink:
       type: object
       description: The Account↔Person link state for one user (ADR-0002).

@@ -261,6 +261,41 @@ def list_activity(action=None, actor_id=None, subject_type=None,
     }
 
 
+# --- "My Contributions" — the current user's OWN rows (FE-5 Account area) -----
+#
+# Strictly own-rows-only BY CONSTRUCTION: this takes a ``user``, not an
+# ``actor_id``, and always filters on ``user.id`` — there is no parameter
+# anywhere in this path that could widen it into the Curator-only full trail
+# (list_activity, above, is what THAT needs).
+
+def my_activity(user, action=None, subject_type=None, page=1, per_page=50):
+    """One member's own audit rows — the My Contributions dashboard. Same
+    action/subject_type filters and pagination shape as ``list_activity``,
+    plus a small summary (counts by action and by subject_type) for the
+    dashboard's header cards."""
+    result = list_activity(action=action, actor_id=user.id,
+                           subject_type=subject_type, page=page, per_page=per_page)
+    result["summary"] = _own_summary(user.id)
+    return result
+
+
+def _own_summary(user_id):
+    """Counts-by-action and counts-by-subject_type across ALL of this user's
+    rows (not just the current page) — the dashboard's header cards."""
+    from app.models import AuditLog
+    from sqlalchemy import func
+
+    by_action = dict(
+        db.session.query(AuditLog.action, func.count(AuditLog.id))
+        .filter(AuditLog.user_id == user_id)
+        .group_by(AuditLog.action).all())
+    by_subject_type = dict(
+        db.session.query(AuditLog.subject_type, func.count(AuditLog.id))
+        .filter(AuditLog.user_id == user_id)
+        .group_by(AuditLog.subject_type).all())
+    return {"by_action": by_action, "by_subject_type": by_subject_type}
+
+
 # --- Member-safe "recent activity" feed for Home (BLOCKERS.md, 2026-07-03) -----
 #
 # The full audit trail above is Curator+ ONLY by design (ADR-0001) — it carries

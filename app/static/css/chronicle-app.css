@@ -644,3 +644,29 @@ fieldset legend, legend.h4 {
 .search-result-row.is-active-option { background: var(--paper-2); }
 .search-result-row__type { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
 .advanced-search__actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+/* ----------------------------------------------------------------------------
+ * 14) RESIDUAL RULES (BLOCKERS.md, 2026-07-05) — migrated verbatim from the
+ * now-deleted app/static/css/style.css, the last 4 rules that survived FE-4's
+ * removal of the pre-Chronicle "elderly-first sizing" layer. Consolidated
+ * here so the app loads one stylesheet instead of two.
+ * --------------------------------------------------------------------------*/
+.hero-banner {
+    max-height: 320px;
+    object-fit: cover;          /* crop, don't squash, the family banner */
+}
+.hero-preview {
+    max-height: 200px;          /* admin settings: current banner preview */
+}
+/* The skip-link target shouldn't show a focus outline when we send focus
+   there programmatically (it's a landmark, not a control) — this file's own
+   :focus-visible rules have no opinion on a plain :focus. */
+#main-content:focus {
+    outline: none;
+}
+/* .chip-group — a layout-only wrapper (no colors/fonts), used by
+   app/templates/people/index.html. */
+.chip-group {
+    display: inline-flex;
+    gap: 0.4rem;
+}

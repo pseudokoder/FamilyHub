@@ -37,7 +37,7 @@ Entry format:
 
 ## Open items
 
-### [OPEN] FE-4 added `app/routes/memories.py` + `app/routes/search.py` + `docs/openapi.yaml` Views entries — BE review at merge
+### [RESOLVED] FE-4 added `app/routes/memories.py` + `app/routes/search.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-05
 - Raised by: FE
 - Blocks: nothing (safe to merge once BE reviews)
@@ -51,7 +51,13 @@ Entry format:
   business logic, schema, or `/api/*` endpoints changed. Confirm it doesn't
   break any existing BE tests (it doesn't — 239/239 green) and sign off at
   merge time.
-- Status: OPEN.
+- Status: **RESOLVED 2026-07-05** — reviewed at merge (already merged to
+  master via PR #15). Both blueprints are view-routing only: every route just
+  `render_template`s a shell page, no direct DB access, no new `/api/*`
+  surface, no schema change. `app/__init__.py` registers both blueprints
+  correctly; the seven `/memories*` + one `/search` OpenAPI Views-tag entries
+  match the routes exactly. Full suite green post-merge. Sign-off complete;
+  no follow-up needed.
 
 ### [OPEN] FE-4 added `app/static/css/style.css` cleanup — BE decides on deleting the file
 - Date: 2026-07-05
@@ -70,7 +76,18 @@ Entry format:
   template. The file is now 40 lines, effectively a small residual file
   rather than a real stylesheet — BE's call whether to delete it outright
   and inline its remaining rules into `chronicle-app.css`, or leave it as is.
-- Status: OPEN.
+- Decision (BE, 2026-07-05): **delete it outright.** A 4-rule residual file
+  that isn't even the app's main stylesheet earns its keep only as a place to
+  find those 4 rules later — inlining them into `chronicle-app.css` (the one
+  stylesheet every Chronicle template already loads) removes a whole file
+  from the include graph for zero loss of clarity. Implemented this session:
+  `app/static/css/style.css` deleted; `.hero-banner`, `.hero-preview`,
+  `.chip-group`, `#main-content:focus` moved verbatim into
+  `app/static/css/chronicle-app.css`; the one remaining `<link>` to
+  `style.css` (`app/templates/base.html`) removed. Full suite still green.
+- Status: **RESOLVED 2026-07-05** — deleted; rules relocated; sign-off above.
+
+### [RESOLVED] FE-3 added `app/routes/tree.py` + `docs/openapi.yaml` Views entries — BE review at merge
 - Date: 2026-07-05
 - Raised by: FE
 - Blocks: nothing (safe to merge once BE reviews)
@@ -82,7 +99,13 @@ Entry format:
   authorized FE to add on-branch. View-routing only — no business logic,
   schema, or `/api/*` endpoints changed. Confirm it doesn't break any existing
   BE tests (it doesn't — 239/239 green) and sign off at merge time.
-- Status: OPEN.
+- Status: **RESOLVED 2026-07-05** — reviewed at merge (already merged to
+  master via PR #13). `tree_bp`'s three routes are view-routing only —
+  each renders a shell template and passes through query params
+  (`family_id`, `a`/`b` for the relationship view) with no direct DB access,
+  no new `/api/*` surface, and no schema change. The three Views-tag OpenAPI
+  entries match the routes exactly. Full suite green post-merge. Sign-off
+  complete; no follow-up needed.
 
 ### [RESOLVED] Person Page "Follow" action has no backend endpoint
 - Date: 2026-07-04

@@ -1008,3 +1008,123 @@ clarification only, no decision changed.
 Docs-only — no app code touched. `pytest` clean (all suites, no count change
 expected since nothing under `app/` or `tests/` changed). No browser check
 applicable.
+
+## BE Gaps: Account self-service for FE-5 (2026-07-05, `be-gaps-fe5`)
+
+FE-5 builds a **My Contributions** dashboard + **Account & Security** page.
+Four member-facing capabilities had no endpoint yet; this session adds all
+four, all under the existing `Account` OpenAPI tag, all gated by nothing more
+than being logged in (own-account-only by construction — none of them take an
+id from the request).
+
+### 1. `GET`/`PUT /api/me` — the account snapshot
+
+`account_service.me_snapshot`/`update_me`. The snapshot is
+display_name/email/role/email_verified_at/timezone/individual_id; the PUT
+only *reads* `display_name` and `timezone` out of the body — role and email
+simply aren't in the set of keys `update_me` looks at, so posting them is a
+no-op rather than a 400 (there's nothing to reject; they're silently not
+among the fields this function touches). `timezone` is validated against
+Python's stdlib `zoneinfo.available_timezones()` — no new dependency, and it's
+the same portable IANA-name approach `settings_service`'s `default_timezone`
+already uses at the site level (§3.5/§5: a per-user value overrides the site
+default; `None` means "use the site default").
+
+### 2. `GET /api/me/contributions` — My Contributions
+
+`write_control.my_activity(user, ...)` reuses `list_activity` (the same
+function `/api/activity` calls) but takes a **User object, not an actor_id**,
+and always filters on `user.id`. That's the whole safety property: there is no
+`actor_id` parameter anywhere in this path for a client to supply, so it can
+never become a side door into the Curator-only full trail — proven in
+`test_contributions_ignores_actor_id_param_no_side_door` (passing
+`?actor_id=<someone else>` is simply ignored; the route never reads it).
+Adds a `summary` block (`by_action`/`by_subject_type` counts, via one
+`GROUP BY` query each) for the dashboard's header cards — computed over the
+user's *entire* history, not just the current page.
+
+### 3. `POST /api/me/change-email` — self-serve, verify-then-apply
+
+This is the one genuinely new piece of machinery: a `users.pending_email`
+column (migration `f3a9c1d5e8b7`) plus an extended
+`user_service.confirm_email_token`. The existing admin change-email
+(`admin_service.change_user_email`) applies the new address **immediately**
+and forces a password reset — appropriate for an admin acting on someone
+else's account, wrong for a member acting on their own: if a stolen session
+posted a change, the real owner would only find out from the forced-reset
+email, after the damage. The self-serve flow instead **stores** the address
+in `pending_email` and only writes it to `email` when the emailed
+verification link is actually clicked. `confirm_email_token` now handles two
+cases from the same `{uid, email}` token shape: the token's email matching
+the CURRENT email (the original re-verify case, unchanged) vs. matching
+`pending_email` (new — this is the branch that performs the actual rename +
+clears `pending_email` + audits it). 503 when mail isn't configured, matching
+every other mail-gated endpoint's convention.
+
+### 4. `POST /api/me/delete` — anonymize, never erase
+
+"Delete my account" cannot mean deleting the row — every audit entry and
+genealogy contribution this member made must keep a valid `subject_id`, or
+ADR-0001's provenance trail breaks for everyone else's history too, not just
+theirs. So `account_service.delete_my_account` requires the current password,
+then: writes the audit entry (`"self-delete"`) FIRST — while `user.email`
+still holds the real address, so the *detail* string names who did it — then
+overwrites `display_name`/`email` with neutral placeholders
+(`"Former member"` / `deleted-user-<id>@familyhub.invalid`), clears
+`pending_email`/`email_verified_at`/`individual_id`, and flips `is_active` to
+`False`. Nothing else is touched: no genealogy row, no other audit row. Because
+`AuditLog.user` is a live relationship (not a snapshotted name), every past
+audit row this user ever generated now reads back as "Former member" too —
+which is exactly the "neutral former-member attribution" the brief asked for,
+for free, with no backfill needed. Blocked 409 if the caller is the **last
+active admin** (`User.role == 'admin' AND is_active`, excluding self) — the
+one guard rule, since every other member can always be safely anonymized. The
+route logs the browser out immediately after (`flask_login.logout_user()`);
+`is_active=False` would also block the *next* request anyway, this just skips
+that one extra round trip.
+
+No TOTP/MFA surface was touched or added — that stays a v2 seam (§9 Tier-3),
+per the brief.
+
+### BLOCKERS.md hygiene
+
+Fixed a formatting accident from the FE-4 commit: it had overwritten the FE-3
+`tree_bp` entry's own `### ` heading with the new style.css entry's heading,
+leaving the FE-3 review body orphaned under the wrong title (one heading, two
+`Status:` lines). Gave it back its own `### [RESOLVED] FE-3 added
+app/routes/tree.py...` heading — no history deleted, just re-titled.
+
+Reviewed and signed off both outstanding cross-builder items: FE-3's `tree_bp`
+and FE-4's `memories_bp`/`search_bp` are both pure view-routing (every route
+just `render_template`s a shell, no DB access, no new `/api/*` surface) with
+matching `app/__init__.py` registrations and OpenAPI Views-tag entries — both
+marked RESOLVED.
+
+Decided the `style.css` question (FE-4's second OPEN entry): **deleted the
+file outright.** A 4-rule residual file earns its keep only as "a place to
+find those 4 rules" — folding `.hero-banner`/`.hero-preview`/`.chip-group`/
+`#main-content:focus` verbatim into `chronicle-app.css` (already loaded on
+every Chronicle page) removes a whole file from the include graph for zero
+loss of clarity. Two other references needed updating to avoid dead links:
+`app/templates/offline.html`'s standalone `<link>` (it can't extend
+`base.html` — the PWA offline page must render entirely from the service
+worker's precache) now points at `chronicle-app.css`, and `app/static/js/
+sw.js`'s `SHELL` precache list + cache name (`familyhub-shell-v3` →
+`-v4`, so old clients don't keep serving a cached `style.css` request that
+now 404s). Verified in a real browser: `/static/css/style.css` now 404s live,
+`/offline` fetches clean, and the migrated rules are present and applied in
+the served `chronicle-app.css`.
+
+### Manual Testing Checklist (be-gaps-fe5)
+
+Verified in a real browser via the preview tool: dashboard renders styled
+after the CSS consolidation (no missing rules), `/offline` loads its one
+stylesheet without a 404, dev DB migrated cleanly with `flask db upgrade`
+(the fresh `pending_email` column). New test file
+`tests/test_api_account_self_service.py` (21 tests): snapshot shape,
+timezone validation, role/email non-writability, own-rows-only
+contributions (including the no-side-door proof), filter/summary math,
+the full change-email pending→verify→applied round trip via a real
+`/auth/verify-email/<token>` hit, the 503-when-unconfigured case, and
+delete/anonymize including the last-active-admin 409. Full suite: **260
+passed** (up from 239 pre-session).
