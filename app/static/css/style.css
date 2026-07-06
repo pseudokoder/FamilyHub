@@ -1,186 +1,46 @@
 /*
- * FamilyHub — elderly-first stylesheet.
+ * FamilyHub — residual stylesheet.
  *
- * TEACHING NOTE (D277 Front-End Web Development): Bootstrap gives us a solid
- * baseline, but its defaults are tuned for general audiences. Our primary
- * users are aging parents, so we override a few things globally:
+ * FE-4 (owner directive, ADR-0004): this file used to carry an "elderly-
+ * first" sizing layer (18px root font, jumbo buttons/inputs, an oversized
+ * hardcoded-blue focus ring) left over from before the Chronicle design
+ * language existed. Two problems with keeping it:
  *
- *   1. Bigger base font  — WCAG accessibility guidance: never make users
- *      squint. 18px base instead of Bootstrap's 16px.
- *   2. Bigger tap targets — fingers get less precise with age; every button
- *      gets generous padding so it's hard to miss.
- *   3. High contrast     — dark text on light backgrounds, obvious focus
- *      rings for keyboard users.
+ *   1. It loaded AFTER chronicle-app.css in base.html (see that file's
+ *      <link> order), so its bigger .btn/.form-control/.form-label rules
+ *      won the cascade and silently overrode Chronicle's own type scale on
+ *      every authenticated page.
+ *   2. `html { font-size: 18px }` changed what `1rem` MEANS everywhere —
+ *      chronicle-main.css's entire --space-*/clamp() token system assumes
+ *      the browser default (16px) root, so this one line was quietly
+ *      scaling the whole app up ~12%.
  *
- * Why a separate stylesheet instead of inline styles? Separation of concerns:
- * templates describe STRUCTURE, CSS describes PRESENTATION. One change here
- * restyles the whole site (you'll meet this principle again in D276 Web
- * Development Foundations).
+ * Per the owner: large-print support is the browser/OS's job (pinch-zoom,
+ * ctrl-+, OS text scaling) — the app should not force large type on every
+ * visitor. Removed rather than migrated. What's left below are the handful
+ * of rules that are still real (referenced by a current template) and were
+ * never part of the sizing layer.
  */
 
-/* 1. Bigger, more readable text everywhere */
-html {
-    font-size: 18px;
-}
-
-body {
-    /* System font stack: crisp on Windows, Mac, and the parents' iPads alike */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                 "Helvetica Neue", Arial, sans-serif;
-    color: #1a1a1a;             /* near-black on white = maximum contrast */
-    background-color: #fafafa;
-}
-
-/* 2. Big, obvious, hard-to-miss buttons */
-.btn {
-    padding: 0.65rem 1.4rem;
-    font-size: 1.1rem;
-    border-radius: 0.5rem;
-}
-
-.btn-lg {
-    padding: 0.9rem 2rem;
-    font-size: 1.3rem;
-}
-
-/* Giant "dashboard" buttons on the home page — the main navigation for
-   the least tech-savvy users. One big button per activity. */
-.btn-dashboard {
-    display: block;
-    width: 100%;
-    padding: 1.5rem;
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-}
-
-/* 3. Forms that are easy to see and easy to hit */
-.form-control, .form-select {
-    font-size: 1.15rem;
-    padding: 0.65rem 0.9rem;
-}
-
-.form-label {
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-/* Obvious focus ring — helps keyboard users and anyone who loses the cursor */
-.form-control:focus, .btn:focus, a:focus {
-    outline: 3px solid #2563eb;
-    outline-offset: 2px;
-}
-
-/* Bigger checkboxes ("remember me", admin flags) */
-.form-check-input {
-    width: 1.4em;
-    height: 1.4em;
-}
-.form-check-label {
-    padding-left: 0.4rem;
-    font-size: 1.1rem;
-}
-
-/* Navbar: larger brand and links than Bootstrap defaults */
-.navbar-brand {
-    font-size: 1.5rem;
-    font-weight: 700;
-}
-.nav-link {
-    font-size: 1.15rem;
-}
-
-/* Photo gallery: card grid with comfortable spacing */
-.photo-card img {
-    width: 100%;
-    height: 240px;
-    object-fit: cover;          /* crop to fill — keeps the grid tidy */
-    border-radius: 0.5rem 0.5rem 0 0;
-}
-
-.album-card {
-    transition: box-shadow 0.15s ease-in-out;
-}
-.album-card:hover {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25); /* obvious "clickable" cue */
-}
-
-/* The photo-detail page shows the full image, never wider than the screen */
-.photo-full {
-    max-width: 100%;
-    height: auto;
-    border-radius: 0.5rem;
-}
-
-/* Flash messages (success/error banners) need to be unmissable */
-.alert {
-    font-size: 1.15rem;
-    padding: 1rem 1.25rem;
-}
-
-/* Skip-to-content link (accessibility): parked off-screen until a keyboard
-   user Tabs to it, then it snaps into the top-left corner as a real,
-   visible button. Mouse users never see it; keyboard/screen-reader users
-   skip the whole navbar with one press. */
-.skip-link {
-    position: absolute;
-    left: -999px;
-    top: 0;
-    z-index: 2000;
-    padding: 0.75rem 1.25rem;
-    background: #0d6efd;
-    color: #fff;
-    font-size: 1.1rem;
-    border-radius: 0 0 0.5rem 0;
-}
-.skip-link:focus {
-    left: 0;                    /* yanked on-screen the moment it's focused */
-}
-/* The target shouldn't show a focus outline when we send focus there
-   programmatically via the skip link (it's a landmark, not a control). */
-#main-content:focus {
-    outline: none;
-}
-
-/* Drag-to-rearrange: the "ghost" is the placeholder SortableJS shows in
-   the spot where the dragged photo will land — faded + outlined so the
-   eye can see the future position while the hand is mid-drag. */
-.drag-ghost {
-    opacity: 0.4;
-    outline: 3px dashed #2563eb;
-    outline-offset: -3px;
-}
-
-/* These classes replaced inline style="..." attributes when the strict
-   Content-Security-Policy landed (DEVDIARY Ch. 19): CSP forbids inline
-   styles unless you weaken it with 'unsafe-inline', and moving five
-   styles here was cheaper than weakening the policy for the whole site. */
+/* Dashboard hero banner + admin's current-hero preview (WP4/admin, unrelated
+ * to elderly sizing — real img-fluid crop rules). */
 .hero-banner {
     max-height: 320px;
     object-fit: cover;          /* crop, don't squash, the family banner */
-}
-.infobox-card {
-    max-width: 26rem;           /* the wiki page's little fact box */
-}
-.album-cover-placeholder {      /* empty album: a big friendly camera */
-    height: 240px;
-    font-size: 4rem;
-}
-.photo-preview {
-    max-height: 320px;          /* caption-edit page: photo above the box */
 }
 .hero-preview {
     max-height: 200px;          /* admin settings: current banner preview */
 }
 
-/* ============================================================================
- * The WP4 app-shell rules that used to live here (Quick Add tiles, On This
- * Day, stat strip, filter chips, person rows) moved to chronicle-app.css in
- * WP5 — the authenticated app is now styled in Chronicle, not plain
- * Bootstrap. See docs/FRONTEND_DESIGN.md's WP5 decision log.
- * ==========================================================================*/
+/* The target shouldn't show a focus outline when we send focus there
+   programmatically via the skip link (it's a landmark, not a control) —
+   chronicle-main.css's own :focus-visible rule has no opinion on this. */
+#main-content:focus {
+    outline: none;
+}
 
-/* .chip-group survives here unchanged — it's a layout-only wrapper (no
-   colors/fonts to migrate) still used by app/templates/people/index.html. */
+/* .chip-group — a layout-only wrapper (no colors/fonts to migrate), still
+   used by app/templates/people/index.html. */
 .chip-group {
     display: inline-flex;
     gap: 0.4rem;

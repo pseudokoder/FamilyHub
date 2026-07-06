@@ -801,3 +801,217 @@ would want: swap the rendering layer, keep the same graph-slice consumption
 contract (`GET /api/individuals/{id}/pedigree`, lazy-fetched per node). The
 Relationship Finder's two independent picker components are a natural mapping
 to two instances of one Angular `PersonPickerComponent`.
+
+---
+
+## FE-4 — Memories (Album Views + Stories), Search, and the Elderly-First Sizing Strip
+
+**Branch:** `fe4-memories-search`
+**Date:** 2026-07-05
+**Status:** Implementation complete; full suite green; pending owner review + merge.
+
+### What FE-4 Delivered
+
+**Task 0 (owner directive, ADR-0004):** stripped the leftover pre-Chronicle
+"elderly-first" sizing layer out of `app/static/css/style.css` — it was
+loading AFTER `chronicle-app.css` and silently winning the cascade on every
+authenticated page since WP5 shipped. Dropped `.display-6` from the three
+error pages (the known one-line fix from the FE-3 log).
+
+**Memories** — the nav's `coming-soon` link is now a real section: a new
+`app/routes/memories.py` blueprint (`GET /memories`, `/memories/person`,
+`/memories/family`, `/memories/event`, `/memories/stories`,
+`/memories/stories/new`, `/memories/stories/<id>`), all client-rendered by
+two new scripts against the WP2 JSON API.
+
+- **Chronological** (the default) — every photo by capture date, falling
+  back to upload date (visibly labeled) via `GET /api/media?order_by=
+  capture`; the section's "+ Upload a photo" entry point (unlinked uploads —
+  link them to someone later).
+- **By Person** — a person picker, then `GET /api/media?subject_type=
+  individual&subject_id=` (the exact call the Person Page's own Photos tab
+  already uses).
+- **By Family** — a family picker, then a client-side aggregation over the
+  family itself, its own events, and its members' events (defined and
+  justified in `docs/FRONTEND_DESIGN.md`'s 2026-07-05 entry — no missing
+  backend capability, no blocker filed).
+- **By Event** — every event with a linked photo, grouped, no picker (a
+  whole-archive view, same spirit as Chronological).
+- **Photo Detail** — extends FE-2's simple lightbox: full metadata, every
+  link as a navigable chip (an event link resolves to ITS subject, since
+  events have no page of their own), Contributor+ edit metadata/manage
+  links/soft-delete.
+- **Stories** — the memory-blog lane over the same `notes` table: a list
+  (newest first), a read view (rendered Markdown, "About" links, Contributor+
+  edit/manage-links/delete), and a "Write a Story" flow (title, content,
+  format, shared-note flag, an optional who/what-it's-about picker) —
+  Contributor+ gated the `people/show.html` way (an honest message for a
+  Viewer who lands there directly, not a form that would just 403).
+
+**Search** — the nav's `coming-soon` link is now `app/routes/search.py`
+(`GET /search`), Quick and Advanced hash-switched on one page (`#quick`/
+`#advanced`, the Person Page's own tab pattern), plus a header quick-search
+overlay reachable from any authenticated page (a Tier-2 design call, logged
+in `docs/FRONTEND_DESIGN.md`).
+
+- **Quick** — search-as-you-type across people AND families (families have
+  no name of their own; matched against the `partner1`/`partner2` strings
+  `GET /api/families` already computes), keyboard-navigable (arrow keys +
+  Enter), each result navigates straight to its page.
+- **Advanced** — every field Master Plan §12 promises: given/surname
+  (partial), sex, living/deceased, birth AND death year ranges, place, plus
+  full-text over notes/bios (the `q` parameter already does double duty —
+  see the design-log entry for why death-year-range needed no blocker).
+
+Full decision log (the `fh-common.js` extraction and why it's scoped to only
+the new pages, the "one photo store" upload-then-link philosophy, the
+capture-date depth-bar fix, the Search design calls, and two real bugs found
+in the browser) is in `docs/FRONTEND_DESIGN.md`'s 2026-07-05 entry — not
+duplicated here.
+
+### Depth-Bar / Design Decisions Worth Recording
+
+- **A photo can be uploaded with no subject at all** (`POST /api/media` only
+  requires `file`) — the Memories upload form takes advantage of this on
+  purpose; "who this is of" is a Photo Detail "manage links" action, not a
+  required upload field, matching how a real family actually digitizes a box
+  of old prints.
+- **The Memories upload/edit forms are the first to populate
+  `capture_date_sort`**, not just `capture_date` — using the same fuzzy-date
+  group (Precision/Year/Month/Day) events/vitals already use, generalized
+  into `fh-common.js`. Photos uploaded through FE-2's older, simpler form
+  keep falling back to upload-date ordering; that's the documented fallback
+  behavior working as designed, not a regression.
+- **`fh-common.js` is new, but `person.js`/`tree.js`/`people.js` are
+  untouched.** Extracting shared helpers into a refactor of three already-
+  shipped, browser-verified files was judged out of this brief's scope
+  (unrequested, and riskier than the duplication it would remove); the new
+  module exists so the THREE NEW files this WP adds don't duplicate each
+  other instead.
+- **Death-year range is a client-side filter, not a `BLOCKERS.md` entry** —
+  `GET /api/search` has no `death_from`/`death_to` parameter, but
+  `PersonListItem.death_year` is a real field on every row the server
+  already returns, so filtering the already-filtered result set client-side
+  is a design/implementation choice (same shape as People's client-side
+  sort), not a missing capability.
+
+### Files Created or Modified
+
+| File | Status | Notes |
+|---|---|---|
+| `app/routes/memories.py`, `app/routes/search.py` | Created | New blueprints, thin view routes |
+| `app/__init__.py` | Modified | Registered both blueprints |
+| `app/templates/memories/*.html`, `app/templates/search/index.html` | Created | Thin shells; all rendering is client-side |
+| `app/templates/base.html` | Modified | Nav links now real; header search button + overlay; `api.js`/`fh-common.js`/`search.js` now load app-wide |
+| `app/templates/dashboard.html` | Modified | Quick Add Photo/Story tiles wired to real routes |
+| `app/templates/errors/{403,429,500}.html` | Modified | Task 0: dropped `.display-6` |
+| `app/static/js/{memories,stories,search,fh-common}.js` | Created | New section scripts + the shared helper module |
+| `app/static/css/style.css` | Modified | Task 0 strip (see design log) |
+| `app/static/css/chronicle-app.css` | Modified | `.tree-subnav` generalized to `.subnav`/`.tree-subnav`; new Memories/Photo-Detail/Stories/Search sections; two browser-bug fixes (see below) |
+| `app/static/js/sw.js` | Modified | Bumped the PWA shell cache version |
+| `docs/openapi.yaml` | Modified | Nine new Views-tag paths |
+| `docs/FRONTEND_DESIGN.md` | Modified | 2026-07-05 decision-log entry |
+
+### Manual Testing Checklist
+
+> Clear this section once the owner has done a browser pass and confirmed green.
+
+- [x] Logged in as the seeded Contributor (`jo@example.com`): uploaded a
+      photo with a fuzzy capture date (Chronological), confirmed it sorts
+      correctly; opened Photo Detail on a seeded photo — edited metadata,
+      added a link (search-as-you-type to a person), removed a link, all
+      persisted and re-rendered correctly.
+- [x] By Person / By Family / By Event — picker-driven views resolve to the
+      right album; By Family's aggregation correctly pulled in a photo linked
+      to a member's own event, not just the family's own direct links.
+- [x] Stories — list, read view, "Write a Story" (title/Markdown content with
+      live preview/format/shared flag/subject picker) end-to-end, then
+      Edit and Delete on the same story — all correct.
+- [x] Quick search (header overlay AND the `/search` page) — people and
+      families both appear, arrow-key navigation highlights rows, Enter/click
+      navigates to the right page.
+- [x] Advanced search — every §12 field, including a death-year-range query
+      and a full-text keyword query that correctly matched and linked to a
+      story.
+- [x] Logged in as the seeded Viewer (`pat@example.com`) — no upload forms,
+      no Edit/Add-a-link/Delete anywhere in Memories or Stories, "Write a
+      Story" shows the honest access message instead of a form; read/browse/
+      search still fully work.
+- [x] 375px viewport: Memories subnav wraps to two rows; the fuzzy-date group
+      shows 2-up instead of squeezed 4-up; Photo Detail stacks image-above-
+      panel; Search's Quick/Advanced tabs and every form field stack cleanly.
+- [x] Zero browser console errors / CSP violations across every new page and
+      both roles tested.
+- [x] 239/239 tests green (nine new routes; `test_openapi.py`'s route-map
+      sync test needed the matching `docs/openapi.yaml` entries, added on
+      this branch).
+
+### Two Bugs Found and Fixed in the Browser
+
+1. **Bootstrap's breakpoint columns key off viewport width, not the
+   immediate container's width.** The fuzzy-date fields squeezed unreadably
+   into one row inside the 340px Photo Detail panel even on a wide desktop
+   viewport, because `col-md-3` computes 25% against whatever satisfies the
+   `≥768px` media query — the *viewport* — not the actual 340px container
+   holding it. Fixed with `col-6 col-md-3` in the shared component (helps
+   real narrow phones) plus a scoped override forcing full-width stacking
+   inside `.photo-detail__panel` specifically (which is narrow
+   unconditionally, regardless of viewport).
+2. **The new header search button overlapped the brand wordmark at 375px.**
+   `.header-actions` gained one more fixed-width child; `.brand`'s text
+   doesn't shrink just from being a flex item without `min-width: 0`. Fixed
+   with a `body.app-shell`-scoped media rule (shrinks the wordmark, hides the
+   tagline below 400px) that leaves the public page's header (no search
+   button there) completely untouched.
+
+### A Non-Bug Worth Recording (Again): the PWA Service Worker Cache
+
+FE-3's diary already documented `sw.js`'s cache-first `/static/` strategy as
+the reason a served file being byte-correct doesn't prove the browser is
+running it. This session hit the exact same trap repeatedly while iterating
+on the two bugs above — `pwa.js` re-registers the service worker on every
+page load, so even after manually unregistering it mid-session to force a
+fresh fetch, the NEXT reload silently re-registered it and re-cached
+whatever was being served at that moment. Confirming a fix required clearing
+Cache Storage (or bumping `CACHE`) before every single re-check. Not a new
+finding — a repeat encounter that reinforces FE-3's one. `CACHE` bumped to
+`"familyhub-shell-v3"`.
+
+### Cross-Boundary Touches
+
+`docs/openapi.yaml`'s Views tag gained nine paths (the Memories + Search view
+routes) — no other section of the spec changed, and no Flask routes/models/
+services outside the two new, FE-owned blueprint files were touched. Per the
+branch-per-WP protocol, this is a doc-only cross-lane edit for BE to
+spot-check at merge; logged in `BLOCKERS.md` alongside a second entry noting
+the `style.css` cleanup, since BE owns the call on whether to delete that
+file now that it's down to four rules.
+
+### WGU Connections
+
+- **D276/D280** — `fh-common.js` is Jinja/JS component extraction applied to
+  vanilla script files instead of a framework: one canonical
+  `subjectPicker()`/`renderNoteContent()`/fuzzy-date group used by three
+  pages instead of three copies.
+- **D278/D279 Front-End, D281 UI Design** — the Bootstrap breakpoint bug is a
+  concrete lesson in the difference between viewport-relative and
+  container-relative responsive design (the "container query" gap), and the
+  header-overlap bug is a concrete lesson in why flex items need
+  `min-width: 0` to actually shrink instead of overflowing.
+- **D286 Discrete Mathematics II / D287 Database** — By Family's aggregation
+  is a small, explicit set-union computed client-side (family's direct links
+  ∪ family-event links ∪ member-event links, deduplicated by media id) over
+  data the server already exposes per-subject, rather than a new query.
+- **D315 Security** — `renderNoteContent()` escapes raw Markdown BEFORE any
+  HTML is built, same discipline as every other rendered field in this app;
+  CSP-strict throughout, no inline styles/scripts anywhere in the new code.
+
+### v2 Spring Boot Migration Notes
+
+Every new page still follows the "Flask renders a shell, JS calls the JSON
+API" split, so nothing here is thrown away in the rewrite: `MemoriesController`
+and `SearchController` map directly to the two new blueprints, and
+`fh-common.js`'s helpers (the subject picker, the Markdown renderer, the
+fuzzy-date group) are natural candidates for shared Angular components/
+pipes rather than page-specific code, since v1 already proved they're needed
+in more than one place.

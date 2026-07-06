@@ -1,0 +1,30 @@
+{# memories/index.html — Chronological (the Memories section's default
+   landing page, Master Plan §4, FE-4): every photo ordered by capture date,
+   falling back to upload date (visibly labeled) when none exists. Also the
+   section's "+ Upload a photo" entry point — Home's Quick Add Photo tile
+   lands here. Entirely client-rendered by memories.js against GET
+   /api/media?order_by=capture. #}
+{% extends "base.html" %}
+
+{% block title %}Memories{% endblock %}
+
+{% block content %}
+<div id="memoriesPage" data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+    {% set active = 'chronological' %}
+    {% include "memories/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">Memories</h1>
+        <p class="text-muted mb-0">Every photo in the archive, in the order it happened.</p>
+    </header>
+
+    <div id="chronologicalView">
+        <div id="chronologicalUpload"></div>
+        <div id="chronologicalGrid"><p class="text-muted">Loading…</p></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/memories.js') }}"></script>
+{% endblock %}

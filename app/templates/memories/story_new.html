@@ -1,0 +1,23 @@
+{# memories/story_new.html — Write a Story (FE-4, Master Plan §5A depth bar):
+   title, content (Markdown, live-previewed), format, shared-note flag, and
+   an optional "who/what it's about" link picker. Contributor+ is a
+   template/JS-rendered affordance (data-can-contribute — the people/show.html
+   convention); the route stays login_required and the API enforces the real
+   write permission. #}
+{% extends "base.html" %}
+
+{% block title %}Write a Story{% endblock %}
+
+{% block content %}
+<div id="storyNewView" data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+    {% set active = 'stories' %}
+    {% include "memories/_subnav.html" %}
+
+    <h1 class="mb-3">Write a Story</h1>
+    <div id="storyNewForm"><p class="text-muted">Loading…</p></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stories.js') }}"></script>
+{% endblock %}

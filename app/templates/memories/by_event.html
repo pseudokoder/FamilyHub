@@ -1,0 +1,26 @@
+{# memories/by_event.html — By Event album view (FE-4): every event that has
+   at least one linked photo, grouped (weddings, reunions…). A whole-archive
+   view — no picker, same spirit as Chronological. #}
+{% extends "base.html" %}
+
+{% block title %}Memories — By Event{% endblock %}
+
+{% block content %}
+<div id="memoriesPage" data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+    {% set active = 'event' %}
+    {% include "memories/_subnav.html" %}
+
+    <header class="mb-3">
+        <h1 class="mb-0">By Event</h1>
+        <p class="text-muted mb-0">Weddings, reunions, and every other occasion with a photo attached.</p>
+    </header>
+
+    <div id="byEventView">
+        <div id="byEventList"><p class="text-muted">Loading…</p></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/memories.js') }}"></script>
+{% endblock %}

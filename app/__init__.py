@@ -189,7 +189,9 @@ def create_app(config_class=Config):
     from app.routes.api import api_bp
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
+    from app.routes.memories import memories_bp
     from app.routes.people import people_bp
+    from app.routes.search import search_bp
     from app.routes.tree import tree_bp
 
     app.register_blueprint(main_bp)
@@ -199,6 +201,10 @@ def create_app(config_class=Config):
     app.register_blueprint(people_bp)
     # FE-3 (Cowork): Pedigree/Family Group/Relationship pages — see routes/tree.py.
     app.register_blueprint(tree_bp)
+    # FE-4 (Cowork): Memories (album views + Stories) — see routes/memories.py.
+    app.register_blueprint(memories_bp)
+    # FE-4 (Cowork): Quick + Advanced search — see routes/search.py.
+    app.register_blueprint(search_bp)
     # The WP2 JSON API (Master Plan §6/§7) — the contract Cowork builds WP3 on.
     app.register_blueprint(api_bp)
 

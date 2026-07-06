@@ -1,0 +1,20 @@
+{# memories/story_show.html — one story's read view (FE-4): rendered
+   Markdown, who/what it's about (every link navigates), and Contributor+
+   inline Edit / manage-links / soft-delete. #}
+{% extends "base.html" %}
+
+{% block title %}Story{% endblock %}
+
+{% block content %}
+<div id="storyShowView" data-note-id="{{ note_id }}"
+     data-can-contribute="{{ 'true' if current_user.has_role('contributor') else 'false' }}">
+    {% set active = 'stories' %}
+    {% include "memories/_subnav.html" %}
+
+    <div id="storyShowBody"><p class="text-muted">Loading this story…</p></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stories.js') }}"></script>
+{% endblock %}
